@@ -45,6 +45,8 @@ class WatchedNotifier @Inject constructor(
             cancel()
             return
         }
+        // Blocked: skip the call and record nothing, so the threads still alert once notifications are allowed.
+        if (!canNotify()) return
         val me = settings.account.first()?.userId
         val before = notified.all().associate { it.threadId to it.lastDate }
         val plan = planAlert(watched.fetchUnread(), before, me, s.ignoreOwnRepliesWatched)
@@ -87,7 +89,6 @@ class WatchedNotifier @Inject constructor(
     // canNotify() checks POST_NOTIFICATIONS; lint does not follow the helper.
     @SuppressLint("MissingPermission")
     private fun show(threads: List<WatchedThread>, alert: Boolean) {
-        if (!canNotify()) return
         createChannel()
         val res = context.resources
         val posts = threads.sumOf { it.unreadCount }

@@ -160,9 +160,19 @@ fun NotificationOptions(settings: Settings, onWatchedNotify: (Boolean) -> Unit, 
         allowed = notificationsAllowed(context)
         onPauseOrDispose {}
     }
+    val openSystemSettings = {
+        context.startActivity(
+            Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName),
+        )
+    }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         allowed = notificationsAllowed(context)
-        if (granted) onWatchedNotify(true)
+        when {
+            granted -> onWatchedNotify(true)
+            // Refused from the "blocked" line (or refused for good, so no dialog showed): the system settings can still allow it.
+            settings.watchedNotify -> openSystemSettings()
+        }
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(stringResource(R.string.setup_notify_watched), Modifier.weight(1f))
@@ -180,10 +190,7 @@ fun NotificationOptions(settings: Settings, onWatchedNotify: (Boolean) -> Unit, 
     if (settings.watchedNotify && !allowed) {
         TextButton(
             onClick = {
-                context.startActivity(
-                    Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName),
-                )
+                if (Build.VERSION.SDK_INT >= 33 && !hasPermission(context)) permission.launch(Manifest.permission.POST_NOTIFICATIONS) else openSystemSettings()
             },
         ) { Text(stringResource(R.string.setup_notify_blocked)) }
     }
