@@ -1,0 +1,3 @@
+{ "name": "whirldroid-capture", "private": true, "type": "module",
+  "scripts": { "public": "node capture.mjs public.json ../../fixtures/html", "api": "./make_api_list.sh api.json && node capture.mjs api.json ../../fixtures/api" },
+  "devDependencies": { "playwright": "^1.60.0" } }

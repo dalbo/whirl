@@ -1,0 +1,80 @@
+name: Release
+
+# The only way a release is published: push a tag vMAJOR.MINOR.PATCH.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+env:
+  # Google Play's minimum targetSdk for new apps and updates (raised each August).
+  PLAY_MIN_TARGET_SDK: 36
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+
+      - name: Version from tag
+        id: version
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Tag $GITHUB_REF_NAME is not vMAJOR.MINOR.PATCH"; exit 1; }
+          echo "name=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          awk -v tag="## $GITHUB_REF_NAME" '$0==tag{f=1;next} /^## /{f=0} f' CHANGELOG.md > notes.md
+          [ -s notes.md ] || { echo "CHANGELOG.md has no '## $GITHUB_REF_NAME' section"; exit 1; }
+
+      - name: Decode keystore
+        env:
+          SIGNING_KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_B64 }}
+        run: |
+          [ -n "$SIGNING_KEYSTORE_B64" ] || { echo "SIGNING_KEYSTORE_B64 secret missing"; exit 1; }
+          echo "$SIGNING_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+      - name: Test and build signed APK + AAB
+        env:
+          WHIRL_KEYSTORE_FILE: ${{ runner.temp }}/release.jks
+          WHIRL_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          WHIRL_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          WHIRL_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: ./gradlew -Pwhirl.version=${{ steps.version.outputs.name }} test assembleRelease bundleRelease --stacktrace
+
+      - name: Verify signature and targetSdk
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          APK=app/build/outputs/apk/release/app-release.apk
+          "$BT/apksigner" verify --print-certs "$APK" | grep -E 'Signer #1 certificate (DN|SHA-256)'
+          target=$("$BT/aapt2" dump badging "$APK" | sed -n "s/^targetSdkVersion:'\([0-9]*\)'.*/\1/p")
+          echo "targetSdk=$target (Play minimum $PLAY_MIN_TARGET_SDK)"
+          [ "$target" -ge "$PLAY_MIN_TARGET_SDK" ]
+
+      - name: Collect artefacts
+        run: |
+          mkdir dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/whirl-${GITHUB_REF_NAME}.apk"
+          cp app/build/outputs/bundle/release/app-release.aab "dist/whirl-${GITHUB_REF_NAME}.aab"
+          (cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          { echo; echo '### SHA-256'; echo '```'; cat dist/SHA256SUMS.txt; echo '```'; } >> notes.md
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pre=""; [[ "$GITHUB_REF_NAME" == v0.* ]] && pre="--prerelease"
+          gh release create "$GITHUB_REF_NAME" dist/* --title "Whirl $GITHUB_REF_NAME" --notes-file notes.md $pre
+
+      # Play upload (r0adkll/upload-google-play to the internal track) is added once a Play developer account exists.

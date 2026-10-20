@@ -1,0 +1,15 @@
+tools/capture/api*.json
+tools/capture/node_modules/
+reference/legacy-whirldroid/
+reference/whirldroid-2.14.12-decompiled/
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+captures/
+*.jks
+*.keystore
+signing.env
+tools/spike/results-*.txt

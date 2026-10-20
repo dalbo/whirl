@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<title>Not signed in</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="format-detection" content="telephone=no">
+	<meta name="HandheldFriendly" content="True">
+	<meta name="ROBOTS" content="NOINDEX,NOFOLLOW">
+	
+	
+	<link rel="stylesheet" href="https://whirlpool.net.au/skin/style-alert.css?7b3f96983aec">
+	<script src="https://whirlpool.net.au/skin/script.js?f1b0467876ef"></script>
+	
+		<script src="https://whirlpool.net.au/skin/script-mod.js?23af004f6da8"></script>
+	
+	<script>
+	var loggedin = false;
+	var user_id = 1;
+	</script>
+	
+	
+</head>
+<body class="brown">
+<main>
+	<div id="alert">
+		
+		<h1>You must be registered and signed in to view this page.</h1>
+		
+		
+		
+		
+				
+				
+
+
+
+
+<div id="dataentry">
+<form method="post" action="#" style="margin:0;"  onsubmit="return login_exec();">
+<input type="Hidden" name="action" value="login">
+
+<table>
+	<colgroup>
+		<col width="40%">
+		<col width="60%">
+	</colgroup>
+	<tbody valign="top">
+	
+	
+	<tr>
+		<th colspan="2">Sign in</th>
+	</tr>
+	<tr>
+		<td class="label">Username</td>
+		<td class="value"><input type="text" name="user" id="username" autocomplete="username" size="22" tabindex="1" maxlength="30" value="" autofocus autocorrect="off" autocapitalize="off" spellcheck="false"></td>
+	</tr>
+	<tr>
+		<td class="label">Password</td>
+		<td class="value"><input type="password" name="pass" id="password" autocomplete="current-password" size="22" tabindex="2" maxlength="150"></td>
+	</tr>
+	<tr id="show_totp" style="display:none;">
+		<td class="label"><label for="token">Authentication code</label></td>
+		<td class="value">
+			<input type="text" name="token" id="token" class="token" autocomplete="one-time-code" tabindex="3" size="7" maxlength="7" placeholder="2FA" pattern="[0-9]*" inputmode="numeric"
+					onkeyup="totp_sanitise(this);" onblur="totp_sanitise(this);">
+			<span style="display:none; font-size:12px; color:#333;" id="show_mobile"><br>
+			Don't have your authenticator handy? <a href="#" style="text-decoration:underline;" onclick="send_sms(); return false;">Send SMS</a>
+			</span>
+		</td>
+	</tr>
+	<tr>
+		<td class="label">Method</td>
+		<td class="value">
+			<input type="checkbox" id="remember" name="remember" value="1" tabindex="4" checked><label for="remember"> Remember me on this device</label>
+		</td>
+	</tr>
+	<tr>
+		<td class="label"></td>
+		<td class="value"><input type="Submit" value="Log in" tabindex="5">
+			<div class="note"></div>
+			</td>
+	</tr>
+	
+	<tr id="passkey_row" style="display:none;">
+		<td class="label"></td>
+		<td class="value"><button type="button" tabindex="6" onclick="passkey_login();">Sign in with a passkey</button></td>
+	</tr>
+	
+	
+	</tbody>
+</table>
+</form>
+<div id="login_note"></div>
+</div>
+
+<script>
+
+
+var loginaction = "/forum/index.cfm?action=threads&f=1&";
+
+
+var loginAjaxTimer = null;
+
+function totp_sanitise(totpField) {
+	var totpElem = document.getElementById('show_totp');
+	// Strip anything which isn't a number
+	totpField.value = totpField.value.replace(/[^\d]+/g,'');
+	// If it's been auto-filled while invisible, make it visible
+	if (totpField.value.length == 6 && totpElem.style.display != '') { totpElem.style.display = ''; }
+	// Don't cancel default action (irrelevant for onKeyUp and onBlur but whatever)
+	return true;
+}
+
+function login_exec() {
+	if (loginAjaxTimer !== null) {
+		clearTimeout(loginAjaxTimer);
+		loginAjaxTimer = null;
+	}
+	var noticeElem = document.getElementById('login_note');
+	var totpElem = document.getElementById('show_totp');
+	var mobileElem = document.getElementById('show_mobile');
+	var userField = document.getElementById("username");
+	var passField = document.getElementById("password");
+	var totpField = document.getElementById("token");
+	var rememberField = document.getElementById('remember');
+
+	noticeElem.className = 'wait';
+	noticeElem.innerHTML = "Wait...";
+
+	// If TOTP is hidden but contains a six digit code, show the field and delay submit for half a second.
+	// This is to reduce confusion stemming from the field being auto-filled while hidden.
+	var delayTime = 0;
+	if (totpField.value.length == 6 && totpElem.style.display != '') {
+		delayTime = 500;
+		totpElem.style.display = '';
+	}
+
+	function submitLoginAjax() {
+		loginAjaxTimer = null;
+		$.ajax({
+			url: "/profile/ajax.cfm", type: "POST", dataType: "json",
+			data: {
+				action: "login",
+				user: userField.value,
+				pass: passField.value,
+				token: totpField.value,
+				remember: (rememberField.checked ? "1" : "0")
+			},
+			success: function(msg) {
+				// msg = {result:0, error:"", totp=0, mobile=0}
+				returned_totp = msg.totp;
+				returned_mobile = msg.mobile;
+				totpElem.style.display = 'none';
+				mobileElem.style.display = 'none';
+				if (msg.result == 1) {
+					noticeElem.innerHTML = '<strong>Login successful.</strong> Please wait...';
+					noticeElem.className = 'success';
+					// Don't redirect back to a logout page
+					if (window.location.search.toLowerCase().indexOf("logout") !== -1) {
+						window.location.href = loginaction;
+					} else {
+						window.location.reload(true);
+					}
+				} else {
+					noticeElem.innerHTML = msg.error;
+					noticeElem.className = 'failure';
+					if (msg.totp > 0) {
+						totpElem.style.display = '';
+						if (msg.mobile > 0) mobileElem.style.display = '';
+						totpField.focus();
+						totpField.select();
+					} else {
+						passField.value = '';
+						userField.focus();
+						userField.select();
+					}
+				}
+			}
+		});
+	}
+
+	if (delayTime > 0) {
+		loginAjaxTimer = setTimeout(submitLoginAjax, delayTime);
+	} else {
+		submitLoginAjax();
+	}
+
+	// Don't submit the form the HTML "native" way
+	return false;
+}
+
+// ---- Passkey sign-in (usernameless; server challenge rides in a single-use cookie) ----
+
+// Server options arrive lowercased via SerializeNiceJSON (rpid, allowcredentials, ...);
+// we rebuild the camelCase object the WebAuthn API wants, converting base64url to ArrayBuffer
+function b64urlToBuf(s) {
+	var b64 = s.replace(/-/g, '+').replace(/_/g, '/');
+	while (b64.length % 4) b64 += '=';
+	var bin = atob(b64);
+	var bytes = new Uint8Array(bin.length);
+	for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+	return bytes.buffer;
+}
+function bufToB64url(buf) {
+	var bytes = new Uint8Array(buf);
+	var bin = '';
+	for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+	return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+// PublicKeyCredential.toJSON() isn't universal enough yet; serialise manually
+function credToJSON(c) {
+	return JSON.stringify({
+		id: c.id,
+		rawId: bufToB64url(c.rawId),
+		type: c.type,
+		authenticatorAttachment: c.authenticatorAttachment,
+		clientExtensionResults: c.getClientExtensionResults(),
+		response: {
+			authenticatorData: bufToB64url(c.response.authenticatorData),
+			clientDataJSON: bufToB64url(c.response.clientDataJSON),
+			signature: bufToB64url(c.response.signature),
+			userHandle: c.response.userHandle ? bufToB64url(c.response.userHandle) : null
+		}
+	});
+}
+
+// rpId of the last options fetched (for the Signal API when a passkey turns out to be unknown)
+var pkRpId = null;
+
+// Fetch assertion options and rebuild the camelCase object the WebAuthn API wants
+function fetchPasskeyOptions(cb) {
+	$.ajax({
+		url: "/profile/ajax.cfm", type: "POST", dataType: "json",
+		data: {action: "getPasskeyLoginOptions"},
+		success: function(msg) {
+			if (msg.success != 1) { cb(null, msg.error || 'Passkey sign-in is not available.'); return; }
+			var o = msg.options;
+			pkRpId = o.rpid;
+			var publicKey = {
+				challenge: b64urlToBuf(o.challenge),
+				timeout: o.timeout,
+				rpId: o.rpid,
+				userVerification: o.userverification
+			};
+			// Empty allowCredentials = discoverable/usernameless login, so only map it when present
+			if (o.allowcredentials && o.allowcredentials.length) {
+				publicKey.allowCredentials = o.allowcredentials.map(function(c) {
+					return {type: c.type, id: b64urlToBuf(c.id)};
+				});
+			}
+			cb(publicKey);
+		}
+	});
+}
+
+// Post a finished assertion as a login (shared by the button and autofill flows)
+function submitPasskeyAssertion(cred) {
+	var noticeElem = document.getElementById('login_note');
+	var rememberField = document.getElementById('remember');
+	$.ajax({
+		url: "/profile/ajax.cfm", type: "POST", dataType: "json",
+		data: {
+			action: "login",
+			passkey_login: "1",
+			passkey_json: credToJSON(cred),
+			remember: (rememberField.checked ? "1" : "0")
+		},
+		success: function(msg2) {
+			if (msg2.result == 1) {
+				noticeElem.innerHTML = '<strong>Login successful.</strong> Please wait...';
+				noticeElem.className = 'success';
+				// Don't redirect back to a logout page
+				if (window.location.search.toLowerCase().indexOf("logout") !== -1) {
+					window.location.href = loginaction;
+				} else {
+					window.location.reload(true);
+				}
+			} else {
+				noticeElem.innerHTML = msg2.error;
+				noticeElem.className = 'failure';
+				// Passkey no longer registered here: ask the password manager to stop offering it
+				if (msg2.passkey_unknown == 1 && pkRpId && window.PublicKeyCredential && PublicKeyCredential.signalUnknownCredential) {
+					PublicKeyCredential.signalUnknownCredential({rpId: pkRpId, credentialId: cred.id}).catch(function() {});
+				}
+				if (pkConditionalMode) armPasskeyAutofill(); // fresh challenge for another try
+			}
+		}
+	});
+}
+
+// Button flow: explicit prompt, for browsers without conditional mediation
+function passkey_login() {
+	var noticeElem = document.getElementById('login_note');
+	noticeElem.className = 'wait';
+	noticeElem.innerHTML = "Follow the prompt from your device...";
+	fetchPasskeyOptions(function(publicKey, err) {
+		if (!publicKey) {
+			noticeElem.className = 'failure';
+			noticeElem.innerHTML = err;
+			return;
+		}
+		navigator.credentials.get({publicKey: publicKey}).then(submitPasskeyAssertion).catch(function(err) {
+			// NotAllowedError = user cancelled or no passkey offered; not a server failure
+			noticeElem.className = 'failure';
+			noticeElem.innerHTML = (err && err.name === 'NotAllowedError')
+				? 'Sign-in was cancelled or no passkey is available.'
+				: 'Passkey sign-in failed. Please try again.';
+		});
+	});
+}
+
+// Conditional mediation: passkeys appear in the username field's autofill. The get() promise
+// stays pending until the user picks one — however long that takes — but its server challenge
+// expires after 10 minutes. So a pending request older than PK_REARM_MS is aborted and replaced
+// with a fresh one (on field focus, and on a timer for pages left open). Also re-armed after a
+// failed submit.
+var PK_REARM_MS = 4 * 60 * 1000;
+var pkConditionalMode = false;
+var pkConditionalPending = false;
+var pkAbort = null;      // AbortController for the pending request
+var pkArmedAt = 0;       // when its challenge was issued
+var pkRearmQueued = false;
+function armPasskeyAutofill() {
+	if (pkConditionalPending) {
+		// Still fresh: leave it. Stale: abort; the finally handler below re-arms.
+		if (pkAbort && Date.now() - pkArmedAt > PK_REARM_MS) {
+			pkRearmQueued = true;
+			pkAbort.abort();
+		}
+		return;
+	}
+	pkConditionalPending = true;
+	fetchPasskeyOptions(function(publicKey) {
+		if (!publicKey) { pkConditionalPending = false; return; }
+		pkAbort = window.AbortController ? new AbortController() : null;
+		pkArmedAt = Date.now();
+		var request = {mediation: 'conditional', publicKey: publicKey};
+		if (pkAbort) request.signal = pkAbort.signal;
+		navigator.credentials.get(request)
+			.then(function(cred) { if (cred) submitPasskeyAssertion(cred); })
+			.catch(function() {}) // aborted (stale) or cancelled
+			.finally(function() {
+				pkConditionalPending = false;
+				pkAbort = null;
+				if (pkRearmQueued) { pkRearmQueued = false; armPasskeyAutofill(); }
+			});
+	});
+}
+
+if (window.PublicKeyCredential && PublicKeyCredential.isConditionalMediationAvailable) {
+	PublicKeyCredential.isConditionalMediationAvailable().then(function(available) {
+		if (available) {
+			// Autofill replaces the button; "webauthn" token opts the username field in
+			pkConditionalMode = true;
+			var userField = document.getElementById("username");
+			userField.autocomplete = "username webauthn";
+			userField.addEventListener('focus', armPasskeyAutofill);
+			armPasskeyAutofill();
+			// Pages left open: replace a stale pending request before its challenge expires
+			// (armPasskeyAutofill is a no-op while the pending request is still fresh). Hidden tabs
+			// don't churn challenges; they catch up when shown again.
+			setInterval(function() { if (!document.hidden) armPasskeyAutofill(); }, 60 * 1000);
+			document.addEventListener('visibilitychange', function() { if (!document.hidden) armPasskeyAutofill(); });
+		} else if (window.PublicKeyCredential) {
+			document.getElementById('passkey_row').style.display = '';
+		}
+	});
+} else if (window.PublicKeyCredential) {
+	document.getElementById('passkey_row').style.display = '';
+}
+
+</script>
+<script>
+
+function send_sms() {
+	if (!loggedin) {
+		if (typeof returned_totp === 'undefined' || typeof returned_mobile === 'undefined') {
+			alert("Error: no two-factor configured or no mobile number registered.");
+			return;
+		}
+	}
+	
+	$.ajax({
+		url: "/profile/ajax.cfm", type: "POST", dataType: "json",
+		data: {
+			action: "sms",
+			totp:   (typeof returned_totp   === 'undefined' ? 0 : returned_totp  ),
+			mobile: (typeof returned_mobile === 'undefined' ? 0 : returned_mobile)
+		},
+		success: function(msg) {
+			if (msg.result === 1) {
+				alert("The two-factor authentication code has been sent to your mobile phone.");
+			} else {
+				alert("Error: no two-factor configured or no mobile number registered.");
+			}
+		}
+	});
+}
+
+</script>
+				<h4>
+				<a href="https://whirlpool.net.au/profile/?action=register" style="font-size:160%;">Sign&nbsp;up</a>
+				&nbsp;&middot;&nbsp; <a href="https://whirlpool.net.au/profile/?action=lostpass">Forgot&nbsp;password</a>
+				&nbsp;&middot;&nbsp; <a href="javascript:history.go(-1)">Go&nbsp;back</a>
+				</h4>
+		
+	</div>
+</main>
+</body>
+</html>
+
+			
+	
