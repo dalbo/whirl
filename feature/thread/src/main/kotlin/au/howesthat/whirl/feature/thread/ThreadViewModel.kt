@@ -8,6 +8,8 @@ import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository.Companion.LAST_PAGE
+import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.data.WhirlpoolLink
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.Post
@@ -41,7 +43,7 @@ import javax.inject.Inject
 
 /**
  * A thread, opened at [page] (1-based, or -1 for the last page). [scrollToPost] is a post number, [scrollToReply] a
- * reply id; [userId] opens it filtered to one user's posts (`ux=`).
+ * reply id; [userId] opens it filtered to one user's posts (`ux=`); [fromWatched] when opened from Watched.
  */
 @Serializable
 data class ThreadRoute(
@@ -51,6 +53,7 @@ data class ThreadRoute(
     val scrollToReply: Long? = null,
     val forumId: Int? = null,
     val userId: Long? = null,
+    val fromWatched: Boolean = false,
 )
 
 /** A post ready to draw: its body parsed into blocks. */
@@ -68,6 +71,8 @@ sealed interface ThreadEvent {
     data class OpenUser(val userId: Long) : ThreadEvent
     data class Browser(val url: String) : ThreadEvent
     data class Failed(val error: Throwable) : ThreadEvent
+    /** Back to the list ("back to list after marking read"). */
+    data object Back : ThreadEvent
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -76,6 +81,7 @@ class ThreadViewModel @Inject constructor(
     savedState: SavedStateHandle,
     private val repo: ThreadPageRepository,
     settingsRepo: SettingsRepository,
+    private val watchedRepo: WatchedRepository,
 ) : ViewModel() {
     private val route = savedState.toRoute<ThreadRoute>()
     val threadId = ThreadId(route.threadId)
@@ -124,8 +130,21 @@ class ThreadViewModel @Inject constructor(
 
     private var loadJob: Job? = null
 
+    /** Watched as far as the cached lists know; opened from Watched counts until they say otherwise. */
+    val isWatched: StateFlow<Boolean> = watchedRepo.isWatched(threadId)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, route.fromWatched)
+
     init {
         open(route.page)
+        viewModelScope.launch { watchedRepo.ensureKnown() }
+    }
+
+    /** Watch, mark read or unwatch (with Undo); marking read can return to the list (2.14.12 `pref_watchedbacktolist`). */
+    fun perform(action: WatchAction) {
+        viewModelScope.launch {
+            watchedRepo.perform(action, listOf(threadId))
+            if (action == WatchAction.MARK_READ && route.fromWatched && settings.value.watchedBackToList) events.send(ThreadEvent.Back)
+        }
     }
 
     /** Pages of the current filter; bodies are parsed off the main thread. */

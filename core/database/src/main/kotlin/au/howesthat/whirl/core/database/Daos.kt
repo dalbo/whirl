@@ -139,6 +139,22 @@ interface ThreadDao {
     @Query("DELETE FROM thread_source WHERE source = :source AND `key` = :key AND thread_id IN (:ids)")
     suspend fun removeFromSourceKey(source: String, key: String, ids: List<String>)
 
+    @Query("SELECT * FROM threads WHERE id IN (:ids)")
+    suspend fun getAll(ids: List<String>): List<ThreadEntity>
+
+    @Upsert
+    suspend fun upsert(threads: List<ThreadEntity>)
+
+    @Query("SELECT * FROM thread_source WHERE source = :source AND thread_id IN (:ids)")
+    suspend fun sourceRows(source: String, ids: List<String>): List<ThreadSourceEntity>
+
+    @Query("SELECT MAX(position) FROM thread_source WHERE source = :source AND `key` = :key")
+    suspend fun maxPosition(source: String, key: String): Int?
+
+    /** Ids on any watched list (Unread or All). */
+    @Query("SELECT DISTINCT thread_id FROM thread_source WHERE source = 'WATCHED'")
+    fun observeWatchedIds(): Flow<List<String>>
+
     /** Drops threads no list refers to any more. */
     @Query("DELETE FROM threads WHERE id NOT IN (SELECT thread_id FROM thread_source)")
     suspend fun deleteOrphans()

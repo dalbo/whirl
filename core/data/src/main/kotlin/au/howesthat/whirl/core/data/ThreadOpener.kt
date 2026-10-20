@@ -5,8 +5,17 @@ import au.howesthat.whirl.core.network.WhirlpoolUrls
 
 /** Where tapping a thread goes. */
 sealed interface OpenThread {
-    /** [page] may be [ThreadPageRepository.LAST_PAGE]; [scrollToPost] is a post number (1-based in the thread). */
-    data class InApp(val id: ThreadId, val page: Int, val scrollToPost: Int? = null, val forumId: Int? = null) : OpenThread
+    /**
+     * [page] may be [ThreadPageRepository.LAST_PAGE]; [scrollToPost] is a post number (1-based in the thread);
+     * [fromWatched] offers Mark as read and Unwatch, and "back to list" after marking read.
+     */
+    data class InApp(
+        val id: ThreadId,
+        val page: Int,
+        val scrollToPost: Int? = null,
+        val forumId: Int? = null,
+        val fromWatched: Boolean = false,
+    ) : OpenThread
     data class Browser(val url: String) : OpenThread
 }
 
@@ -54,6 +63,7 @@ class ThreadOpener(private val urls: WhirlpoolUrls = WhirlpoolUrls()) {
                 page = watched.lastPage,
                 scrollToPost = watched.lastReadPost.takeIf { it > 0 && !settings.loadWatchedAtTop },
                 forumId = forumId,
+                fromWatched = true,
             )
             atLastPage -> OpenThread.InApp(id, ThreadPageRepository.LAST_PAGE, forumId = forumId)
             else -> OpenThread.InApp(id, 1, forumId = forumId)

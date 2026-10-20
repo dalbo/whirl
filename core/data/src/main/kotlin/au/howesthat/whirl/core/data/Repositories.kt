@@ -10,13 +10,11 @@ import au.howesthat.whirl.core.database.NewsEntity
 import au.howesthat.whirl.core.database.ThreadDao
 import au.howesthat.whirl.core.database.ThreadEntity
 import au.howesthat.whirl.core.database.ThreadSource
-import au.howesthat.whirl.core.database.WatchedThreadColumns
 import au.howesthat.whirl.core.model.Forum
 import au.howesthat.whirl.core.model.NewsItem
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.model.ThreadSummary
 import au.howesthat.whirl.core.model.UserRef
-import au.howesthat.whirl.core.model.WatchedThread
 import au.howesthat.whirl.core.network.WhirlpoolApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -177,45 +175,6 @@ private fun observeApiList(dao: ThreadDao, log: FetchLogDao, source: ThreadSourc
         Cached(rows.map { it.toSummary() }, at?.let(Instant::ofEpochMilli))
     }
 
-@Singleton
-class WatchedRepository @Inject constructor(
-    private val api: WhirlpoolApi,
-    private val dao: ThreadDao,
-    private val log: FetchLogDao,
-    clock: Clock,
-) {
-    private val refresher = Refresher(log, clock)
-
-    fun watched(unreadOnly: Boolean): Flow<Cached<List<WatchedThread>>> {
-        val key = key(unreadOnly)
-        return combine(dao.observeSource(ThreadSource.WATCHED.name, key), log.observeFetchedAt("watched:$key")) { rows, at ->
-            Cached(rows.map { it.toWatched() }, at?.let(Instant::ofEpochMilli))
-        }
-    }
-
-    suspend fun refresh(unreadOnly: Boolean, force: Boolean = false): Boolean {
-        val key = key(unreadOnly)
-        return refresher.refresh("watched:$key", MaxAge.THREAD_LISTS, force) {
-            dao.replaceWatchedList(key, api.watched(unreadOnly).map { it.toColumns() })
-        }
-    }
-
-    /** Marks threads read locally first (so the list updates at once), then on Whirlpool. */
-    suspend fun markRead(ids: List<ThreadId>) {
-        val raw = ids.map { it.value }
-        dao.markRead(raw)
-        dao.removeFromSourceKey(ThreadSource.WATCHED.name, key(unreadOnly = true), raw)
-        api.markRead(ids)
-    }
-
-    suspend fun unwatch(ids: List<ThreadId>) {
-        dao.removeFromSource(ThreadSource.WATCHED.name, ids.map { it.value })
-        api.unwatch(ids)
-    }
-
-    private fun key(unreadOnly: Boolean) = if (unreadOnly) "unread" else "all"
-}
-
 private fun ThreadSummary.toColumns() = ApiThreadColumns(
     id = id.value, title = title, forumId = forumId, forumName = forumName, groupName = group, replies = replies,
     firstUserId = firstPoster.id, firstUserName = firstPoster.name, firstDate = firstDate.toInstant().toEpochMilli(),
@@ -223,15 +182,8 @@ private fun ThreadSummary.toColumns() = ApiThreadColumns(
     isUnread = isUnread,
 )
 
-private fun WatchedThread.toColumns() = WatchedThreadColumns(
-    id = id.value, title = title, forumId = forumId, forumName = forumName, replies = replies,
-    firstUserId = firstPoster.id, firstUserName = firstPoster.name, firstDate = firstDate.toInstant().toEpochMilli(),
-    lastUserId = lastPoster.id, lastUserName = lastPoster.name, lastDate = lastDate.toInstant().toEpochMilli(),
-    unreadCount = unreadCount, lastReadPost = lastReadPost, lastPage = lastPage,
-)
-
 // Cached rows lose the API's +1000 offset; instants are what matter and display uses the device or Sydney zone.
-private fun Long?.toOffsetDateTime(): OffsetDateTime =
+internal fun Long?.toOffsetDateTime(): OffsetDateTime =
     OffsetDateTime.ofInstant(Instant.ofEpochMilli(this ?: 0), ZoneOffset.UTC)
 
 private fun ThreadEntity.toSummary() = ThreadSummary(
@@ -239,11 +191,4 @@ private fun ThreadEntity.toSummary() = ThreadSummary(
     firstDate = firstDate.toOffsetDateTime(), firstPoster = UserRef(firstUserId ?: 0, firstUserName.orEmpty()),
     lastDate = lastDate.toOffsetDateTime(), lastPoster = UserRef(lastUserId ?: 0, lastUserName.orEmpty()),
     isSubscribed = false, isUnread = isUnread == true, hasParticipated = false,
-)
-
-private fun ThreadEntity.toWatched() = WatchedThread(
-    id = ThreadId(id), title = title, replies = replies, forumId = forumId, forumName = forumName,
-    firstDate = firstDate.toOffsetDateTime(), firstPoster = UserRef(firstUserId ?: 0, firstUserName.orEmpty()),
-    lastDate = lastDate.toOffsetDateTime(), lastPoster = UserRef(lastUserId ?: 0, lastUserName.orEmpty()),
-    unreadCount = unreadCount ?: 0, lastReadPost = lastReadPost ?: 0, lastPage = lastPage ?: 1,
 )

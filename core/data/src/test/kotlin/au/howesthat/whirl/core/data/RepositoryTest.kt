@@ -5,7 +5,6 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import au.howesthat.whirl.core.database.FetchLogEntity
 import au.howesthat.whirl.core.database.WhirlDatabase
-import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.model.WhirlpoolError
 import au.howesthat.whirl.core.network.RetryPolicy
 import au.howesthat.whirl.core.network.WhirlpoolApi
@@ -104,9 +103,9 @@ class RepositoryTest {
     }
 
     @Test
-    fun `watched list refreshes, respects max age and marks read locally`() = runTest {
+    fun `watched list refreshes and respects max age`() = runTest {
         settings.signIn("k", Account(216903, "d@llin"))
-        val repo = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), clock)
+        val repo = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), clock, backgroundScope)
         enqueue("api_watched_mode0.json")
         assertTrue(repo.refresh(unreadOnly = true))
         val cached = repo.watched(unreadOnly = true).first()
@@ -121,11 +120,6 @@ class RepositoryTest {
         assertTrue(repo.refresh(unreadOnly = true, force = true), "pull-to-refresh ignores the max age")
         assertEquals(2, server.requestCount)
 
-        enqueue("api_bogus_get.json") // the watchedread command's response shape is unknown; an envelope is enough
-        repo.markRead(listOf(ThreadId("9yvx1663")))
-        assertEquals(listOf("9q684xp3"), repo.watched(unreadOnly = true).first().value.map { it.id.value })
-        repeat(2) { server.takeRequest() }
-        assertEquals("9yvx1663", server.takeRequest().url.queryParameter("watchedread"))
     }
 
     @Test

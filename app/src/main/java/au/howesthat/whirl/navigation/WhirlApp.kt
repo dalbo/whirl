@@ -1,6 +1,11 @@
 package au.howesthat.whirl.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -8,6 +13,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -45,7 +52,16 @@ import kotlinx.coroutines.launch
  * this composition, so changing the start screen in Settings applies from the next launch, as in 2.14.12.
  */
 @Composable
-fun WhirlApp(startRoute: Any, account: Account?, alert: String, link: Any? = null, onLinkHandled: () -> Unit = {}) {
+fun WhirlApp(
+    startRoute: Any,
+    account: Account?,
+    alert: String,
+    link: Any? = null,
+    onLinkHandled: () -> Unit = {},
+    /** App-wide snackbars (watch actions), shown above every screen. */
+    snackbars: @Composable (SnackbarHostState) -> Unit = {},
+) {
+    val snackbarHost = remember { SnackbarHostState() }
     val nav = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -57,7 +73,9 @@ fun WhirlApp(startRoute: Any, account: Account?, alert: String, link: Any? = nul
     val backIcon = remember(nav) { NavIcon.Back { nav.popBackStack() } }
     val listNav = remember(nav) {
         ThreadListNav(
-            openThread = { t -> nav.navigate(ThreadRoute(t.id.value, t.page, scrollToPost = t.scrollToPost, forumId = t.forumId)) },
+            openThread = { t ->
+                nav.navigate(ThreadRoute(t.id.value, t.page, scrollToPost = t.scrollToPost, forumId = t.forumId, fromWatched = t.fromWatched))
+            },
             openForum = { f -> nav.navigate(ForumRoute(f.id, f.title, f.groupId)) },
             openSearch = { nav.navigate(it) },
         )
@@ -67,6 +85,7 @@ fun WhirlApp(startRoute: Any, account: Account?, alert: String, link: Any? = nul
             openThread = { nav.navigate(it) },
             openForum = listNav.openForum,
             openUser = { nav.navigate(UserRoute(it)) },
+            back = { nav.popBackStack() },
         )
     }
 
@@ -78,42 +97,46 @@ fun WhirlApp(startRoute: Any, account: Account?, alert: String, link: Any? = nul
         }
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        // Edge swipes stay free for pagers on pushed screens; the drawer opens from the menu button there anyway.
-        gesturesEnabled = isTopLevel || drawerState.isOpen,
-        drawerContent = {
-            DrawerContent(
-                account = account,
-                alert = alert,
-                isSelected = { route -> destination?.hierarchy?.any { it.hasRoute(route) } == true },
-                onSelect = { entry ->
-                    scope.launch { drawerState.close() }
-                    nav.navigateTopLevel(entry.route)
-                },
-            )
-        },
-    ) {
-        NavHost(nav, startDestination = startRoute) {
-            composable<NewsRoute> { NewsScreen(drawerIcon) }
-            composable<RecentRoute> { RecentScreen(drawerIcon, listNav) }
-            composable<LatestRoute> { LatestScreen(drawerIcon, listNav) }
-            composable<WatchedRoute> { WatchedScreen(drawerIcon, listNav) }
-            composable<PopularRoute> { PopularScreen(drawerIcon, listNav) }
-            composable<ForumRoute> { ForumScreen(backIcon, listNav) }
-            composable<ThreadRoute> { ThreadScreen(backIcon, threadNav) }
-            composable<UserRoute> { UserScreen(backIcon, listNav) }
-            composable<SearchRoute> { SearchScreen(backIcon, listNav) }
-            composable<ForumsRoute> { ForumsScreen(drawerIcon, onOpenForum = listNav.openForum, onSearch = { listNav.openSearch(SearchRoute()) }) }
-            composable<SettingsRoute> {
-                SettingsScreen(
-                    onBack = { nav.popBackStack() },
-                    // Signing out clears setupDone, and MainActivity swaps this whole tree for the setup wizard.
-                    onSignedOut = {},
+    snackbars(snackbarHost)
+    Box(Modifier.fillMaxSize()) {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            // Edge swipes stay free for pagers on pushed screens; the drawer opens from the menu button there anyway.
+            gesturesEnabled = isTopLevel || drawerState.isOpen,
+            drawerContent = {
+                DrawerContent(
+                    account = account,
+                    alert = alert,
+                    isSelected = { route -> destination?.hierarchy?.any { it.hasRoute(route) } == true },
+                    onSelect = { entry ->
+                        scope.launch { drawerState.close() }
+                        nav.navigateTopLevel(entry.route)
+                    },
                 )
+            },
+        ) {
+            NavHost(nav, startDestination = startRoute) {
+                composable<NewsRoute> { NewsScreen(drawerIcon) }
+                composable<RecentRoute> { RecentScreen(drawerIcon, listNav) }
+                composable<LatestRoute> { LatestScreen(drawerIcon, listNav) }
+                composable<WatchedRoute> { WatchedScreen(drawerIcon, listNav) }
+                composable<PopularRoute> { PopularScreen(drawerIcon, listNav) }
+                composable<ForumRoute> { ForumScreen(backIcon, listNav) }
+                composable<ThreadRoute> { ThreadScreen(backIcon, threadNav) }
+                composable<UserRoute> { UserScreen(backIcon, listNav) }
+                composable<SearchRoute> { SearchScreen(backIcon, listNav) }
+                composable<ForumsRoute> { ForumsScreen(drawerIcon, onOpenForum = listNav.openForum, onSearch = { listNav.openSearch(SearchRoute()) }) }
+                composable<SettingsRoute> {
+                    SettingsScreen(
+                        onBack = { nav.popBackStack() },
+                        // Signing out clears setupDone, and MainActivity swaps this whole tree for the setup wizard.
+                        onSignedOut = {},
+                    )
+                }
+                composable<AboutRoute> { AboutScreen(backIcon) }
             }
-            composable<AboutRoute> { AboutScreen(backIcon) }
         }
+        SnackbarHost(snackbarHost, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
 }
 

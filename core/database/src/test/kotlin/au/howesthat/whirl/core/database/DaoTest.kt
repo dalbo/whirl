@@ -68,6 +68,23 @@ class DaoTest {
     }
 
     @Test
+    fun `watched ids, source rows and positions for undo`() = runTest {
+        threads.replaceWatchedList("unread", listOf(watched("a", 5)))
+        threads.replaceWatchedList("all", listOf(watched("a", 5), watched("b", 0)))
+        assertEquals(setOf("a", "b"), threads.observeWatchedIds().first().toSet())
+        assertEquals(1, threads.maxPosition("WATCHED", "all"))
+        assertNull(threads.maxPosition("WATCHED", "nothing"))
+        val rows = threads.sourceRows("WATCHED", listOf("a"))
+        assertEquals(setOf("unread" to 0, "all" to 0), rows.map { it.key to it.position }.toSet())
+
+        val before = threads.getAll(listOf("a", "missing"))
+        assertEquals(listOf("a"), before.map { it.id })
+        threads.markRead(listOf("a"))
+        threads.upsert(before)
+        assertEquals(5, threads.get("a")!!.unreadCount, "a full upsert restores the row")
+    }
+
+    @Test
     fun `forum refresh keeps favourites and learned privacy`() = runTest {
         forums.replaceAll(listOf(ForumEntity(92, "Choosing an ISP", "ISPs", 0), ForumEntity(35, "Feedback", "Whirlpool", 1)))
         forums.addFavourite(FavouriteForumEntity(92, 1))
