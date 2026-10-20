@@ -16,21 +16,25 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.toRoute
 import au.howesthat.whirl.R
 import au.howesthat.whirl.about.AboutScreen
 import au.howesthat.whirl.core.data.Account
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.feature.forums.ForumsScreen
+import au.howesthat.whirl.feature.news.NewsScreen
 import au.howesthat.whirl.feature.settings.SettingsScreen
 import au.howesthat.whirl.feature.thread.ThreadNav
 import au.howesthat.whirl.feature.thread.ThreadRoute
 import au.howesthat.whirl.feature.thread.ThreadScreen
+import au.howesthat.whirl.feature.user.UserRoute
+import au.howesthat.whirl.feature.user.UserScreen
 import au.howesthat.whirl.feature.threadlist.ForumRoute
 import au.howesthat.whirl.feature.threadlist.ForumScreen
 import au.howesthat.whirl.feature.threadlist.LatestScreen
 import au.howesthat.whirl.feature.threadlist.PopularScreen
 import au.howesthat.whirl.feature.threadlist.RecentScreen
+import au.howesthat.whirl.feature.threadlist.SearchRoute
+import au.howesthat.whirl.feature.threadlist.SearchScreen
 import au.howesthat.whirl.feature.threadlist.ThreadListNav
 import au.howesthat.whirl.feature.threadlist.WatchedScreen
 import kotlinx.coroutines.launch
@@ -54,6 +58,7 @@ fun WhirlApp(startRoute: Any, account: Account?, alert: String) {
         ThreadListNav(
             openThread = { t -> nav.navigate(ThreadRoute(t.id.value, t.page, scrollToPost = t.scrollToPost, forumId = t.forumId)) },
             openForum = { f -> nav.navigate(ForumRoute(f.id, f.title, f.groupId)) },
+            openSearch = { nav.navigate(it) },
         )
     }
     val threadNav = remember(nav) {
@@ -81,15 +86,16 @@ fun WhirlApp(startRoute: Any, account: Account?, alert: String) {
         },
     ) {
         NavHost(nav, startDestination = startRoute) {
-            composable<NewsRoute> { PlaceholderScreen(stringResource(R.string.nav_news), drawerIcon) }
+            composable<NewsRoute> { NewsScreen(drawerIcon) }
             composable<RecentRoute> { RecentScreen(drawerIcon, listNav) }
             composable<LatestRoute> { LatestScreen(drawerIcon, listNav) }
             composable<WatchedRoute> { WatchedScreen(drawerIcon, listNav) }
             composable<PopularRoute> { PopularScreen(drawerIcon, listNav) }
             composable<ForumRoute> { ForumScreen(backIcon, listNav) }
             composable<ThreadRoute> { ThreadScreen(backIcon, threadNav) }
-            composable<UserRoute> { entry -> PlaceholderScreen("#${entry.toRoute<UserRoute>().userId}", backIcon) }
-            composable<ForumsRoute> { ForumsScreen(drawerIcon, onOpenForum = listNav.openForum) }
+            composable<UserRoute> { UserScreen(backIcon, listNav) }
+            composable<SearchRoute> { SearchScreen(backIcon, listNav) }
+            composable<ForumsRoute> { ForumsScreen(drawerIcon, onOpenForum = listNav.openForum, onSearch = { listNav.openSearch(SearchRoute()) }) }
             composable<SettingsRoute> {
                 SettingsScreen(
                     onBack = { nav.popBackStack() },

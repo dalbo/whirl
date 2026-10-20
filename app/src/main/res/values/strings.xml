@@ -9,7 +9,6 @@
     <string name="nav_popular">Popular threads</string>
     <string name="nav_forums">Forums</string>
     <string name="nav_about">About</string>
-    <string name="placeholder_coming">This screen arrives later in Phase 2.</string>
     <string name="about_version">Version %1$s</string>
     <string name="about_summary">An unofficial Android client for the Whirlpool forums, rewritten from Whirldroid. Free software under the MIT licence.</string>
     <string name="about_source">Source code</string>

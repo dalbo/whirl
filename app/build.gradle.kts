@@ -72,6 +72,8 @@ dependencies {
     implementation(project(":feature:threadlist"))
     implementation(project(":feature:forums"))
     implementation(project(":feature:thread"))
+    implementation(project(":feature:news"))
+    implementation(project(":feature:user"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.splashscreen)

@@ -23,6 +23,3 @@ fun Homepage.route(): Any = when (this) {
     Homepage.FORUMS -> ForumsRoute
 }
 
-/** A user's profile; its screen arrives in task 6. */
-@Serializable
-data class UserRoute(val userId: Long)

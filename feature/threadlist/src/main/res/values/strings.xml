@@ -36,4 +36,13 @@
         <item quantity="one">%1$d page</item>
         <item quantity="other">%1$d pages</item>
     </plurals>
+    <string name="search">Search</string>
+    <string name="search_hint">Search thread titles</string>
+    <string name="search_in">In %1$s</string>
+    <string name="search_everywhere">Only in %1$s</string>
+    <string name="search_everywhere_action">Search all forums</string>
+    <string name="search_none">No threads match.</string>
+    <string name="previous_page">Previous</string>
+    <string name="next_page">Next</string>
+    <string name="page_n">Page %1$d</string>
 </resources>
