@@ -38,7 +38,9 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.howesthat.whirl.core.data.OpenThread
+import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.RowKind
 import au.howesthat.whirl.core.ui.EmptyState
@@ -95,6 +97,8 @@ fun ThreadListBody(
     val launch = rememberThreadLauncher(nav)
     val browser = rememberOpenInBrowser()
     val now = Instant.now()
+    // Read so rows recompose when a watch action changes what they offer.
+    val watchedIds by viewModel.watchedIds.collectAsStateWithLifecycle()
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = onRefresh, modifier = modifier.fillMaxSize()) {
         when {
             sections == null && error != null -> ErrorState(
@@ -136,6 +140,8 @@ fun ThreadListBody(
                             onLastPost = { launch(viewModel.lastPost(item)) },
                             onOpenInBrowser = { browser(viewModel.browserUrl(item)) },
                             onOpenForum = item.forum?.takeIf { showForum }?.let { forum -> { nav.openForum(forum.copy(groupId = null)) } },
+                            watchActions = remember(item, watchedIds) { viewModel.watchActions(item) },
+                            onWatchAction = { action -> viewModel.perform(action, item) },
                         )
                         HorizontalDivider()
                     }
@@ -167,6 +173,8 @@ fun ThreadRowItem(
     onLastPost: () -> Unit,
     onOpenInBrowser: () -> Unit,
     onOpenForum: (() -> Unit)?,
+    watchActions: List<WatchAction> = emptyList(),
+    onWatchAction: (WatchAction) -> Unit = {},
 ) {
     var menu by remember { mutableStateOf(false) }
     val openable = item.openId != null
@@ -195,6 +203,9 @@ fun ThreadRowItem(
             },
         )
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            watchActions.forEach { action ->
+                DropdownMenuItem(text = { Text(watchActionLabel(action)) }, onClick = { menu = false; onWatchAction(action) })
+            }
             DropdownMenuItem(text = { Text(stringResource(R.string.row_last_post)) }, onClick = { menu = false; onLastPost() }, enabled = openable)
             DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser)) }, onClick = { menu = false; onOpenInBrowser() })
             onOpenForum?.let { go ->
@@ -203,6 +214,15 @@ fun ThreadRowItem(
         }
     }
 }
+
+@Composable
+private fun watchActionLabel(action: WatchAction): String = stringResource(
+    when (action) {
+        WatchAction.WATCH -> R.string.row_watch
+        WatchAction.MARK_READ -> R.string.row_mark_read
+        WatchAction.UNWATCH -> R.string.row_unwatch
+    },
+)
 
 @Composable
 private fun labels(item: ThreadItem): String? = listOfNotNull(

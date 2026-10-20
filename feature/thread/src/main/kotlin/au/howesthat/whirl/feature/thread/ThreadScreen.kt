@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.Post
 import au.howesthat.whirl.core.model.PostFilter
@@ -79,6 +80,7 @@ class ThreadNav(
     val openThread: (ThreadRoute) -> Unit,
     val openForum: (ForumRef) -> Unit,
     val openUser: (Long) -> Unit,
+    val back: () -> Unit,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,6 +104,7 @@ fun ThreadScreen(navIcon: NavIcon, nav: ThreadNav, viewModel: ThreadViewModel = 
                 is ThreadEvent.OpenUser -> nav.openUser(event.userId)
                 is ThreadEvent.Browser -> browser(event.url)
                 is ThreadEvent.Failed -> snackbar.showSnackbar(failedText)
+                ThreadEvent.Back -> nav.back()
             }
         }
     }
@@ -173,6 +176,8 @@ private fun ThreadPager(
             actions = {
                 IconButton(onClick = { viewModel.refresh() }) { Icon(Icons.Default.Refresh, stringResource(R.string.refresh)) }
                 ThreadMenu(
+                    isWatched = viewModel.isWatched.collectAsStateWithLifecycle().value,
+                    onWatchAction = viewModel::perform,
                     filter = filter,
                     myUserId = viewModel.myUserId.collectAsStateWithLifecycle().value,
                     onFilter = viewModel::setFilter,
@@ -411,6 +416,8 @@ private fun filterLabel(filter: PostFilter): String = when (filter) {
 
 @Composable
 private fun ThreadMenu(
+    isWatched: Boolean,
+    onWatchAction: (WatchAction) -> Unit,
     filter: PostFilter,
     myUserId: Long?,
     onFilter: (PostFilter) -> Unit,
@@ -423,6 +430,13 @@ private fun ThreadMenu(
     var open by remember { mutableStateOf(false) }
     IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, stringResource(R.string.more)) }
     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        if (isWatched) {
+            DropdownMenuItem(text = { Text(stringResource(R.string.mark_read)) }, onClick = { open = false; onWatchAction(WatchAction.MARK_READ) })
+            DropdownMenuItem(text = { Text(stringResource(R.string.unwatch)) }, onClick = { open = false; onWatchAction(WatchAction.UNWATCH) })
+        } else {
+            DropdownMenuItem(text = { Text(stringResource(R.string.watch)) }, onClick = { open = false; onWatchAction(WatchAction.WATCH) })
+        }
+        HorizontalDivider()
         DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.first_page)) }, onClick = { open = false; onFirst() })
         DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.last_page)) }, onClick = { open = false; onLast() })
         DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.go_to_page)) }, onClick = { open = false; onGoTo() })

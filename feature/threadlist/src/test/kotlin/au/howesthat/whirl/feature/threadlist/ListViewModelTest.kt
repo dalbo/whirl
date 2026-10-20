@@ -5,12 +5,21 @@ import androidx.test.core.app.ApplicationProvider
 import au.howesthat.whirl.core.data.ForumRepository
 import au.howesthat.whirl.core.data.OpenedFrom
 import au.howesthat.whirl.core.data.SettingsRepository
+import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.data.WatchedPosition
+import au.howesthat.whirl.core.data.WatchedRepository
+import au.howesthat.whirl.core.model.ForumRef
+import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.database.WhirlDatabase
 import au.howesthat.whirl.core.network.WhirlpoolApi
 import au.howesthat.whirl.core.network.WhirlpoolHttp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -37,9 +46,13 @@ class ListViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), WhirlDatabase::class.java)
         .allowMainThreadQueries().build()
+    private val api = WhirlpoolApi(WhirlpoolHttp.client("t"), { null })
+    private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val watched = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), Clock.systemUTC(), appScope)
     private val deps = ListDeps(
         SettingsRepository(ApplicationProvider.getApplicationContext()),
-        ForumRepository(WhirlpoolApi(WhirlpoolHttp.client("t"), { null }), db.forumDao(), db.fetchLogDao(), Clock.systemUTC()),
+        ForumRepository(api, db.forumDao(), db.fetchLogDao(), Clock.systemUTC()),
+        watched,
     )
 
     /** A list whose fetches wait until the test completes them. */
@@ -64,6 +77,7 @@ class ListViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        appScope.cancel()
         db.close()
     }
 
@@ -82,5 +96,18 @@ class ListViewModelTest {
         advanceUntilIdle()
         assertFalse(vm.refreshing.value)
         assertNull(vm.error.value)
+    }
+
+    @Test
+    fun `rows offer Watch, or Mark as read and Unwatch once watched`() = TestScope(dispatcher).runTest {
+        val vm = Blocking(deps)
+        val row = ThreadItem(ThreadId("3pxj858k"), ThreadId("3pxj858k"), "NBN", forum = ForumRef(92, "Choosing an ISP"))
+        assertEquals(listOf(WatchAction.WATCH), vm.watchActions(row))
+        assertEquals(emptyList(), vm.watchActions(row.copy(openId = null)), "deleted rows with nowhere to go")
+        assertEquals(listOf(WatchAction.MARK_READ, WatchAction.UNWATCH), vm.watchActions(row.copy(unreadCount = 3, watched = WatchedPosition(1, 1))))
+
+        watched.perform(WatchAction.WATCH, listOf(row.id))
+        vm.watchedIds.first { row.id in it }
+        assertEquals(listOf(WatchAction.UNWATCH), vm.watchActions(row))
     }
 }

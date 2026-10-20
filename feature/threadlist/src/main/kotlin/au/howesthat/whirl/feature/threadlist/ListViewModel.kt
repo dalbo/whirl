@@ -8,6 +8,9 @@ import au.howesthat.whirl.core.data.OpenedFrom
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadOpener
+import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.data.WatchedRepository
+import au.howesthat.whirl.core.model.ThreadId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,14 +21,17 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** What every thread list needs to decide how a tap opens a thread. */
-class ListDeps @Inject constructor(val settings: SettingsRepository, val forums: ForumRepository)
+/** What every thread list needs to decide how a tap opens a thread and which watch actions a row offers. */
+class ListDeps @Inject constructor(val settings: SettingsRepository, val forums: ForumRepository, val watched: WatchedRepository)
 
 /** Refresh state, errors and thread opening shared by every thread list screen. */
-abstract class ListViewModel(deps: ListDeps, private val from: OpenedFrom) : ViewModel() {
+abstract class ListViewModel(private val deps: ListDeps, private val from: OpenedFrom) : ViewModel() {
     private val opener = ThreadOpener()
     protected val settings: StateFlow<Settings> = deps.settings.settings.stateIn(viewModelScope, SharingStarted.Eagerly, Settings())
     protected val privateIds: StateFlow<Set<Int>> = deps.forums.privateIds.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    /** Watched threads (both lists, plus actions waiting out their Undo window), to offer Watch or Unwatch. */
+    val watchedIds: StateFlow<Set<ThreadId>> = deps.watched.watchedIds.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
@@ -35,6 +41,11 @@ abstract class ListViewModel(deps: ListDeps, private val from: OpenedFrom) : Vie
     val error: StateFlow<Throwable?> = _error.asStateFlow()
 
     protected abstract suspend fun fetch(force: Boolean)
+
+    init {
+        // Outside Watched, the rows only know what is watched if the All list has been fetched.
+        if (from != OpenedFrom.WATCHED) viewModelScope.launch { deps.watched.ensureKnown() }
+    }
 
     private var refreshJob: Job? = null
 
@@ -63,7 +74,27 @@ abstract class ListViewModel(deps: ListDeps, private val from: OpenedFrom) : Vie
     fun open(item: ThreadItem): OpenThread? {
         val id = item.openId ?: return null
         val forumId = item.forum?.id
+        // 2.14.12 "auto mark as read": opening a watched thread from Watched marks it read, with no Undo.
+        if (from == OpenedFrom.WATCHED && settings.value.watchedAutoMarkAsRead && item.unreadCount > 0) {
+            viewModelScope.launch { deps.watched.perform(WatchAction.MARK_READ, listOf(id), undoable = false) }
+        }
         return opener.open(id, forumId, forumId in privateIds.value, from, settings.value, item.watched)
+    }
+
+    /** The watch actions a row's menu offers. */
+    fun watchActions(item: ThreadItem): List<WatchAction> {
+        val id = item.openId ?: return emptyList()
+        val watched = item.watched != null || id in watchedIds.value
+        return when {
+            !watched -> listOf(WatchAction.WATCH)
+            item.unreadCount > 0 -> listOf(WatchAction.MARK_READ, WatchAction.UNWATCH)
+            else -> listOf(WatchAction.UNWATCH)
+        }
+    }
+
+    fun perform(action: WatchAction, item: ThreadItem) {
+        val id = item.openId ?: return
+        viewModelScope.launch { deps.watched.perform(action, listOf(id)) }
     }
 
     fun lastPost(item: ThreadItem): OpenThread? {

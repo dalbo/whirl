@@ -14,6 +14,9 @@
     <string name="post_edit">Edit in browser</string>
     <string name="post_user_info">About %1$s</string>
     <string name="post_users_posts">Posts by %1$s in this thread</string>
+    <string name="watch">Watch</string>
+    <string name="mark_read">Mark as read</string>
+    <string name="unwatch">Unwatch</string>
     <string name="reply_to_thread">Reply in browser</string>
     <string name="filter_all">All posts</string>
     <string name="filter_mine">Posts by me</string>

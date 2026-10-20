@@ -18,9 +18,9 @@ class ThreadOpenerTest {
 
     @Test
     fun `watched threads open at LASTPAGE scrolled to the last read post`() {
-        assertEquals(InApp(id, 3, 47, 92), open(OpenedFrom.WATCHED, w = watched))
-        assertEquals(InApp(id, 3, null, 92), open(OpenedFrom.WATCHED, defaults.copy(loadWatchedAtTop = true), w = watched))
-        assertEquals(InApp(id, 1, null, 92), open(OpenedFrom.WATCHED, w = WatchedPosition(1, 0)), "nothing read yet")
+        assertEquals(InApp(id, 3, 47, 92, fromWatched = true), open(OpenedFrom.WATCHED, w = watched))
+        assertEquals(InApp(id, 3, null, 92, fromWatched = true), open(OpenedFrom.WATCHED, defaults.copy(loadWatchedAtTop = true), w = watched))
+        assertEquals(InApp(id, 1, null, 92, fromWatched = true), open(OpenedFrom.WATCHED, w = WatchedPosition(1, 0)), "nothing read yet")
     }
 
     @Test

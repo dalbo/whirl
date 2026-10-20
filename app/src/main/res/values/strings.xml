@@ -16,4 +16,11 @@
     <string name="about_whirldroid">Whirldroid</string>
     <string name="about_whirldroid_summary">The original app by Greg Smith, which Whirl rewrites</string>
     <string name="about_disclaimer">Whirl is not made by or affiliated with Whirlpool. Posting, private forums and private messages open in your browser, where you log in to Whirlpool.</string>
+    <string name="undo">Undo</string>
+    <string name="watch_done">Thread watched</string>
+    <string name="mark_read_done">Marked as read</string>
+    <string name="unwatch_done">Thread unwatched</string>
+    <string name="watch_failed">Could not watch the thread: %1$s</string>
+    <string name="mark_read_failed">Could not mark the thread read: %1$s</string>
+    <string name="unwatch_failed">Could not unwatch the thread: %1$s</string>
 </resources>

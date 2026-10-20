@@ -7,6 +7,8 @@ import app.cash.turbine.test
 import au.howesthat.whirl.core.data.ForumRepository
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository
+import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.database.WhirlDatabase
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.ThreadId
@@ -15,7 +17,10 @@ import au.howesthat.whirl.core.network.WhirlpoolApi
 import au.howesthat.whirl.core.network.WhirlpoolHttp
 import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.network.WhirlpoolWeb
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -56,6 +61,9 @@ class ThreadViewModelTest {
     private val forums = ForumRepository(WhirlpoolApi(client, { null }, server.url("/api/"), RetryPolicy.NONE), db.forumDao(), db.fetchLogDao(), clock)
     private val repo = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock)
     private val settings = SettingsRepository(ApplicationProvider.getApplicationContext())
+    private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    // No key: watch actions apply locally and their sends fail without a request.
+    private val watched = WatchedRepository(WhirlpoolApi(client, { null }, server.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), clock, appScope)
 
     @Before
     fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -63,6 +71,7 @@ class ThreadViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        appScope.cancel()
         server.close()
         db.close()
     }
@@ -70,7 +79,7 @@ class ThreadViewModelTest {
     private fun enqueueHtml(name: String) =
         server.enqueue(MockResponse.Builder().body(File(System.getProperty("whirl.fixtures"), "html/$name").readText()).build())
 
-    private fun viewModel(vararg args: Pair<String, Any?>) = ThreadViewModel(SavedStateHandle(mapOf(*args)), repo, settings)
+    private fun viewModel(vararg args: Pair<String, Any?>) = ThreadViewModel(SavedStateHandle(mapOf(*args)), repo, settings, watched)
 
     // Room and MockWebServer do real I/O, so wait in wall-clock time, not runTest's virtual time.
     private suspend fun <T> await(block: suspend () -> T): T =
@@ -159,9 +168,27 @@ class ThreadViewModelTest {
         // Two minutes later the cached page is stale, so the view model fetches, and the fetch fails.
         val later = Clock.offset(clock, Duration.ofMinutes(2))
         val staleRepo = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, later)
-        val vm = ThreadViewModel(SavedStateHandle(mapOf("threadId" to "3pxj858k", "page" to 2)), staleRepo, settings)
+        val vm = ThreadViewModel(SavedStateHandle(mapOf("threadId" to "3pxj858k", "page" to 2)), staleRepo, settings, watched)
         assertEquals(2, await { vm.startPage.filterNotNull().first() })
         assertEquals("Simple, ad-free NBN plan comparison tool I built", await { vm.title.filterNotNull().first() })
         await { vm.error.filterNotNull().first() }
+    }
+
+    @Test
+    fun `watch flips the menu at once, and marking read from Watched can go back to the list`() = runTest {
+        enqueueHtml("thread_3pxj858k_p2.html")
+        val vm = viewModel("threadId" to "3pxj858k", "page" to 2)
+        assertEquals(false, vm.isWatched.value)
+        vm.perform(WatchAction.WATCH)
+        await { vm.isWatched.first { it } }
+
+        settings.update { it.copy(watchedBackToList = true) }
+        enqueueHtml("thread_3pxj858k_p2.html")
+        val fromWatched = viewModel("threadId" to "3pxj858k", "page" to 2, "fromWatched" to true)
+        await { fromWatched.settings.first { it.watchedBackToList } }
+        fromWatched.navigation.test {
+            fromWatched.perform(WatchAction.MARK_READ)
+            assertEquals(ThreadEvent.Back, awaitItem())
+        }
     }
 }

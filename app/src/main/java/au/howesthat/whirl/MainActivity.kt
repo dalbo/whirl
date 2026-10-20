@@ -16,6 +16,7 @@ import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.ThemeMode
 import au.howesthat.whirl.core.ui.WhirlTheme
 import au.howesthat.whirl.feature.setup.SetupScreen
+import au.howesthat.whirl.navigation.WatchSnackbars
 import au.howesthat.whirl.navigation.WhirlApp
 import au.howesthat.whirl.navigation.routeForLink
 import au.howesthat.whirl.navigation.route
@@ -46,7 +47,9 @@ class MainActivity : ComponentActivity() {
                     // Fixed while this tree lives: a changed homepage setting must not re-route an open NavHost.
                     val startRoute = remember { loaded.settings.homepage.route() }
                     val link by viewModel.link.collectAsStateWithLifecycle()
-                    WhirlApp(startRoute = startRoute, account = account, alert = alert, link = link, onLinkHandled = viewModel::linkHandled)
+                    WhirlApp(startRoute = startRoute, account = account, alert = alert, link = link, onLinkHandled = viewModel::linkHandled) { host ->
+                        WatchSnackbars(host, viewModel.watchEvents, viewModel::undo, viewModel::commit)
+                    }
                 }
             }
         }

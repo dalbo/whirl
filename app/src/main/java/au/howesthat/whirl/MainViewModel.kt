@@ -2,8 +2,10 @@ package au.howesthat.whirl
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import au.howesthat.whirl.core.data.PendingWatch
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.SettingsRepository
+import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.network.WhirlpoolApi
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +20,11 @@ import javax.inject.Inject
 data class MainState(val settings: Settings, val setupDone: Boolean)
 
 @HiltViewModel
-class MainViewModel @Inject constructor(settings: SettingsRepository, api: WhirlpoolApi) : ViewModel() {
+class MainViewModel @Inject constructor(
+    settings: SettingsRepository,
+    api: WhirlpoolApi,
+    private val watched: WatchedRepository,
+) : ViewModel() {
     /** Null until settings are read, which keeps the splash screen up. */
     val state: StateFlow<MainState?> = combine(settings.settings, settings.isSetupDone, ::MainState)
         .distinctUntilChanged()
@@ -40,4 +46,11 @@ class MainViewModel @Inject constructor(settings: SettingsRepository, api: Whirl
     fun linkHandled() {
         _link.value = null
     }
+
+    /** Watch actions waiting for Undo, and failures, for the app-wide snackbar. */
+    val watchEvents = watched.events
+
+    suspend fun undo(p: PendingWatch) = watched.undo(p)
+
+    fun commit(p: PendingWatch) = watched.commit(p)
 }

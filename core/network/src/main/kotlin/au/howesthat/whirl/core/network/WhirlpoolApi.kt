@@ -75,34 +75,47 @@ class WhirlpoolApi(
 
     /** Watched threads. Always passes `watchedmode`: without it the API returns a third, undocumented subset. */
     suspend fun watched(unreadOnly: Boolean): List<WatchedThread> =
-        call(setOf("watched"), mapOf("watchedmode" to if (unreadOnly) "0" else "1")).watched.required("WATCHED").map {
-            WatchedThread(
-                id = ThreadId(it.id),
-                title = unescape(it.title),
-                replies = it.replies,
-                forumId = it.forumId,
-                forumName = it.forumName,
-                firstDate = parseApiDate(it.firstDate),
-                firstPoster = UserRef(it.first.id, it.first.name),
-                lastDate = parseApiDate(it.lastDate),
-                lastPoster = UserRef(it.last.id, it.last.name),
-                unreadCount = it.unread,
-                lastReadPost = it.lastRead,
-                lastPage = maxOf(it.lastPage, 1),
-            )
+        call(setOf("watched"), mapOf("watchedmode" to mode(unreadOnly))).watched.required("WATCHED").map(::toWatched)
+
+    /**
+     * Sends the watched-thread commands (comma-separated ids; at least one list non-empty) together with
+     * `get=watched&watchedmode=1`, as 2.14.12 did, and returns all watched threads after the change.
+     *
+     * Verified 2026-10-21 (fixtures/api/api_cmd_*): the returned list already reflects the commands; a command alone
+     * answers with the bare envelope; watching a thread marks it read to the end (`UNREAD 0`, `LASTREAD` = replies + 1);
+     * an unknown id is an HTML HTTP 500, which surfaces as [WhirlpoolError.Maintenance] after the usual retries.
+     */
+    suspend fun updateWatched(
+        watch: Collection<ThreadId> = emptyList(),
+        markRead: Collection<ThreadId> = emptyList(),
+        unwatch: Collection<ThreadId> = emptyList(),
+    ): List<WatchedThread> {
+        require(watch.isNotEmpty() || markRead.isNotEmpty() || unwatch.isNotEmpty())
+        val params = buildMap {
+            put("watchedmode", mode(unreadOnly = false))
+            mapOf("watchedadd" to watch, "watchedread" to markRead, "watchedremove" to unwatch).forEach { (name, ids) ->
+                if (ids.isNotEmpty()) put(name, ids.joinToString(",") { it.value })
+            }
         }
-
-    // Commands taking comma-separated thread ids (fixtures/api/api_cmd_*, captured 2026-10-21). Each answers with the bare
-    // envelope; combined with get=watched the list already reflects the change. Watching marks the thread read to the end.
-    // An unknown id is an HTML HTTP 500, which surfaces as Maintenance after the usual retries.
-    suspend fun watch(ids: Collection<ThreadId>) = command("watchedadd", ids)
-    suspend fun markRead(ids: Collection<ThreadId>) = command("watchedread", ids)
-    suspend fun unwatch(ids: Collection<ThreadId>) = command("watchedremove", ids)
-
-    private suspend fun command(name: String, ids: Collection<ThreadId>) {
-        require(ids.isNotEmpty())
-        call(emptySet(), mapOf(name to ids.joinToString(",") { it.value }))
+        return call(setOf("watched"), params).watched.required("WATCHED").map(::toWatched)
     }
+
+    private fun mode(unreadOnly: Boolean) = if (unreadOnly) "0" else "1"
+
+    private fun toWatched(it: WatchedDto) = WatchedThread(
+        id = ThreadId(it.id),
+        title = unescape(it.title),
+        replies = it.replies,
+        forumId = it.forumId,
+        forumName = it.forumName,
+        firstDate = parseApiDate(it.firstDate),
+        firstPoster = UserRef(it.first.id, it.first.name),
+        lastDate = parseApiDate(it.lastDate),
+        lastPoster = UserRef(it.last.id, it.last.name),
+        unreadCount = it.unread,
+        lastReadPost = it.lastRead,
+        lastPage = maxOf(it.lastPage, 1),
+    )
 
     private suspend fun call(gets: Set<String>, params: Map<String, String> = emptyMap(), key: String? = null): ApiEnvelope {
         val apiKey = key ?: apiKey() ?: throw WhirlpoolError.BadKey("No API key set")
