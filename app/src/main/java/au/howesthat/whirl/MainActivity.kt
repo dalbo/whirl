@@ -1,5 +1,6 @@
 package au.howesthat.whirl
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,6 +17,7 @@ import au.howesthat.whirl.core.data.ThemeMode
 import au.howesthat.whirl.core.ui.WhirlTheme
 import au.howesthat.whirl.feature.setup.SetupScreen
 import au.howesthat.whirl.navigation.WhirlApp
+import au.howesthat.whirl.navigation.routeForLink
 import au.howesthat.whirl.navigation.route
 import dagger.hilt.android.AndroidEntryPoint
 import java.time.LocalTime
@@ -28,6 +30,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen().setKeepOnScreenCondition { viewModel.state.value == null }
         super.onCreate(savedInstanceState)
+        // A recreated activity has already handled its launch intent.
+        if (savedInstanceState == null) viewModel.openLink(intent.data?.let { routeForLink(it) })
         enableEdgeToEdge()
         setContent {
             val state by viewModel.state.collectAsStateWithLifecycle()
@@ -41,10 +45,16 @@ class MainActivity : ComponentActivity() {
                 } else {
                     // Fixed while this tree lives: a changed homepage setting must not re-route an open NavHost.
                     val startRoute = remember { loaded.settings.homepage.route() }
-                    WhirlApp(startRoute = startRoute, account = account, alert = alert)
+                    val link by viewModel.link.collectAsStateWithLifecycle()
+                    WhirlApp(startRoute = startRoute, account = account, alert = alert, link = link, onLinkHandled = viewModel::linkHandled)
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        viewModel.openLink(intent.data?.let { routeForLink(it) })
     }
 }
 

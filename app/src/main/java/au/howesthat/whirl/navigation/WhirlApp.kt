@@ -4,6 +4,7 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,7 +45,7 @@ import kotlinx.coroutines.launch
  * this composition, so changing the start screen in Settings applies from the next launch, as in 2.14.12.
  */
 @Composable
-fun WhirlApp(startRoute: Any, account: Account?, alert: String) {
+fun WhirlApp(startRoute: Any, account: Account?, alert: String, link: Any? = null, onLinkHandled: () -> Unit = {}) {
     val nav = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -67,6 +68,14 @@ fun WhirlApp(startRoute: Any, account: Account?, alert: String) {
             openForum = listNav.openForum,
             openUser = { nav.navigate(UserRoute(it)) },
         )
+    }
+
+    // Links open on top of the start screen, so Back returns to it.
+    LaunchedEffect(link) {
+        link?.let {
+            nav.navigate(it)
+            onLinkHandled()
+        }
     }
 
     ModalNavigationDrawer(

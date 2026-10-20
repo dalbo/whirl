@@ -81,6 +81,13 @@ class ForumViewModel @Inject constructor(
     val route = savedState.toRoute<ForumRoute>()
     private val forumId = route.forumId
 
+    /** The route's title, or (for links, which carry none) the forum's name from the forum list or the page. */
+    val title: StateFlow<String> = combine(
+        deps.forums.forums.map { cached -> cached.value.firstOrNull { it.forum.id == forumId }?.forum?.title },
+        scraped.observe(ScrapedList.ForumPage(forumId, 1, route.groupId)).map { it?.value?.forum?.title },
+    ) { listed, scrapedTitle -> route.title.ifBlank { listed ?: scrapedTitle.orEmpty() } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, route.title)
+
     private val _group = MutableStateFlow(route.groupId)
     val group: StateFlow<Int?> = _group.asStateFlow()
 
@@ -170,17 +177,18 @@ fun ForumScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: ForumViewModel 
     LaunchedEffect(group) { pager.scrollToPage(0) }
 
     val groupName = groups.firstOrNull { it.id == group }?.name
+    val title by viewModel.title.collectAsStateWithLifecycle()
     Scaffold(
         topBar = {
             Column {
                 TopAppBar(
-                    title = { ListTitle(viewModel.route.title, updatedAt = null, subtitle = groupName) },
+                    title = { ListTitle(title, updatedAt = null, subtitle = groupName) },
                     navigationIcon = { NavIconButton(navIcon) },
                     actions = {
                         // Private forums search in the browser, where the user is logged in; offer the browser instead.
                         if (!isPrivate) {
                             IconButton(onClick = {
-                                nav.openSearch(SearchRoute(forumId = viewModel.route.forumId, groupId = group, scopeTitle = groupName ?: viewModel.route.title))
+                                nav.openSearch(SearchRoute(forumId = viewModel.route.forumId, groupId = group, scopeTitle = groupName ?: title))
                             }) { Icon(Icons.Default.Search, stringResource(R.string.search)) }
                         }
                         RefreshButton { viewModel.refresh() }
