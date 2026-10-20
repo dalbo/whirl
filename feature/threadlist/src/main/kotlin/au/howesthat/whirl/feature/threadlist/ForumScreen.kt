@@ -143,6 +143,9 @@ class ForumViewModel @Inject constructor(
 
     fun browserUrl(): String = WhirlpoolUrls().forum(forumId, currentPage.value, _group.value).toString()
 
+    /** Posting stays in the browser, where the user is logged in to Whirlpool. */
+    fun newThreadUrl(): String = WhirlpoolUrls().newThread(forumId).toString()
+
     override suspend fun fetch(force: Boolean) {
         if (isPrivate.value) {
             apiThreads.refresh(forumId, force)
@@ -192,7 +195,7 @@ fun ForumScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: ForumViewModel 
                             }) { Icon(Icons.Default.Search, stringResource(R.string.search)) }
                         }
                         RefreshButton { viewModel.refresh() }
-                        Overflow(onOpenInBrowser = { browser(viewModel.browserUrl()) })
+                        Overflow(onNewThread = { browser(viewModel.newThreadUrl()) }, onOpenInBrowser = { browser(viewModel.browserUrl()) })
                     },
                 )
                 if (!isPrivate && (groups.isNotEmpty() || pageCount > 1)) {
@@ -272,10 +275,11 @@ private fun GroupPicker(groups: List<ForumGroup>, selected: Int?, onSelect: (Int
 }
 
 @Composable
-private fun Overflow(onOpenInBrowser: () -> Unit) {
+private fun Overflow(onNewThread: () -> Unit, onOpenInBrowser: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, stringResource(R.string.more)) }
     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        DropdownMenuItem(text = { Text(stringResource(R.string.new_thread)) }, onClick = { open = false; onNewThread() })
         DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser)) }, onClick = { open = false; onOpenInBrowser() })
     }
 }
