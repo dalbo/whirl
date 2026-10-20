@@ -25,6 +25,7 @@ import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import mockwebserver3.MockResponse
+import okhttp3.Dns
 import mockwebserver3.MockWebServer
 import org.junit.After
 import org.junit.Before
@@ -33,6 +34,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
+import java.net.UnknownHostException
 import java.time.Clock
 import kotlin.test.assertEquals
 
@@ -44,7 +46,10 @@ class ThreadViewModelTest {
     private val server = MockWebServer().apply { start() }
     private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), WhirlDatabase::class.java)
         .allowMainThreadQueries().build()
-    private val client = WhirlpoolHttp.client("Whirl/test")
+    // Unit tests never touch the network: whrl.pl fails to resolve, everything else is MockWebServer on localhost.
+    private val client = WhirlpoolHttp.client("Whirl/test").newBuilder()
+        .dns { host -> if (host == "localhost" || host == "127.0.0.1") Dns.SYSTEM.lookup(host) else throw UnknownHostException(host) }
+        .build()
     private val clock = Clock.systemUTC()
     private val forums = ForumRepository(WhirlpoolApi(client, { null }, server.url("/api/"), RetryPolicy.NONE), db.forumDao(), db.fetchLogDao(), clock)
     private val repo = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock)
@@ -130,5 +135,17 @@ class ThreadViewModelTest {
         assertEquals(2, await { vm.jumpTo.filterNotNull().first() })
         assertEquals(ScrollTarget(2, postNumber = 21), vm.scrollTarget.value)
         assertEquals("/forum/?action=replies&r=75543951", server.takeRequest().target)
+    }
+
+    @Test
+    fun `a short link that cannot be followed opens in the browser`() = runTest {
+        enqueueHtml("thread_3pxj858k_p2.html")
+        val vm = viewModel("threadId" to "3pxj858k", "page" to 2)
+        await { vm.startPage.filterNotNull().first() }
+        vm.navigation.test {
+            // The test client cannot resolve whrl.pl, so following the link fails.
+            vm.openLink("https://whrl.pl/RgPkJ5")
+            assertEquals(ThreadEvent.Browser("https://whrl.pl/RgPkJ5"), awaitItem())
+        }
     }
 }

@@ -293,7 +293,17 @@ class ThreadViewModel @Inject constructor(
             is WhirlpoolLink.Forum -> events.send(ThreadEvent.OpenForum(ForumRef(link.id, "", link.groupId)))
             is WhirlpoolLink.User -> events.send(ThreadEvent.OpenUser(link.id))
             is WhirlpoolLink.Reply -> locate(link.replyId)
-            is WhirlpoolLink.Short -> handle(repo.resolveShortLink(link.url).let { if (it is WhirlpoolLink.Short) WhirlpoolLink.External(link.url) else it })
+            // Where whrl.pl redirects is unverified; if it cannot be followed, the browser can.
+            is WhirlpoolLink.Short -> {
+                val target = try {
+                    repo.resolveShortLink(link.url)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    null
+                }
+                handle(target?.takeUnless { it is WhirlpoolLink.Short } ?: WhirlpoolLink.External(link.url))
+            }
             is WhirlpoolLink.External -> events.send(ThreadEvent.Browser(link.url))
         }
     }
