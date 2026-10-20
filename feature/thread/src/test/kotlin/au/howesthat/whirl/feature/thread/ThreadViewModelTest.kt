@@ -9,6 +9,7 @@ import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository
 import au.howesthat.whirl.core.database.WhirlDatabase
 import au.howesthat.whirl.core.model.ForumRef
+import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.network.RetryPolicy
 import au.howesthat.whirl.core.network.WhirlpoolApi
 import au.howesthat.whirl.core.network.WhirlpoolHttp
@@ -36,6 +37,7 @@ import org.robolectric.annotation.Config
 import java.io.File
 import java.net.UnknownHostException
 import java.time.Clock
+import java.time.Duration
 import kotlin.test.assertEquals
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -147,5 +149,19 @@ class ThreadViewModelTest {
             vm.openLink("https://whrl.pl/RgPkJ5")
             assertEquals(ThreadEvent.Browser("https://whrl.pl/RgPkJ5"), awaitItem())
         }
+    }
+
+    @Test
+    fun `a cached page shows its title when the fetch fails`() = runTest {
+        enqueueHtml("thread_3pxj858k_p2.html")
+        repo.load(ThreadId("3pxj858k"), 2)
+        server.close()
+        // Two minutes later the cached page is stale, so the view model fetches, and the fetch fails.
+        val later = Clock.offset(clock, Duration.ofMinutes(2))
+        val staleRepo = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, later)
+        val vm = ThreadViewModel(SavedStateHandle(mapOf("threadId" to "3pxj858k", "page" to 2)), staleRepo, settings)
+        assertEquals(2, await { vm.startPage.filterNotNull().first() })
+        assertEquals("Simple, ad-free NBN plan comparison tool I built", await { vm.title.filterNotNull().first() })
+        await { vm.error.filterNotNull().first() }
     }
 }
