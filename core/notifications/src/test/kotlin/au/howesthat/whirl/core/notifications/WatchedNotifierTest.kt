@@ -168,9 +168,15 @@ class WatchedNotifierTest {
     @Test
     fun `without permission nothing is posted`() = runTest {
         shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
-        enqueue(unreadTwo)
         notifier.check()
         assertNull(shown())
+        assertEquals(0, server.requestCount)
+        assertEquals(emptyList(), db.notifiedDao().all(), "they alert once allowed")
+
+        shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        enqueue(unreadTwo)
+        notifier.check()
+        assertNotNull(shown())
     }
 
     @Test
