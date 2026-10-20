@@ -8,24 +8,17 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.ThemeMode
 import au.howesthat.whirl.core.ui.WhirlTheme
-import au.howesthat.whirl.feature.settings.SettingsScreen
 import au.howesthat.whirl.feature.setup.SetupScreen
-import au.howesthat.whirl.home.HomeScreen
+import au.howesthat.whirl.navigation.WhirlApp
+import au.howesthat.whirl.navigation.route
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.serialization.Serializable
 import java.time.LocalTime
-
-@Serializable object SetupRoute
-@Serializable object HomeRoute
-@Serializable object SettingsRoute
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -40,20 +33,15 @@ class MainActivity : ComponentActivity() {
             val state by viewModel.state.collectAsStateWithLifecycle()
             val loaded = state ?: return@setContent
             WhirlTheme(darkTheme = isDark(loaded.settings)) {
-                val nav = rememberNavController()
-                NavHost(nav, startDestination = if (loaded.setupDone) HomeRoute else SetupRoute) {
-                    composable<SetupRoute> {
-                        SetupScreen(onFinished = { nav.navigate(HomeRoute) { popUpTo(SetupRoute) { inclusive = true } } })
-                    }
-                    composable<HomeRoute> {
-                        HomeScreen(onOpenSettings = { nav.navigate(SettingsRoute) })
-                    }
-                    composable<SettingsRoute> {
-                        SettingsScreen(
-                            onBack = { nav.popBackStack() },
-                            onSignedOut = { nav.navigate(SetupRoute) { popUpTo(0) { inclusive = true } } },
-                        )
-                    }
+                val account by viewModel.account.collectAsStateWithLifecycle()
+                val alert by viewModel.alert.collectAsStateWithLifecycle()
+                if (!loaded.setupDone) {
+                    // Finishing setup or signing out flips setupDone, which swaps between these two trees.
+                    SetupScreen(onFinished = {})
+                } else {
+                    // Fixed while this tree lives: a changed homepage setting must not re-route an open NavHost.
+                    val startRoute = remember { loaded.settings.homepage.route() }
+                    WhirlApp(startRoute = startRoute, account = account, alert = alert)
                 }
             }
         }

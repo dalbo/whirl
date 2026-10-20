@@ -38,7 +38,7 @@ Read in this order: this file → `PLAN.md` → `fixtures/README.md` → `tools/
   - `:core:data` — `SettingsRepository` (DataStore; API key + all §1.2 settings; excluded from backup), `AccountRepository`, `ForumRepository`, `NewsRepository`, `LatestThreadsRepository`, `WatchedRepository`, `Refresher` (2.14.12 max ages, 10 s manual throttle), `Cached<T>(value, updatedAt)`, `NetworkModule` (User-Agent `Whirl/<version> (Android; +https://github.com/dalbo/whirl)`).
   - `:core:ui` — `WhirlTheme`, `errorMessage`, `ErrorState` (Retry + Open in browser), `UpdatedAgo`.
   - `:feature:setup` (wizard, verified live on the phone), `:feature:settings` (every setting, log out).
-  - `:app` — Hilt, splash, type-safe Navigation (`SetupRoute`, `HomeRoute`, `SettingsRoute`), theme from settings. `home/HomeScreen.kt` is a **temporary** Phase 1 status screen; Phase 2 replaces it.
+  - `:app` — Hilt, splash, type-safe Navigation, theme from settings. (Phase 1's temporary `home/HomeScreen.kt` was replaced in Phase 2 task 1.)
 - **Devices**: the phone is reached over USB with the Windows adb (`/mnt/c/Users/dalli/AppData/Local/Android/Sdk/platform-tools/adb.exe`, pass APKs with `wslpath -w`). Wireless pairing failed; ask Dallin to plug in. Debug builds install as `au.howesthat.whirl.debug` beside the release app.
 - **Fixture corrections found in Phase 1** (now in the docs): `thread_3pxj858k_p2.html` has 3 edited posts, not 8; `forum92_p1.html` has 1 deleted row; `thread_97r5wzn3_p1.html` has no public notebar; forum 71 is "Lifestyle", group 189 "Food"; lists, `<hr>` and moderator-hidden posts do occur.
 
@@ -52,6 +52,10 @@ PLAN.md §1 is the spec and §9 the scope. Open a PR per task; keep CI green.
 6. **News, search (list view; relevance view optional), user profile**.
 7. **Deep links**: `https://forums.whirlpool.net.au/thread|forum|user|archive/*` (needs `autoVerify` off since we don't own the domain: register as a browsable handler) and the old `whirldroid-thread://` scheme only if cheap.
 8. **Release v0.1**: manual device checklist (PLAN.md §8) with Dallin, `## v0.1.0` in CHANGELOG.md, tag `v0.1.0` from `main`.
+
+## Phase 2 progress
+One PR per task; this list says what landed and what was decided along the way.
+1. **Navigation shell** (done): drawer in `app/navigation/` (`WhirlApp`, `Drawer`, type-safe `Routes`), About screen. Setup is no longer a NavHost destination: `MainActivity` shows `SetupScreen` while `setupDone` is false and `WhirlApp` otherwise, so finishing setup or signing out swaps the tree and the homepage is always the root of the back stack. "Latest activity" (`get=threads`, site-wide) is a drawer entry and a `Homepage` option (new; not in 2.14.12). Screens that can be drawer roots or pushed take a `NavIcon` (`:core:ui`). `openInBrowser` (Custom Tabs, `androidx.browser`) is in `:core:ui`. Drawer screens not built yet show a placeholder.
 
 ## Known unknowns to resolve as you go
 - Shape of `get=recent` when non-empty (assumed to match `THREADS`; the Recent screen must cope with it failing as Drift).

@@ -14,4 +14,7 @@
     <string name="updated_hours">Updated %1$d h ago</string>
     <string name="updated_days">Updated %1$d d ago</string>
     <string name="never_updated">Not loaded yet</string>
+    <string name="no_browser">No app can open this link.</string>
+    <string name="open_menu">Open menu</string>
+    <string name="back">Back</string>
 </resources>

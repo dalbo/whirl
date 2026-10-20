@@ -157,6 +157,7 @@ private fun homepageLabel(h: Homepage) = stringResource(
     when (h) {
         Homepage.NEWS -> R.string.home_news
         Homepage.RECENT -> R.string.home_recent
+        Homepage.LATEST -> R.string.home_latest
         Homepage.WATCHED -> R.string.home_watched
         Homepage.POPULAR -> R.string.home_popular
         Homepage.FORUMS -> R.string.home_forums
