@@ -18,6 +18,9 @@ import androidx.compose.ui.unit.dp
 import au.howesthat.whirl.core.model.WhirlpoolError
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 /** The message for any failure. API `ERROR`/`ALERT` text is shown verbatim. */
 @Composable
@@ -65,4 +68,30 @@ fun UpdatedAgo(updatedAt: Instant?, now: Instant, modifier: Modifier = Modifier)
         }
     }
     Text(text, modifier.fillMaxWidth(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+/** "5 min ago", "3 h ago", "2 d ago", then the date, for an API time. Shown in the device's zone. */
+@Composable
+fun timeAgo(at: Instant, now: Instant): String {
+    val minutes = Duration.between(at, now).toMinutes().coerceAtLeast(0)
+    return when {
+        minutes < 1 -> stringResource(R.string.ago_just_now)
+        minutes < 60 -> stringResource(R.string.ago_minutes, minutes.toInt())
+        minutes < 60 * 24 -> stringResource(R.string.ago_hours, (minutes / 60).toInt())
+        minutes < 60 * 24 * 7 -> stringResource(R.string.ago_days, (minutes / (60 * 24)).toInt())
+        else -> DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).format(at.atZone(ZoneId.systemDefault()))
+    }
+}
+
+/** A full-screen message for an empty list. */
+@Composable
+fun EmptyState(text: String, modifier: Modifier = Modifier, action: (@Composable () -> Unit)? = null) {
+    Column(
+        modifier = modifier.padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        action?.invoke()
+    }
 }

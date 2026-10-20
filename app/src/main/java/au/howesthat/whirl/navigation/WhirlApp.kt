@@ -16,11 +16,19 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import au.howesthat.whirl.R
 import au.howesthat.whirl.about.AboutScreen
 import au.howesthat.whirl.core.data.Account
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.feature.settings.SettingsScreen
+import au.howesthat.whirl.feature.threadlist.ForumRoute
+import au.howesthat.whirl.feature.threadlist.ForumScreen
+import au.howesthat.whirl.feature.threadlist.LatestScreen
+import au.howesthat.whirl.feature.threadlist.PopularScreen
+import au.howesthat.whirl.feature.threadlist.RecentScreen
+import au.howesthat.whirl.feature.threadlist.ThreadListNav
+import au.howesthat.whirl.feature.threadlist.WatchedScreen
 import kotlinx.coroutines.launch
 
 /**
@@ -38,6 +46,12 @@ fun WhirlApp(startRoute: Any, account: Account?, alert: String) {
 
     val drawerIcon = remember(drawerState) { NavIcon.Drawer { scope.launch { drawerState.open() } } }
     val backIcon = remember(nav) { NavIcon.Back { nav.popBackStack() } }
+    val listNav = remember(nav) {
+        ThreadListNav(
+            openThread = { t -> nav.navigate(ThreadRoute(t.id.value, t.page, t.scrollToPost, t.forumId)) },
+            openForum = { f -> nav.navigate(ForumRoute(f.id, f.title, f.groupId)) },
+        )
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -57,10 +71,15 @@ fun WhirlApp(startRoute: Any, account: Account?, alert: String) {
     ) {
         NavHost(nav, startDestination = startRoute) {
             composable<NewsRoute> { PlaceholderScreen(stringResource(R.string.nav_news), drawerIcon) }
-            composable<RecentRoute> { PlaceholderScreen(stringResource(R.string.nav_recent), drawerIcon) }
-            composable<LatestRoute> { PlaceholderScreen(stringResource(R.string.nav_latest), drawerIcon) }
-            composable<WatchedRoute> { PlaceholderScreen(stringResource(R.string.nav_watched), drawerIcon) }
-            composable<PopularRoute> { PlaceholderScreen(stringResource(R.string.nav_popular), drawerIcon) }
+            composable<RecentRoute> { RecentScreen(drawerIcon, listNav) }
+            composable<LatestRoute> { LatestScreen(drawerIcon, listNav) }
+            composable<WatchedRoute> { WatchedScreen(drawerIcon, listNav) }
+            composable<PopularRoute> { PopularScreen(drawerIcon, listNav) }
+            composable<ForumRoute> { ForumScreen(backIcon, listNav) }
+            composable<ThreadRoute> { entry ->
+                val route = entry.toRoute<ThreadRoute>()
+                PlaceholderScreen("${route.threadId} · ${route.page}", backIcon)
+            }
             composable<ForumsRoute> { PlaceholderScreen(stringResource(R.string.nav_forums), drawerIcon) }
             composable<SettingsRoute> {
                 SettingsScreen(

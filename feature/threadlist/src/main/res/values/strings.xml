@@ -1,0 +1,44 @@
+<resources>
+    <string name="refresh">Refresh</string>
+    <string name="more">More options</string>
+    <string name="updated_ago">Updated %1$s</string>
+    <string name="latest_title">Latest activity</string>
+    <string name="recent_title">Recent threads</string>
+    <string name="popular_title">Popular threads</string>
+    <string name="watched_title">Watched threads</string>
+    <string name="watched_tab_unread">Unread</string>
+    <string name="watched_tab_all">All</string>
+    <plurals name="watched_unread">
+        <item quantity="one">%1$d unread</item>
+        <item quantity="other">%1$d unread</item>
+    </plurals>
+    <string name="empty_latest">No recent activity.</string>
+    <string name="empty_recent">You have not posted in any threads in this period. The period is set in Settings.</string>
+    <string name="empty_popular">No popular threads right now.</string>
+    <string name="empty_watched_unread">No unread posts in your watched threads.</string>
+    <string name="empty_watched">You are not watching any threads.</string>
+    <string name="empty_forum">No threads on this page.</string>
+    <string name="empty_private_forum">This forum needs a Whirlpool login. Open it in your browser.</string>
+    <string name="all_groups">All groups</string>
+    <string name="page_of">Page %1$d of %2$d</string>
+    <string name="go_to_page">Go to page</string>
+    <string name="first_page">First</string>
+    <string name="last_page">Last</string>
+    <string name="go">Go</string>
+    <string name="row_last_post">Jump to last post</string>
+    <string name="row_go_to_forum">Go to %1$s</string>
+    <string name="row_sticky">Sticky</string>
+    <string name="row_closed">Closed</string>
+    <string name="row_moved">Moved</string>
+    <string name="row_deleted">Deleted</string>
+    <string name="row_last_by_at">%1$s, %2$s</string>
+    <string name="row_last_by">%1$s</string>
+    <plurals name="row_replies">
+        <item quantity="one">%1$d reply</item>
+        <item quantity="other">%1$d replies</item>
+    </plurals>
+    <plurals name="row_pages">
+        <item quantity="one">%1$d page</item>
+        <item quantity="other">%1$d pages</item>
+    </plurals>
+</resources>

@@ -84,15 +84,10 @@ class ThreadPageRepository @Inject constructor(
         )
         val html = web.get(url)
         return try {
-            ThreadPageParser.parse(html)
+            parseOrDrift { ThreadPageParser.parse(html) }
         } catch (e: WhirlpoolError.NotSignedIn) {
             forumId?.let { forums.markPrivate(it) }
             throw e
-        } catch (e: WhirlpoolError) {
-            throw e
-        } catch (e: RuntimeException) {
-            // Anything else from the parser (a missing attribute, a malformed number) means the markup moved.
-            throw WhirlpoolError.Drift("Could not read thread ${id.value}", e)
         }
     }
 
