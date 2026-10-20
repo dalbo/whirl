@@ -62,7 +62,13 @@ class WhirlpoolUrls(val forums: HttpUrl = "https://forums.whirlpool.net.au/".toH
     /** Reply to a post, in the browser (seen in the thread page markup). */
     fun replyToPost(replyId: Long): HttpUrl = action("reply").addQueryParameter("r", replyId.toString()).build()
 
-    /** Reply to a thread, in the browser (2.14.12's URL; not in logged-out markup). */
+    /**
+     * Start a thread in a forum, in the browser (2.14.12's URL). Logged out it answers with the "Not signed in" page,
+     * where an unknown action is a 404 (checked 2026-10-21), so the action exists.
+     */
+    fun newThread(forumId: Int): HttpUrl = action("newthread").addQueryParameter("f", forumId.toString()).build()
+
+    /** Reply to a thread, in the browser (2.14.12's URL; not in logged-out markup; logged out it is "Not signed in", not a 404). */
     fun replyToThread(id: ThreadId): HttpUrl = action("reply").addQueryParameter("t", id.value).build()
 
     /** Edit one's own post, in the browser (2.14.12's URL; only shown to the author when logged in). */
