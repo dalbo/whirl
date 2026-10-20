@@ -20,6 +20,7 @@ import au.howesthat.whirl.core.model.WatchedThread
 import au.howesthat.whirl.core.network.WhirlpoolApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import java.time.Clock
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -40,8 +41,14 @@ class ForumRepository @Inject constructor(
 
     val forums: Flow<Cached<List<ForumListItem>>> =
         combine(dao.observeAll(), log.observeFetchedAt(KEY)) { rows, at ->
-            Cached(rows.map { ForumListItem(Forum(it.id, it.title, it.section), it.isFavourite, it.isPrivate) }, at?.let(Instant::ofEpochMilli))
+            Cached(
+                rows.map { ForumListItem(Forum(it.id, it.title, it.section), it.isFavourite, it.isPrivate || it.id in KNOWN_PRIVATE) },
+                at?.let(Instant::ofEpochMilli),
+            )
         }
+
+    /** Forums whose pages need a web login: the known ones plus any learned from a "Not signed in" page. */
+    val privateIds: Flow<Set<Int>> = dao.observeAll().map { rows -> rows.filter { it.isPrivate }.mapTo(KNOWN_PRIVATE.toMutableSet()) { it.id } }
 
     suspend fun refresh(force: Boolean = false) = refresher.refresh(KEY, MaxAge.FORUMS, force) {
         dao.replaceAll(api.forums().mapIndexed { i, f -> ForumEntity(f.id, f.title, f.section, i) })
@@ -53,8 +60,11 @@ class ForumRepository @Inject constructor(
     /** Called when a forum page turns out to need a web login. */
     suspend fun markPrivate(forumId: Int) = dao.setPrivate(forumId, true)
 
-    private companion object {
-        const val KEY = "forums"
+    companion object {
+        private const val KEY = "forums"
+
+        /** Private Messages, Feedback, In the news, Talk with a mod (PLAN.md §2.2). */
+        val KNOWN_PRIVATE = setOf(1, 35, 85, 134)
     }
 }
 
@@ -100,10 +110,7 @@ class LatestThreadsRepository @Inject constructor(
 ) {
     private val refresher = Refresher(log, clock)
 
-    val threads: Flow<Cached<List<ThreadSummary>>> =
-        combine(dao.observeSource(ThreadSource.LATEST.name, KEY), log.observeFetchedAt(LOG_KEY)) { rows, at ->
-            Cached(rows.map { it.toSummary() }, at?.let(Instant::ofEpochMilli))
-        }
+    val threads: Flow<Cached<List<ThreadSummary>>> = observeApiList(dao, log, ThreadSource.LATEST, KEY, LOG_KEY)
 
     suspend fun refresh(force: Boolean = false) = refresher.refresh(LOG_KEY, MaxAge.THREAD_LISTS, force) {
         dao.replaceApiList(ThreadSource.LATEST, KEY, api.threads(count = 100).map { it.toColumns() })
@@ -114,6 +121,61 @@ class LatestThreadsRepository @Inject constructor(
         const val LOG_KEY = "latest"
     }
 }
+
+/**
+ * One forum's 100 most recently active threads from the API (`get=threads&forumids=N&threadcount=100`). For public
+ * forums this overlays `UNREAD` on the scraped pages; for private forums it is the whole list (where the API allows).
+ */
+@Singleton
+class ForumThreadsRepository @Inject constructor(
+    private val api: WhirlpoolApi,
+    private val dao: ThreadDao,
+    private val log: FetchLogDao,
+    clock: Clock,
+) {
+    private val refresher = Refresher(log, clock)
+
+    fun threads(forumId: Int): Flow<Cached<List<ThreadSummary>>> =
+        observeApiList(dao, log, ThreadSource.FORUM, forumId.toString(), logKey(forumId))
+
+    suspend fun refresh(forumId: Int, force: Boolean = false) = refresher.refresh(logKey(forumId), MaxAge.THREAD_LISTS, force) {
+        dao.replaceApiList(ThreadSource.FORUM, forumId.toString(), api.threads(listOf(forumId), count = 100).map { it.toColumns() })
+    }
+
+    private fun logKey(forumId: Int) = "forum-api:$forumId"
+}
+
+/** Threads the user posted in over the last `recentHistoryDays` days (`get=recent`). */
+@Singleton
+class RecentRepository @Inject constructor(
+    private val api: WhirlpoolApi,
+    private val dao: ThreadDao,
+    private val log: FetchLogDao,
+    clock: Clock,
+) {
+    private val refresher = Refresher(log, clock)
+
+    fun threads(days: Int): Flow<Cached<List<ThreadSummary>>> = observeApiList(dao, log, ThreadSource.RECENT, KEY, logKey(days))
+
+    /** A changed history length is a different list, so it fetches at once. */
+    suspend fun refresh(days: Int, force: Boolean = false) = refresher.refresh(logKey(days), MaxAge.THREAD_LISTS, force) {
+        dao.replaceApiList(ThreadSource.RECENT, KEY, api.recent(days).map { it.toColumns() })
+        // Only the latest history length's list is stored, so older lengths must refetch.
+        log.deleteMatching("recent:%")
+    }
+
+    private fun logKey(days: Int) = "recent:$days"
+
+    private companion object {
+        // clearAccountData() clears this key on log out.
+        const val KEY = ""
+    }
+}
+
+private fun observeApiList(dao: ThreadDao, log: FetchLogDao, source: ThreadSource, key: String, logKey: String) =
+    combine(dao.observeSource(source.name, key), log.observeFetchedAt(logKey)) { rows, at ->
+        Cached(rows.map { it.toSummary() }, at?.let(Instant::ofEpochMilli))
+    }
 
 @Singleton
 class WatchedRepository @Inject constructor(

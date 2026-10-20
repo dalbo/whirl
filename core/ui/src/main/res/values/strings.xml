@@ -17,4 +17,8 @@
     <string name="no_browser">No app can open this link.</string>
     <string name="open_menu">Open menu</string>
     <string name="back">Back</string>
+    <string name="ago_just_now">just now</string>
+    <string name="ago_minutes">%1$d min ago</string>
+    <string name="ago_hours">%1$d h ago</string>
+    <string name="ago_days">%1$d d ago</string>
 </resources>

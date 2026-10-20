@@ -175,6 +175,10 @@ interface FetchLogDao {
 
     @Query("DELETE FROM fetch_log")
     suspend fun clear()
+
+    /** Deletes entries whose key matches the SQL LIKE [pattern]. */
+    @Query("DELETE FROM fetch_log WHERE `key` LIKE :pattern")
+    suspend fun deleteMatching(pattern: String)
 }
 
 @Dao

@@ -69,6 +69,7 @@ dependencies {
     implementation(project(":core:ui"))
     implementation(project(":feature:setup"))
     implementation(project(":feature:settings"))
+    implementation(project(":feature:threadlist"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.splashscreen)
