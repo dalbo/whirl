@@ -2,6 +2,7 @@ package au.howesthat.whirl.core.database
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -89,4 +90,60 @@ data class NotifiedEntity(
 data class FetchLogEntity(
     @PrimaryKey val key: String,
     @ColumnInfo(name = "fetched_at") val fetchedAt: Long,
+)
+
+/**
+ * A cached thread page: the page's metadata, with its posts in [PostEntity]. [filter] is "" for all posts, or the
+ * post filter the page was fetched with (`u<userid>`, `m`, `r`). Pages are evicted least-recently-opened first.
+ */
+@Entity(tableName = "thread_pages", primaryKeys = ["thread_id", "filter", "page"])
+data class ThreadPageEntity(
+    @ColumnInfo(name = "thread_id") val threadId: String,
+    val filter: String,
+    val page: Int,
+    @ColumnInfo(name = "page_count") val pageCount: Int,
+    val title: String,
+    @ColumnInfo(name = "forum_id") val forumId: Int?,
+    @ColumnInfo(name = "forum_title") val forumTitle: String?,
+    @ColumnInfo(name = "group_id") val groupId: Int?,
+    @ColumnInfo(name = "moderator_note_html") val moderatorNoteHtml: String?,
+    /** Multi-part thread links as `number:threadId:current` joined with `;` (empty when none). */
+    val parts: String,
+    @ColumnInfo(name = "fetched_at") val fetchedAt: Long,
+    @ColumnInfo(name = "accessed_at") val accessedAt: Long,
+)
+
+/** A post on a cached [ThreadPageEntity]; deleted with its page. Times are epoch milliseconds. */
+@Entity(
+    tableName = "posts",
+    primaryKeys = ["thread_id", "filter", "page", "reply_id"],
+    foreignKeys = [
+        ForeignKey(
+            entity = ThreadPageEntity::class,
+            parentColumns = ["thread_id", "filter", "page"],
+            childColumns = ["thread_id", "filter", "page"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+)
+data class PostEntity(
+    @ColumnInfo(name = "thread_id") val threadId: String,
+    val filter: String,
+    val page: Int,
+    @ColumnInfo(name = "reply_id") val replyId: Long,
+    @ColumnInfo(name = "reply_num") val replyNum: Int,
+    @ColumnInfo(name = "user_id") val userId: Long,
+    @ColumnInfo(name = "user_name") val userName: String,
+    @ColumnInfo(name = "user_group") val userGroup: String?,
+    val quip: String?,
+    @ColumnInfo(name = "post_count") val postCount: Int?,
+    @ColumnInfo(name = "posted_text") val postedText: String?,
+    /** [postedText] read as Sydney local time. */
+    @ColumnInfo(name = "posted_at") val postedAt: Long?,
+    @ColumnInfo(name = "edited_text") val editedText: String?,
+    @ColumnInfo(name = "is_op") val isOp: Boolean,
+    @ColumnInfo(name = "hidden_reason") val hiddenReason: String?,
+    @ColumnInfo(name = "is_deleted") val isDeleted: Boolean,
+    @ColumnInfo(name = "short_url") val shortUrl: String?,
+    @ColumnInfo(name = "body_html") val bodyHtml: String,
 )
