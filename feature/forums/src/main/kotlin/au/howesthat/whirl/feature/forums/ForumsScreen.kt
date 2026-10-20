@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -111,7 +112,7 @@ class ForumsViewModel @Inject constructor(private val repo: ForumRepository) : V
 /** The forum list. Public forums open in the app ([onOpenForum]); private ones in the browser, where the user is logged in. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ForumsScreen(navIcon: NavIcon, onOpenForum: (ForumRef) -> Unit, viewModel: ForumsViewModel = hiltViewModel()) {
+fun ForumsScreen(navIcon: NavIcon, onOpenForum: (ForumRef) -> Unit, onSearch: () -> Unit, viewModel: ForumsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
@@ -124,7 +125,10 @@ fun ForumsScreen(navIcon: NavIcon, onOpenForum: (ForumRef) -> Unit, viewModel: F
             TopAppBar(
                 title = { Text(stringResource(R.string.forums_title)) },
                 navigationIcon = { NavIconButton(navIcon) },
-                actions = { IconButton(onClick = { viewModel.refresh() }) { Icon(Icons.Default.Refresh, stringResource(R.string.refresh)) } },
+                actions = {
+                    IconButton(onClick = onSearch) { Icon(Icons.Default.Search, stringResource(R.string.search)) }
+                    IconButton(onClick = { viewModel.refresh() }) { Icon(Icons.Default.Refresh, stringResource(R.string.refresh)) }
+                },
             )
         },
     ) { padding ->

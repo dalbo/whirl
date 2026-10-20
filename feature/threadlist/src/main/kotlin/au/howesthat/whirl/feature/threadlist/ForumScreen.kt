@@ -10,6 +10,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -176,6 +177,12 @@ fun ForumScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: ForumViewModel 
                     title = { ListTitle(viewModel.route.title, updatedAt = null, subtitle = groupName) },
                     navigationIcon = { NavIconButton(navIcon) },
                     actions = {
+                        // Private forums search in the browser, where the user is logged in; offer the browser instead.
+                        if (!isPrivate) {
+                            IconButton(onClick = {
+                                nav.openSearch(SearchRoute(forumId = viewModel.route.forumId, groupId = group, scopeTitle = groupName ?: viewModel.route.title))
+                            }) { Icon(Icons.Default.Search, stringResource(R.string.search)) }
+                        }
                         RefreshButton { viewModel.refresh() }
                         Overflow(onOpenInBrowser = { browser(viewModel.browserUrl()) })
                     },

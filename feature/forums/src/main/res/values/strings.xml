@@ -6,4 +6,5 @@
     <string name="add_favourite">Add to favourites</string>
     <string name="remove_favourite">Remove from favourites</string>
     <string name="private_forum">Needs a Whirlpool login; opens in your browser</string>
+    <string name="search">Search</string>
 </resources>

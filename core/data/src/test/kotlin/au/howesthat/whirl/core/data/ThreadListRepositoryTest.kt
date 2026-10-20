@@ -141,4 +141,17 @@ class ThreadListRepositoryTest {
         enqueue("api/api_whims.json")
         assertFailsWith<WhirlpoolError.Drift> { repo.refresh(7) }
     }
+
+    @Test
+    fun `user profiles are scraped and cached`() = runTest {
+        val repo = UserRepository(web, clock)
+        enqueue("html/user_30703.html")
+        assertTrue(repo.refresh(30703))
+        assertEquals("/user/30703", server.takeRequest().target)
+        val profile = repo.profile(30703).first()!!.value
+        assertEquals(30703L, profile.user.id)
+        assertTrue(profile.about.isNotEmpty())
+        assertFalse(repo.refresh(30703), "fresh")
+        assertNull(repo.profile(1).first())
+    }
 }

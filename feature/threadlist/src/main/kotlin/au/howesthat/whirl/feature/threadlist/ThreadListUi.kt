@@ -52,6 +52,7 @@ import java.time.Instant
 class ThreadListNav(
     val openThread: (OpenThread.InApp) -> Unit,
     val openForum: (ForumRef) -> Unit,
+    val openSearch: (SearchRoute) -> Unit,
 )
 
 /** Turns an [OpenThread] decision into navigation or a Custom Tab. */
@@ -89,6 +90,7 @@ fun ThreadListBody(
     /** Cross-forum lists offer "Go to forum" on rows and make headers tappable. */
     showForum: Boolean = sections?.any { it.forum != null } == true,
     header: (LazyListScope.() -> Unit)? = null,
+    footer: (LazyListScope.() -> Unit)? = null,
 ) {
     val launch = rememberThreadLauncher(nav)
     val browser = rememberOpenInBrowser()
@@ -138,6 +140,7 @@ fun ThreadListBody(
                         HorizontalDivider()
                     }
                 }
+                footer?.invoke(this)
             }
         }
     }
