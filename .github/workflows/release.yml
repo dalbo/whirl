@@ -55,9 +55,10 @@ jobs:
 
       - name: Verify signature and targetSdk
         run: |
-          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          set -o pipefail
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/[0-9]* | sort -V | tail -1)
           APK=app/build/outputs/apk/release/app-release.apk
-          "$BT/apksigner" verify --print-certs "$APK" | grep -E 'Signer #1 certificate (DN|SHA-256)'
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | grep -E 'Verified using|certificate (DN|SHA-256)'
           target=$("$BT/aapt2" dump badging "$APK" | sed -n "s/^targetSdkVersion:'\([0-9]*\)'.*/\1/p")
           echo "targetSdk=$target (Play minimum $PLAY_MIN_TARGET_SDK)"
           [ "$target" -ge "$PLAY_MIN_TARGET_SDK" ]
