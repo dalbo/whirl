@@ -2,7 +2,8 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
-## Unreleased
+## v0.1.0
+First usable release: read-only parity with Whirldroid 2.14.12. Watching, marking read, notifications and posting from the app come in v0.2; posting and private forums open in your browser.
 - Navigation drawer (Industry news, Recent, Latest activity, Watched, Popular, Forums, Settings, About); the start screen setting picks where the app opens. Latest activity (site-wide, from the API) is new and can be the start screen.
 - About screen with the version, source code and issue tracker links.
 - Thread lists: Latest activity, Recent (honours the history length and "ignore my own replies"), Watched (Unread/All tabs), Popular, and forum pages with swipeable pages, a page picker and a group selector. Sticky, closed, moved and deleted threads are marked; unread threads (from the API) are bold. Long-press a thread to jump to its last post, open it in the browser or go to its forum. Private forums list through the API and open threads in the browser.

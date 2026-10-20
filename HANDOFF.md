@@ -51,7 +51,7 @@ PLAN.md §1 is the spec and §9 the scope. Open a PR per task; keep CI green.
 5. **Thread view**: pager over pages from the inline vars, `?p=-1` for the last page, Compose renderer for `PostBody` (quote attribution as a link, `wcrep1`/`wcrep2` colours from PLAN.md §1.5, tap-to-reveal spoilers, lists, image placeholders, in-app links for thread/forum/user/archive and whrl.pl), moderator note header, parts links, hidden-post rendering, post filters (`ux`/`um`/`ur`), long-press (reply/edit in browser, user info, user's posts), quote navigation (same page → scroll; else `WhirlpoolUrls.reply(postId)`), post font size setting, opening-position rules from PLAN.md §1.1.
 6. **News, search (list view; relevance view optional), user profile**.
 7. **Deep links**: `https://forums.whirlpool.net.au/thread|forum|user|archive/*` (needs `autoVerify` off since we don't own the domain: register as a browsable handler) and the old `whirldroid-thread://` scheme only if cheap.
-8. **Release v0.1**: manual device checklist (PLAN.md §8) with Dallin, `## v0.1.0` in CHANGELOG.md, tag `v0.1.0` from `main`.
+8. **Release v0.1**: manual device checklist (PLAN.md §8) with Dallin, `## v0.1.0` in CHANGELOG.md, tag `v0.1.0` from `main`. (Checklist done 2026-10-21; release notes merged.)
 
 ## Phase 2 progress
 One PR per task; this list says what landed and what was decided along the way.
@@ -66,7 +66,7 @@ One PR per task; this list says what landed and what was decided along the way.
 - Shape of `get=recent` when non-empty (assumed to match `THREADS`; the Recent screen must cope with it failing as Drift).
 - Markup of a deleted post and of a post with an image (capture when found: add the URL to `tools/capture/public.json`, run `npm run public`).
 - Behaviour on mobile data.
-- **Resolved 2026-10-21 (Dallin's phone, Android 17, Wi-Fi):** `/forum/?action=replies&r=<postid>` redirects from OkHttp to the thread page holding the post (quote on page 2 of `3pxj858k` → page 1, post #19). The Phase 1 debug install upgraded to Room v2 without a crash. Watched, thread paging at page 2587 of 2622, forum 7 (Desktops) groups/sticky/closed/paging and deep links via `adb shell am start` all worked.
+- **Resolved 2026-10-21 (Dallin's phone, Android 17, Wi-Fi):** `/forum/?action=replies&r=<postid>` redirects from OkHttp to the thread page holding the post (quote on page 2 of `3pxj858k` → page 1, post #19). The Phase 1 debug install upgraded to Room v2 without a crash. Watched, thread paging at page 2587 of 2622, forum 7 (Desktops) groups/sticky/closed/paging and deep links via `adb shell am start` all worked. Offline (app network blocked with `cmd connectivity set-package-networking-enabled false <pkg>`, which keeps wireless adb up): cached pages render with the error banner, uncached pages show Retry/Open in browser, Retry recovers. Dallin checked the rest of `docs/device-checklist.md` by hand; whrl.pl links were not exercised (none found in posts) and fall back to the browser if they cannot be followed.
 - Where whrl.pl short links redirect to (assumed: the thread page with `#r<n>`).
 - Exact response of `watchedadd/read/remove` (Phase 3).
 
