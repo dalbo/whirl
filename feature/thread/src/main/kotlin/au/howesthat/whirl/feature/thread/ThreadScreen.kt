@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -31,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -103,7 +106,11 @@ fun ThreadScreen(navIcon: NavIcon, nav: ThreadNav, viewModel: ThreadViewModel = 
         }
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { outer ->
+    // The top bars below are drawn inside the content and pad for the status bar themselves.
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
+        contentWindowInsets = ScaffoldDefaults.contentWindowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+    ) { outer ->
         val start = startPage
         if (start == null) {
             Column(Modifier.padding(outer)) {

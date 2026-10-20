@@ -65,7 +65,8 @@ One PR per task; this list says what landed and what was decided along the way.
 ## Known unknowns to resolve as you go
 - Shape of `get=recent` when non-empty (assumed to match `THREADS`; the Recent screen must cope with it failing as Drift).
 - Markup of a deleted post and of a post with an image (capture when found: add the URL to `tools/capture/public.json`, run `npm run public`).
-- Behaviour on mobile data; whether `/forum/?action=replies&r=<postid>` redirects as expected from OkHttp (check on the phone; the app relies on it for quotes on other pages).
+- Behaviour on mobile data.
+- **Resolved 2026-10-21 (Dallin's phone, Android 17, Wi-Fi):** `/forum/?action=replies&r=<postid>` redirects from OkHttp to the thread page holding the post (quote on page 2 of `3pxj858k` → page 1, post #19). The Phase 1 debug install upgraded to Room v2 without a crash. Watched, thread paging at page 2587 of 2622, forum 7 (Desktops) groups/sticky/closed/paging and deep links via `adb shell am start` all worked.
 - Where whrl.pl short links redirect to (assumed: the thread page with `#r<n>`).
 - Exact response of `watchedadd/read/remove` (Phase 3).
 

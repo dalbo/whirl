@@ -78,7 +78,7 @@ fun WatchedThread.toItem() = ThreadItem(
     isUnread = unreadCount > 0,
     unreadCount = unreadCount,
     replies = replies,
-    pageCount = lastPage.takeIf { it > 1 },
+    // LASTPAGE is the page of the last read post, not the thread's length.
     lastPoster = lastPoster.name,
     lastPostedAt = lastDate.toInstant(),
     watched = WatchedPosition(lastPage, lastReadPost),
