@@ -9,6 +9,7 @@ import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadOpener
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -35,21 +36,28 @@ abstract class ListViewModel(deps: ListDeps, private val from: OpenedFrom) : Vie
 
     protected abstract suspend fun fetch(force: Boolean)
 
+    private var refreshJob: Job? = null
+
+    /**
+     * Refreshes what is on screen. The latest call wins: a page swipe or tab change during a fetch cancels it, so the
+     * new page always loads (ignoring calls while busy left it blank).
+     */
     fun refresh(force: Boolean = true) {
-        if (_refreshing.value) return
+        refreshJob?.cancel()
         _refreshing.value = true
-        viewModelScope.launch {
-            _error.value = try {
+        val job = viewModelScope.launch {
+            try {
                 fetch(force)
-                null
+                _error.value = null
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                e
-            } finally {
-                _refreshing.value = false
+                _error.value = e
             }
         }
+        refreshJob = job
+        // Only the newest job clears the indicator, not one it cancelled.
+        job.invokeOnCompletion { if (refreshJob === job) _refreshing.value = false }
     }
 
     fun open(item: ThreadItem): OpenThread? {

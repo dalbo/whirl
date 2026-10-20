@@ -13,4 +13,5 @@ dependencies {
     implementation(libs.compose.material.icons.core)
 
     testImplementation(project(":core:scraper"))
+    testImplementation(project(":core:database"))
 }
