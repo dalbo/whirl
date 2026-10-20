@@ -92,7 +92,9 @@ class WhirlpoolApi(
             )
         }
 
-    // Documented commands taking comma-separated thread ids; their responses are not yet captured (Phase 3).
+    // Commands taking comma-separated thread ids (fixtures/api/api_cmd_*, captured 2026-10-21). Each answers with the bare
+    // envelope; combined with get=watched the list already reflects the change. Watching marks the thread read to the end.
+    // An unknown id is an HTML HTTP 500, which surfaces as Maintenance after the usual retries.
     suspend fun watch(ids: Collection<ThreadId>) = command("watchedadd", ids)
     suspend fun markRead(ids: Collection<ThreadId>) = command("watchedread", ids)
     suspend fun unwatch(ids: Collection<ThreadId>) = command("watchedremove", ids)

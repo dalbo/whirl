@@ -161,11 +161,43 @@ class WhirlpoolApiTest {
 
     @Test
     fun `commands send comma-separated ids and no get`() = runTest {
-        enqueue("api_bogus_get.json")
+        enqueue("api_cmd_watchedread.json")
         api.markRead(listOf(ThreadId("9yvx1663"), ThreadId("9q684xp3")))
         val url = server.takeRequest().url
         assertEquals("9yvx1663,9q684xp3", url.queryParameter("watchedread"))
         assertNull(url.queryParameter("get"))
+    }
+
+    @Test
+    fun `each command answers with the bare envelope`() = runTest {
+        enqueue("api_cmd_watchedadd.json")
+        enqueue("api_cmd_watchedread.json")
+        enqueue("api_cmd_watchedremove.json")
+        val id = listOf(ThreadId("3pxj858k"))
+        api.watch(id)
+        api.markRead(id)
+        api.unwatch(id)
+        assertEquals("3pxj858k", server.takeRequest().url.queryParameter("watchedadd"))
+        assertEquals("3pxj858k", server.takeRequest().url.queryParameter("watchedread"))
+        assertEquals("3pxj858k", server.takeRequest().url.queryParameter("watchedremove"))
+    }
+
+    @Test
+    fun `a newly watched thread comes back read to the end`() = runTest {
+        enqueue("api_cmd_after_add.json")
+        val added = api.watched(unreadOnly = false).single { it.id == ThreadId("3pxj858k") }
+        assertEquals(0, added.unreadCount)
+        assertEquals(added.replies + 1, added.lastReadPost)
+        assertEquals(13, added.lastPage)
+    }
+
+    @Test
+    fun `an unknown thread id is an HTML 500 from the API`() = runTest {
+        // Captured with watchedadd=zzzzzzzz (and watchedremove, identical): HTML "Something broke!" sent as application/json.
+        repeat(3) { enqueue("api_cmd_bogus_id_500.html", code = 500) }
+        val error = assertFailsWith<WhirlpoolError.Maintenance> { api.watch(listOf(ThreadId("zzzzzzzz"))) }
+        assertEquals(500, error.httpCode)
+        assertEquals(3, server.requestCount)
     }
 
     @Test

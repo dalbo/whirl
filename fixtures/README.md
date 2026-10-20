@@ -8,6 +8,11 @@ Raw HTML in `html/` is the server body an HTTP client receives; `html/rendered/`
 | `api_badkey.json` | get=badkey | bad key → HTTP 403, JSON ERROR |
 | `api_bogus_get.json` | get=bogus_get | unknown get → bare envelope (same as whims) |
 | `api_combined.json` | get=combined | get=forum+news+recent+watched, no watchedmode (4 watched) |
+| `api_cmd_watchedadd.json`, `api_cmd_watchedread.json`, `api_cmd_watchedremove.json` | watchedadd/watchedread/watchedremove=3pxj858k, no get | bare envelope, HTTP 200 (captured 2026-10-21, `npm run actions`) |
+| `api_cmd_after_add.json`, `api_cmd_after_read.json` | get=watched&watchedmode=1 after the add / read | 20 watched; 3pxj858k comes back `UNREAD 0`, `LASTREAD 257` (replies + 1), `LASTPAGE 13` |
+| `api_cmd_after_remove.json`, `api_cmd_final.json` | get=watched&watchedmode=1 after the remove | 19 watched, back to the original list |
+| `api_cmd_watchedadd_with_get.json`, `api_cmd_watchedremove_with_get.json` | get=watched&watchedmode=1 combined with the command | the list already reflects the command (20, then 19) |
+| `api_cmd_bogus_id_500.html` | watchedadd=zzzzzzzz (watchedremove identical) | HTTP 500, HTML "Something broke!" page with `Content-Type: application/json` |
 | `api_contacts.json` | get=contacts | [] |
 | `api_forum.json` | get=forum | 54 forums, 8 sections |
 | `api_news.json` | get=news | 30 items |
