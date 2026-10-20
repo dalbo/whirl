@@ -1,0 +1,9 @@
+<resources>
+    <string name="forums_title">Forums</string>
+    <string name="refresh">Refresh</string>
+    <string name="favourites">Favourites</string>
+    <string name="favourite">Favourite</string>
+    <string name="add_favourite">Add to favourites</string>
+    <string name="remove_favourite">Remove from favourites</string>
+    <string name="private_forum">Needs a Whirlpool login; opens in your browser</string>
+</resources>

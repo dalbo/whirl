@@ -21,6 +21,7 @@ import au.howesthat.whirl.R
 import au.howesthat.whirl.about.AboutScreen
 import au.howesthat.whirl.core.data.Account
 import au.howesthat.whirl.core.ui.NavIcon
+import au.howesthat.whirl.feature.forums.ForumsScreen
 import au.howesthat.whirl.feature.settings.SettingsScreen
 import au.howesthat.whirl.feature.threadlist.ForumRoute
 import au.howesthat.whirl.feature.threadlist.ForumScreen
@@ -80,7 +81,7 @@ fun WhirlApp(startRoute: Any, account: Account?, alert: String) {
                 val route = entry.toRoute<ThreadRoute>()
                 PlaceholderScreen("${route.threadId} · ${route.page}", backIcon)
             }
-            composable<ForumsRoute> { PlaceholderScreen(stringResource(R.string.nav_forums), drawerIcon) }
+            composable<ForumsRoute> { ForumsScreen(drawerIcon, onOpenForum = listNav.openForum) }
             composable<SettingsRoute> {
                 SettingsScreen(
                     onBack = { nav.popBackStack() },
