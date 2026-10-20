@@ -5,4 +5,5 @@ plugins {
 dependencies {
     api(project(":core:model"))
     implementation(libs.jsoup)
+    compileOnly(libs.jspecify)
 }

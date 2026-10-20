@@ -9,6 +9,7 @@ dependencies {
     api(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.jsoup)
+    compileOnly(libs.jspecify)
 
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.kotlinx.coroutines.test)
