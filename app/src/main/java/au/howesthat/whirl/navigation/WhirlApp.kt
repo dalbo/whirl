@@ -92,7 +92,7 @@ fun WhirlApp(
     // Links open on top of the start screen, so Back returns to it.
     LaunchedEffect(link) {
         link?.let {
-            nav.navigate(it)
+            nav.navigate(it) { launchSingleTop = true }
             onLinkHandled()
         }
     }

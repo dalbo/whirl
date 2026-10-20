@@ -67,6 +67,7 @@ android {
 dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:ui"))
+    implementation(project(":core:notifications"))
     implementation(project(":feature:setup"))
     implementation(project(":feature:settings"))
     implementation(project(":feature:threadlist"))

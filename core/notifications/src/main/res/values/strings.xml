@@ -1,0 +1,28 @@
+<resources>
+    <string name="channel_watched">Watched threads</string>
+    <string name="channel_watched_description">New replies in threads you watch</string>
+    <plurals name="notify_title">
+        <item quantity="one">New watched thread reply</item>
+        <item quantity="other">New watched thread replies</item>
+    </plurals>
+    <plurals name="notify_unread_posts">
+        <item quantity="one">%1$d unread post</item>
+        <item quantity="other">%1$d unread posts</item>
+    </plurals>
+    <!-- "12 new replies in 3 threads" -->
+    <string name="notify_replies_in_threads">%1$s in %2$s</string>
+    <plurals name="notify_replies">
+        <item quantity="one">%1$d new reply</item>
+        <item quantity="other">%1$d new replies</item>
+    </plurals>
+    <plurals name="notify_threads">
+        <item quantity="one">%1$d thread</item>
+        <item quantity="other">%1$d threads</item>
+    </plurals>
+    <!-- One inbox line: thread title and its unread count. -->
+    <string name="notify_line">%1$s (%2$d)</string>
+    <string name="notify_more">+%1$d more</string>
+    <string name="notify_mark_read">Mark read</string>
+    <string name="notify_unwatch">Unwatch</string>
+    <string name="notify_action_failed">Whirl could not reach Whirlpool. Try again from the Watched screen.</string>
+</resources>

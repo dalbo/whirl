@@ -1,0 +1,221 @@
+package au.howesthat.whirl.core.notifications
+
+import android.Manifest
+import android.app.Application
+import android.app.Notification
+import android.app.NotificationManager
+import android.content.Context
+import androidx.core.app.NotificationCompat
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import androidx.work.ListenableWorker
+import androidx.work.WorkerFactory
+import androidx.work.WorkerParameters
+import androidx.work.testing.TestListenableWorkerBuilder
+import au.howesthat.whirl.core.data.Account
+import au.howesthat.whirl.core.data.SettingsRepository
+import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.data.WatchedRepository
+import au.howesthat.whirl.core.database.NotifiedEntity
+import au.howesthat.whirl.core.database.WhirlDatabase
+import au.howesthat.whirl.core.model.ThreadId
+import au.howesthat.whirl.core.network.RetryPolicy
+import au.howesthat.whirl.core.network.WhirlpoolApi
+import au.howesthat.whirl.core.network.WhirlpoolHttp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
+import java.io.File
+import java.time.Clock
+import java.time.OffsetDateTime
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
+class WatchedNotifierTest {
+
+    private val context = ApplicationProvider.getApplicationContext<Application>()
+    private val server = MockWebServer().apply { start() }
+    private val db = Room.inMemoryDatabaseBuilder(context, WhirlDatabase::class.java).allowMainThreadQueries().build()
+    private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val settings = SettingsRepository(context)
+    private val api = WhirlpoolApi(WhirlpoolHttp.client("Whirl/test"), settings::apiKey, server.url("/api/"), RetryPolicy.NONE)
+    private val watched = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), Clock.systemUTC(), appScope)
+    private val notifier = WatchedNotifier(context, settings, watched, db.notifiedDao())
+    private val manager = context.getSystemService(NotificationManager::class.java)
+
+    @Before
+    fun setUp() = runTest {
+        shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        settings.signIn("k", Account(216903, "d@llin"))
+        settings.update { it.copy(watchedNotify = true, ignoreOwnRepliesWatched = false) }
+    }
+
+    @After
+    fun tearDown() {
+        appScope.cancel()
+        server.close()
+        db.close()
+    }
+
+    private fun fixture(name: String) = File(System.getProperty("whirl.fixtures"), "api/$name").readText()
+
+    private fun enqueue(body: String, code: Int = 200) = server.enqueue(MockResponse.Builder().code(code).body(body).build())
+
+    private fun shown(): Notification? = shadowOf(manager).getNotification(WatchedNotifier.NOTIFICATION_ID)
+
+    private val unreadTwo get() = fixture("api_watched_mode0.json")
+
+    @Test
+    fun `new replies alert once, listing every unread thread`() = runTest {
+        enqueue(unreadTwo)
+        notifier.check()
+        val url = server.takeRequest().url
+        assertEquals("watched", url.queryParameter("get"))
+        assertEquals("0", url.queryParameter("watchedmode"))
+
+        val n = assertNotNull(shown())
+        assertEquals(WatchedNotifier.CHANNEL_WATCHED, n.channelId)
+        assertEquals("New watched thread replies", n.extras.getString(NotificationCompat.EXTRA_TITLE))
+        assertEquals("18210 new replies in 2 threads", n.extras.getCharSequence(NotificationCompat.EXTRA_TEXT).toString())
+        val lines = n.extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)!!.map { it.toString() }
+        assertEquals(listOf("Bike Riding (683)", "Electric Vehicles (17527)"), lines)
+        assertEquals(0, n.flags and Notification.FLAG_ONLY_ALERT_ONCE, "alerts")
+        assertEquals(listOf("Mark read", "Unwatch"), n.actions.map { it.title.toString() })
+        assertEquals(setOf("9yvx1663", "9q684xp3"), db.notifiedDao().all().map { it.threadId }.toSet())
+
+        // Same replies again: the notification is refreshed without alerting.
+        enqueue(unreadTwo)
+        notifier.check()
+        assertTrue(assertNotNull(shown()).flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+
+        // Dismissed, and nothing new: it stays dismissed.
+        manager.cancelAll()
+        enqueue(unreadTwo)
+        notifier.check()
+        assertNull(shown())
+    }
+
+    @Test
+    fun `a reply newer than the one notified alerts again`() = runTest {
+        fun millis(date: String) = OffsetDateTime.parse(date).toInstant().toEpochMilli()
+        // Both already notified at their current last posts: no alert, and nothing showing to refresh.
+        db.notifiedDao().put(
+            listOf(NotifiedEntity("9yvx1663", millis("2026-10-20T17:23:15+10:00")), NotifiedEntity("9q684xp3", millis("2026-10-20T14:28:45+10:00"))),
+        )
+        enqueue(unreadTwo)
+        notifier.check()
+        assertNull(shown())
+
+        // 9yvx1663 was notified for an earlier post.
+        db.notifiedDao().put(listOf(NotifiedEntity("9yvx1663", millis("2026-10-20T17:00:00+10:00"))))
+        enqueue(unreadTwo)
+        notifier.check()
+        assertEquals(0, assertNotNull(shown()).flags and Notification.FLAG_ONLY_ALERT_ONCE)
+    }
+
+    @Test
+    fun `nothing unread cancels, and forgets what was notified`() = runTest {
+        enqueue(unreadTwo)
+        notifier.check()
+        assertNotNull(shown())
+        enqueue(fixture("api_recent_14d.json").replace("\"RECENT\"", "\"WATCHED\""))
+        notifier.check()
+        assertNull(shown())
+        assertEquals(emptyList(), db.notifiedDao().all())
+    }
+
+    @Test
+    fun `one thread is named in the title`() = runTest {
+        // With "ignore my own replies", a thread whose last post is mine (muli's, here) is left out.
+        settings.signIn("k", Account(456291, "muli"))
+        settings.update { it.copy(ignoreOwnRepliesWatched = true) }
+        enqueue(unreadTwo)
+        notifier.check()
+        val n = assertNotNull(shown())
+        assertEquals(1, n.extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)!!.size)
+        assertEquals("Bike Riding", n.extras.getString(NotificationCompat.EXTRA_TITLE))
+        assertEquals("683 unread posts", n.extras.getCharSequence(NotificationCompat.EXTRA_TEXT).toString())
+    }
+
+    @Test
+    fun `alerts off cancels without calling the API`() = runTest {
+        enqueue(unreadTwo)
+        notifier.check()
+        settings.update { it.copy(watchedNotify = false) }
+        notifier.check()
+        assertNull(shown())
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
+    fun `without permission nothing is posted`() = runTest {
+        shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        enqueue(unreadTwo)
+        notifier.check()
+        assertNull(shown())
+    }
+
+    @Test
+    fun `the notification's Mark read button marks every listed thread read and removes it`() = runTest {
+        enqueue(unreadTwo)
+        notifier.check()
+        val markRead = assertNotNull(shown()).actions.first()
+        val intent = shadowOf(markRead.actionIntent).savedIntent
+        val (action, ids) = assertNotNull(NotificationActionReceiver.parse(intent))
+        assertEquals(WatchAction.MARK_READ, action)
+        assertEquals(listOf(ThreadId("9yvx1663"), ThreadId("9q684xp3")), ids)
+
+        server.takeRequest()
+        enqueue(fixture("api_watched_mode1.json").replace("\"UNREAD\":683", "\"UNREAD\":0").replace("\"UNREAD\":17527", "\"UNREAD\":0"))
+        assertTrue(notifier.act(action, ids))
+        assertEquals("9yvx1663,9q684xp3", server.takeRequest().url.queryParameter("watchedread"))
+        assertNull(shown())
+        assertEquals(emptyList(), watched.watched(unreadOnly = true).first().value)
+    }
+
+    @Test
+    fun `a failed button keeps the notification`() = runTest {
+        enqueue(unreadTwo)
+        notifier.check()
+        enqueue(fixture("api_cmd_bogus_id_500.html"), code = 500)
+        assertFalse(notifier.act(WatchAction.UNWATCH, listOf(ThreadId("9yvx1663"))))
+        assertNotNull(shown())
+        assertEquals(2, watched.watched(unreadOnly = true).first().value.size, "rolled back")
+    }
+
+    @Test
+    fun `the worker retries network failures and gives up on the rest`() = runTest {
+        val factory = object : WorkerFactory() {
+            override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters) =
+                WatchedCheckWorker(appContext, workerParameters, notifier)
+        }
+        enqueue(unreadTwo)
+        val ok = TestListenableWorkerBuilder<WatchedCheckWorker>(context).setWorkerFactory(factory).build().doWork()
+        assertIs<ListenableWorker.Result.Success>(ok)
+        assertNotNull(shown())
+
+        server.close()
+        val offline = TestListenableWorkerBuilder<WatchedCheckWorker>(context).setWorkerFactory(factory).build().doWork()
+        assertIs<ListenableWorker.Result.Retry>(offline)
+        val last = TestListenableWorkerBuilder<WatchedCheckWorker>(context).setWorkerFactory(factory).setRunAttemptCount(3).build().doWork()
+        assertIs<ListenableWorker.Result.Success>(last, "the next period tries again")
+    }
+}

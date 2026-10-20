@@ -1,7 +1,13 @@
 package au.howesthat.whirl.feature.setup
 
+import android.Manifest
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -32,6 +38,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -40,8 +49,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.ThemeMode
@@ -135,12 +147,45 @@ private fun NextButton(onClick: () -> Unit) {
     Button(onClick = onClick, Modifier.fillMaxWidth()) { Text(stringResource(R.string.setup_next)) }
 }
 
-/** Shared with the settings screen's Notifications section. */
+/**
+ * Shared with the settings screen's Notifications section. Turning alerts on asks for the notification permission
+ * (Android 13+) first and stays off if it is refused; when the system blocks Whirl's notifications, a line says so and
+ * opens the system settings.
+ */
 @Composable
 fun NotificationOptions(settings: Settings, onWatchedNotify: (Boolean) -> Unit, onInterval: (Int) -> Unit) {
+    val context = LocalContext.current
+    var allowed by remember { mutableStateOf(notificationsAllowed(context)) }
+    LifecycleResumeEffect(Unit) {
+        allowed = notificationsAllowed(context)
+        onPauseOrDispose {}
+    }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        allowed = notificationsAllowed(context)
+        if (granted) onWatchedNotify(true)
+    }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(stringResource(R.string.setup_notify_watched), Modifier.weight(1f))
-        Switch(checked = settings.watchedNotify, onCheckedChange = onWatchedNotify)
+        Switch(
+            checked = settings.watchedNotify,
+            onCheckedChange = { on ->
+                if (on && Build.VERSION.SDK_INT >= 33 && !hasPermission(context)) {
+                    permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    onWatchedNotify(on)
+                }
+            },
+        )
+    }
+    if (settings.watchedNotify && !allowed) {
+        TextButton(
+            onClick = {
+                context.startActivity(
+                    Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName),
+                )
+            },
+        ) { Text(stringResource(R.string.setup_notify_blocked)) }
     }
     if (settings.watchedNotify) {
         Text(stringResource(R.string.setup_notify_interval), style = MaterialTheme.typography.labelLarge)
@@ -155,6 +200,12 @@ fun NotificationOptions(settings: Settings, onWatchedNotify: (Boolean) -> Unit, 
         }
     }
 }
+
+private fun hasPermission(context: Context): Boolean =
+    Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+
+private fun notificationsAllowed(context: Context): Boolean =
+    hasPermission(context) && NotificationManagerCompat.from(context).areNotificationsEnabled()
 
 @Composable
 private fun intervalLabel(minutes: Int): String =

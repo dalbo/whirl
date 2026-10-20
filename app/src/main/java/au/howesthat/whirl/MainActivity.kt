@@ -15,7 +15,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.ThemeMode
 import au.howesthat.whirl.core.ui.WhirlTheme
+import au.howesthat.whirl.core.notifications.WatchedNotifier
 import au.howesthat.whirl.feature.setup.SetupScreen
+import au.howesthat.whirl.navigation.WatchedRoute
 import au.howesthat.whirl.navigation.WatchSnackbars
 import au.howesthat.whirl.navigation.WhirlApp
 import au.howesthat.whirl.navigation.routeForLink
@@ -32,7 +34,7 @@ class MainActivity : ComponentActivity() {
         installSplashScreen().setKeepOnScreenCondition { viewModel.state.value == null }
         super.onCreate(savedInstanceState)
         // A recreated activity has already handled its launch intent.
-        if (savedInstanceState == null) viewModel.openLink(intent.data?.let { routeForLink(it) })
+        if (savedInstanceState == null) viewModel.openLink(routeFor(intent))
         enableEdgeToEdge()
         setContent {
             val state by viewModel.state.collectAsStateWithLifecycle()
@@ -57,7 +59,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        viewModel.openLink(intent.data?.let { routeForLink(it) })
+        viewModel.openLink(routeFor(intent))
+    }
+
+    /** A Whirlpool link, or the watched-thread notification (which opens Watched). */
+    private fun routeFor(intent: Intent): Any? = when {
+        intent.getBooleanExtra(WatchedNotifier.EXTRA_OPEN_WATCHED, false) -> WatchedRoute
+        else -> intent.data?.let { routeForLink(it) }
     }
 }
 

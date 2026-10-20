@@ -12,6 +12,7 @@
     <string name="setup_logged_in_as">Logged in as %1$s (#%2$d)</string>
     <string name="setup_notify_watched">Tell me about new replies in watched threads</string>
     <string name="setup_notify_interval">Check every</string>
+    <string name="setup_notify_blocked">Notifications are blocked for Whirl. Tap to allow them.</string>
     <string name="setup_theme_title">Theme</string>
     <string name="setup_done_title">All set</string>
     <string name="setup_done_body">You can change any of this later in Settings.</string>

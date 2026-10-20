@@ -85,6 +85,17 @@ class DaoTest {
     }
 
     @Test
+    fun `notified keeps only threads still unread`() = runTest {
+        val notified = db.notifiedDao()
+        notified.put(listOf(NotifiedEntity("a", 1), NotifiedEntity("b", 2)))
+        notified.put(listOf(NotifiedEntity("a", 3)))
+        notified.keepOnly(listOf("a"))
+        assertEquals(listOf(NotifiedEntity("a", 3)), notified.all())
+        notified.keepOnly(emptyList())
+        assertEquals(emptyList(), notified.all())
+    }
+
+    @Test
     fun `forum refresh keeps favourites and learned privacy`() = runTest {
         forums.replaceAll(listOf(ForumEntity(92, "Choosing an ISP", "ISPs", 0), ForumEntity(35, "Feedback", "Whirlpool", 1)))
         forums.addFavourite(FavouriteForumEntity(92, 1))
