@@ -2,6 +2,26 @@
 
 Run on a real phone before tagging a release (PLAN.md §8). Debug builds install beside the release app as `au.howesthat.whirl.debug`. Note the build, the phone and its Android version, and the network (Wi-Fi or mobile data) with the result.
 
+## v0.2 (actions and notifications)
+**Watch actions** (use a thread you are happy to watch, e.g. `3pxj858k`)
+- [ ] Long-press a thread in a forum: Watch → "Thread watched · Undo"; Undo, then pull to refresh Watched (All): not there. Watch again and let the snackbar go: it appears in Watched (All).
+- [ ] Watched: long-press → Unwatch → Undo puts the row back in place; Unwatch without Undo removes it for good (refresh after 15 s).
+- [ ] Watched (Unread): Mark as read moves the thread out of Unread; with "back to list after marking read", Mark as read in the thread view returns to Watched.
+- [ ] "Mark as read when opened": opening an unread thread from Watched marks it read.
+- [ ] Offline (`cmd connectivity set-package-networking-enabled false <pkg>`): an action rolls back with "Could not …".
+
+**Notifications**
+- [ ] Settings → turn alerts on: Android asks for permission; refusing leaves them off; "blocked" line asks again or opens the system settings.
+- [ ] With unread watched threads, a check posts one notification (title, "N new replies in M threads" or the thread's title, inbox lines, Mark read / Unwatch). Tapping opens Watched.
+- [ ] The same replies do not alert again; a new reply does. Nothing unread cancels it.
+- [ ] Mark read / Unwatch buttons remove the notification and update Watched.
+- [ ] Dozing: app in the background, screen off, `adb shell dumpsys deviceidle force-idle`; the check is deferred and runs in the next maintenance window (`dumpsys deviceidle step`), WorkManager's periodic run survives a reboot.
+- [ ] Changing the interval keeps one scheduled job (`dumpsys jobscheduler | grep WatchedCheckWorker`).
+
+**Other**
+- [ ] Forum overflow → New thread in browser opens the new-thread form (logged in to Whirlpool in the browser).
+- [ ] "Dark at night" with a window starting a minute from now: the theme switches while the app is open.
+
 ## v0.1 (read-only parity)
 **Start**
 - [ ] Fresh install: setup wizard → API key → "Logged in as NAME (#ID)" → theme → lands on the start screen chosen in Settings (default Forums).
