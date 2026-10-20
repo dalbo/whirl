@@ -1,0 +1,23 @@
+<resources>
+    <string name="refresh">Refresh</string>
+    <string name="more">More options</string>
+    <string name="updated_ago">Updated %1$s</string>
+    <string name="link_failed">Could not open that link.</string>
+    <string name="moderator_note">Moderator note</string>
+    <string name="parts">Parts:</string>
+    <string name="part_n">Part %1$d</string>
+    <string name="post_hidden">This post was hidden by a moderator (%1$s).</string>
+    <string name="post_deleted">This post was deleted.</string>
+    <string name="post_op">OP</string>
+    <string name="post_edited">edited %1$s</string>
+    <string name="post_reply">Reply in browser</string>
+    <string name="post_edit">Edit in browser</string>
+    <string name="post_user_info">About %1$s</string>
+    <string name="post_users_posts">Posts by %1$s in this thread</string>
+    <string name="reply_to_thread">Reply in browser</string>
+    <string name="filter_all">All posts</string>
+    <string name="filter_mine">Posts by me</string>
+    <string name="filter_mods">Posts by moderators</string>
+    <string name="filter_reps">Posts by reps</string>
+    <string name="filter_user">One user\'s posts</string>
+</resources>

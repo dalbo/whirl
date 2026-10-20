@@ -15,7 +15,8 @@ import au.howesthat.whirl.core.network.WhirlpoolWeb
 import au.howesthat.whirl.core.scraper.ThreadPageParser
 import au.howesthat.whirl.core.scraper.WhirlpoolTime
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
@@ -39,8 +40,10 @@ class ThreadPageRepository @Inject constructor(
 
     /** The cached page, or null until it has been loaded once. */
     fun page(id: ThreadId, page: Int, filter: PostFilter = PostFilter.All): Flow<Cached<ThreadPage>?> =
-        combine(dao.observePage(id.value, filter.key, page), dao.observePosts(id.value, filter.key, page)) { meta, posts ->
-            meta?.let { Cached(it.toModel(posts), Instant.ofEpochMilli(it.fetchedAt)) }
+        // The page row is rewritten in the same transaction as its posts, so reading the posts when it changes never
+        // sees a half-stored page (combining two flows did, briefly showing an empty page).
+        dao.observePage(id.value, filter.key, page).map { meta ->
+            meta?.let { Cached(it.toModel(dao.posts(id.value, filter.key, page)), Instant.ofEpochMilli(it.fetchedAt)) }
         }
 
     /** The thread's page count as last seen, to show its last page from the cache before `?p=-1` returns. */
@@ -72,6 +75,27 @@ class ThreadPageRepository @Inject constructor(
         }
         if (loaded != LAST_PAGE) dao.touch(id.value, filter.key, loaded, clock.millis())
         return loaded
+    }
+
+    /**
+     * Finds the page holding reply [replyId] through the site's reply locator (`/forum/?action=replies&r=`, which
+     * redirects to the thread page), caches that page and returns where the post is.
+     */
+    suspend fun locate(replyId: Long): Located {
+        val page = parseOrDrift { ThreadPageParser.parse(web.get(web.urls.locateReply(replyId))) }
+        store(page.threadId, PostFilter.All, page)
+        val post = page.posts.firstOrNull { it.replyId == replyId }
+            ?: throw WhirlpoolError.Drift("Reply $replyId is not on the page it redirected to")
+        return Located(page.threadId, page.page, post.number)
+    }
+
+    /** Where a post lives. */
+    data class Located(val threadId: ThreadId, val page: Int, val postNumber: Int)
+
+    /** Follows a whrl.pl short link and classifies where it ends. */
+    suspend fun resolveShortLink(url: String): WhirlpoolLink {
+        val target = web.resolve(url.toHttpUrl())
+        return WhirlpoolLink.parse(target.toString())
     }
 
     private suspend fun fetch(id: ThreadId, page: Int, filter: PostFilter, forumId: Int?): ThreadPage {

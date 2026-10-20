@@ -20,11 +20,6 @@
     <string name="empty_forum">No threads on this page.</string>
     <string name="empty_private_forum">This forum needs a Whirlpool login. Open it in your browser.</string>
     <string name="all_groups">All groups</string>
-    <string name="page_of">Page %1$d of %2$d</string>
-    <string name="go_to_page">Go to page</string>
-    <string name="first_page">First</string>
-    <string name="last_page">Last</string>
-    <string name="go">Go</string>
     <string name="row_last_post">Jump to last post</string>
     <string name="row_go_to_forum">Go to %1$s</string>
     <string name="row_sticky">Sticky</string>

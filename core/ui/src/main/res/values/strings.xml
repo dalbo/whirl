@@ -17,6 +17,13 @@
     <string name="no_browser">No app can open this link.</string>
     <string name="open_menu">Open menu</string>
     <string name="back">Back</string>
+    <string name="page_of">Page %1$d of %2$d</string>
+    <string name="go_to_page">Go to page</string>
+    <string name="first_page">First page</string>
+    <string name="last_page">Last page</string>
+    <string name="go">Go</string>
+    <string name="image">Image (tap to open)</string>
+    <string name="image_named">Image: %1$s (tap to open)</string>
     <string name="ago_just_now">just now</string>
     <string name="ago_minutes">%1$d min ago</string>
     <string name="ago_hours">%1$d h ago</string>

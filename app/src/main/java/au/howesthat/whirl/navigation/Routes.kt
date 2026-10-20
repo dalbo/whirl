@@ -23,6 +23,6 @@ fun Homepage.route(): Any = when (this) {
     Homepage.FORUMS -> ForumsRoute
 }
 
-/** A thread page; [page] may be -1 for the last page, [scrollToPost] is a post number. Its screen arrives in task 5. */
+/** A user's profile; its screen arrives in task 6. */
 @Serializable
-data class ThreadRoute(val threadId: String, val page: Int = 1, val scrollToPost: Int? = null, val forumId: Int? = null)
+data class UserRoute(val userId: Long)

@@ -27,7 +27,10 @@ class WhirlpoolWebTest {
         assertEquals("https://forums.whirlpool.net.au/forum/92?p=2", urls.forum(92, 2).toString())
         assertEquals("https://forums.whirlpool.net.au/forum/7?g=179", urls.forum(7, group = 179).toString())
         assertEquals("https://forums.whirlpool.net.au/forum/?action=popular_views", urls.popular().toString())
-        assertEquals("https://forums.whirlpool.net.au/forum/?action=replies&r=75543951", urls.reply(75543951).toString())
+        assertEquals("https://forums.whirlpool.net.au/forum/?action=replies&r=75543951", urls.locateReply(75543951).toString())
+        assertEquals("https://forums.whirlpool.net.au/forum/?action=reply&r=75543951", urls.replyToPost(75543951).toString())
+        assertEquals("https://forums.whirlpool.net.au/forum/?action=reply&t=3pxj858k", urls.replyToThread(id).toString())
+        assertEquals("https://forums.whirlpool.net.au/forum/?action=edit&e=75543951", urls.editPost(75543951).toString())
         assertEquals("https://forums.whirlpool.net.au/user/30703?days=7", urls.user(30703, 7).toString())
         assertEquals(
             "https://forums.whirlpool.net.au/forum/?action=search&q=nbn&f=&fg=&w=t&o=list",
@@ -48,6 +51,19 @@ class WhirlpoolWebTest {
             assertEquals(html, web.get(server.url("/forum/92")))
             assertFailsWith<WhirlpoolError.Challenge> { web.get(server.url("/forum/92")) }
             assertEquals(404, assertFailsWith<WhirlpoolError.Api> { web.get(server.url("/thread/nope")) }.httpCode)
+        }
+    }
+
+    @Test
+    fun `resolve follows redirects`() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(MockResponse.Builder().code(302).addHeader("Location", "/thread/3pxj858k?p=2#r21").build())
+            server.enqueue(MockResponse.Builder().body("<html></html>").build())
+            val web = WhirlpoolWeb(WhirlpoolHttp.client("Whirl/test"), retry = RetryPolicy.NONE)
+            val end = web.resolve(server.url("/AbCd"))
+            assertEquals("/thread/3pxj858k", end.encodedPath)
+            assertEquals("2", end.queryParameter("p"))
         }
     }
 }

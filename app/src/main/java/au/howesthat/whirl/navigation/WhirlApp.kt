@@ -23,6 +23,9 @@ import au.howesthat.whirl.core.data.Account
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.feature.forums.ForumsScreen
 import au.howesthat.whirl.feature.settings.SettingsScreen
+import au.howesthat.whirl.feature.thread.ThreadNav
+import au.howesthat.whirl.feature.thread.ThreadRoute
+import au.howesthat.whirl.feature.thread.ThreadScreen
 import au.howesthat.whirl.feature.threadlist.ForumRoute
 import au.howesthat.whirl.feature.threadlist.ForumScreen
 import au.howesthat.whirl.feature.threadlist.LatestScreen
@@ -49,8 +52,15 @@ fun WhirlApp(startRoute: Any, account: Account?, alert: String) {
     val backIcon = remember(nav) { NavIcon.Back { nav.popBackStack() } }
     val listNav = remember(nav) {
         ThreadListNav(
-            openThread = { t -> nav.navigate(ThreadRoute(t.id.value, t.page, t.scrollToPost, t.forumId)) },
+            openThread = { t -> nav.navigate(ThreadRoute(t.id.value, t.page, scrollToPost = t.scrollToPost, forumId = t.forumId)) },
             openForum = { f -> nav.navigate(ForumRoute(f.id, f.title, f.groupId)) },
+        )
+    }
+    val threadNav = remember(nav) {
+        ThreadNav(
+            openThread = { nav.navigate(it) },
+            openForum = listNav.openForum,
+            openUser = { nav.navigate(UserRoute(it)) },
         )
     }
 
@@ -77,10 +87,8 @@ fun WhirlApp(startRoute: Any, account: Account?, alert: String) {
             composable<WatchedRoute> { WatchedScreen(drawerIcon, listNav) }
             composable<PopularRoute> { PopularScreen(drawerIcon, listNav) }
             composable<ForumRoute> { ForumScreen(backIcon, listNav) }
-            composable<ThreadRoute> { entry ->
-                val route = entry.toRoute<ThreadRoute>()
-                PlaceholderScreen("${route.threadId} · ${route.page}", backIcon)
-            }
+            composable<ThreadRoute> { ThreadScreen(backIcon, threadNav) }
+            composable<UserRoute> { entry -> PlaceholderScreen("#${entry.toRoute<UserRoute>().userId}", backIcon) }
             composable<ForumsRoute> { ForumsScreen(drawerIcon, onOpenForum = listNav.openForum) }
             composable<SettingsRoute> {
                 SettingsScreen(
