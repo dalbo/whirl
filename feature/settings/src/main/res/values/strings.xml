@@ -29,6 +29,7 @@
     </plurals>
     <string name="home_news">Industry news</string>
     <string name="home_recent">Recent threads</string>
+    <string name="home_latest">Latest activity</string>
     <string name="home_watched">Watched threads</string>
     <string name="home_popular">Popular threads</string>
     <string name="home_forums">Forums</string>

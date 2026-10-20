@@ -32,7 +32,8 @@ data class Settings(
     }
 }
 
-enum class Homepage { NEWS, RECENT, WATCHED, POPULAR, FORUMS }
+/** The start screen. [LATEST] (site-wide latest activity, `get=threads`) is new; 2.14.12 had the other five. */
+enum class Homepage { NEWS, RECENT, LATEST, WATCHED, POPULAR, FORUMS }
 
 /** 2.14.12 offered Light, Dark and "Dark at night"; following the system is the modern default. */
 enum class ThemeMode { SYSTEM, LIGHT, DARK, DARK_AT_NIGHT }

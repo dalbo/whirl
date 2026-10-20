@@ -10,4 +10,6 @@ android {
 dependencies {
     api(project(":core:model"))
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.browser)
+    implementation(libs.compose.material.icons.core)
 }
