@@ -35,7 +35,7 @@ Raw HTML in `html/` is the server body an HTTP client receives; `html/rendered/`
 | `forum1_pm_html.html` | /forum/1 — Private Messages, "Not signed in" | 14461 bytes |
 | `forum35_feedback_html.html` | /forum/35 — "Not signed in" | 14462 bytes |
 | `forum7_g179.html` | /forum/7?g=179 — group page, select[name=g] | 68295 bytes |
-| `forum92_p1.html` | /forum/92 — list, 48 rows, 1 pointer, 2 deleted, select[name=p], no groups | 66203 bytes |
+| `forum92_p1.html` | /forum/92 — list, 50 rows: 48 threads, 1 pointer, 1 deleted, select[name=p], no groups | 66203 bytes |
 | `forum92_p2.html` | /forum/92?p=2 — 2 closed | 67558 bytes |
 | `forum_index.html` | / — forum index, 50 public forums | 41337 bytes |
 | `popular.html` | /forum/?action=popular_views — 36 sections, 183 rows, 2 sticky | 214601 bytes |
@@ -46,9 +46,9 @@ Raw HTML in `html/` is the server body an HTTP client receives; `html/rendered/`
 | `search_nbn_listview.html` | /forum/?action=search&q=nbn&w=t&o=list — table, 100 rows (what 2.14.12 parsed) | 136895 bytes |
 | `search_nbn_p2.html` | /search?q=nbn&p=2 | 76295 bytes |
 | `search_noresults.html` | /search with no hits | 29627 bytes |
-| `thread_3pxj858k_p2.html` | ?p=2 — page 2 of 13, 8 edited, 5 OP, 17 quote refs | 96365 bytes |
+| `thread_3pxj858k_p2.html` | ?p=2 — page 2 of 13, 3 edited, 5 OP, 17 quote refs, 1 list | 96365 bytes |
 | `thread_97r5wzn3_last.html` | ?p=-1 — last page, 17 posts | 80400 bytes |
-| `thread_97r5wzn3_p1.html` | /thread/97r5wzn3 — 20 posts, 18 edited, public notebar | 91473 bytes |
+| `thread_97r5wzn3_p1.html` | /thread/97r5wzn3 — 20 posts, 8 edited, 8 OP, no public notebar | 91473 bytes |
 | `thread_archive_numeric.html` | /archive/1000422 — whole thread, 48 posts, no paging | 161054 bytes |
 | `thread_big_9nznpky9_last.html` | page 2663 of 2663, 9 posts, #top_notebar_public | 53299 bytes |
 | `thread_big_9pl2kzy9_last.html` | large thread last page | 91811 bytes |
