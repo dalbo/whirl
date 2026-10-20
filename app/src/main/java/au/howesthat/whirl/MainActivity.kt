@@ -8,9 +8,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.ThemeMode
@@ -23,7 +27,10 @@ import au.howesthat.whirl.navigation.WhirlApp
 import au.howesthat.whirl.navigation.routeForLink
 import au.howesthat.whirl.navigation.route
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.delay
 import java.time.LocalTime
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -74,9 +81,37 @@ private fun isDark(settings: Settings): Boolean = when (settings.theme) {
     ThemeMode.SYSTEM -> isSystemInDarkTheme()
     ThemeMode.LIGHT -> false
     ThemeMode.DARK -> true
-    // Evaluated when the activity composes; a live switch at the window edge comes with the Phase 3 schedule work.
-    ThemeMode.DARK_AT_NIGHT -> isNight(LocalTime.now(), settings.nightStart, settings.nightEnd)
+    ThemeMode.DARK_AT_NIGHT -> rememberIsNight(settings.nightStart, settings.nightEnd)
 }
+
+/**
+ * Whether it is night now, switching at the window's edges while the app is open. A timer covers the open app; the
+ * check on resume covers a timer that ran late while the phone slept.
+ */
+@Composable
+private fun rememberIsNight(start: LocalTime, end: LocalTime): Boolean {
+    var night by remember(start, end) { mutableStateOf(isNight(LocalTime.now(), start, end)) }
+    LifecycleResumeEffect(start, end) {
+        night = isNight(LocalTime.now(), start, end)
+        onPauseOrDispose {}
+    }
+    LaunchedEffect(start, end) {
+        while (true) {
+            delay(untilNextEdge(LocalTime.now(), start, end))
+            night = isNight(LocalTime.now(), start, end)
+        }
+    }
+    return night
+}
+
+/** Time from [now] until just after the next start or end of the window (a clock change only costs an extra wake). */
+internal fun untilNextEdge(now: LocalTime, start: LocalTime, end: LocalTime): Duration {
+    fun until(edge: LocalTime): Long = java.time.Duration.between(now, edge).toMillis().let { if (it <= 0) it + DAY_MILLIS else it }
+    return (minOf(until(start), until(end)) + EDGE_SLACK_MILLIS).milliseconds
+}
+
+private const val DAY_MILLIS = 24 * 60 * 60 * 1000L
+private const val EDGE_SLACK_MILLIS = 500L
 
 /** True if [now] falls in the window [start, end), which may wrap past midnight. */
 internal fun isNight(now: LocalTime, start: LocalTime, end: LocalTime): Boolean =
