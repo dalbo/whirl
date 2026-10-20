@@ -178,8 +178,8 @@ class ThreadViewModel @Inject constructor(
 
     private fun load(page: Int, force: Boolean) {
         loadJob?.cancel()
-        loadJob = viewModelScope.launch {
-            _refreshing.value = true
+        _refreshing.value = true
+        val job = viewModelScope.launch {
             try {
                 val filter = _filter.value
                 val resolved = repo.load(threadId, page, filter, route.forumId, force)
@@ -200,10 +200,11 @@ class ThreadViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 _error.value = e
-            } finally {
-                _refreshing.value = false
             }
         }
+        loadJob = job
+        // Only the newest load clears the indicator, not one it cancelled.
+        job.invokeOnCompletion { if (loadJob === job) _refreshing.value = false }
     }
 
     fun jumpHandled() {
