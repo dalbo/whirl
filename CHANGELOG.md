@@ -11,6 +11,7 @@ Release notes for each tag are taken from the matching `## vX.Y.Z` section below
 - Industry news, grouped by day; articles open in the browser.
 - Search thread titles across Whirlpool (from Forums) or within a forum or group (from the forum's search button).
 - User profiles: about lines and recent activity.
+- Whirlpool links (threads, forums, users, archive) can open in Whirl: turn them on under App info → Open by default. Whirldroid's old thread links work too.
 
 ## v0.0.2
 - Pipeline proof (v0.0.1's run failed at the signature check; nothing was published from it).

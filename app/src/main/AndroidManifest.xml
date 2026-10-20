@@ -12,12 +12,55 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.Whirl">
+        <!-- singleTask: a link opened from another app reaches the running instance through onNewIntent. -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!--
+                Whirlpool links. Not autoVerify: we do not own the domain, so on Android 12+ the user turns these on
+                under App info > Open by default. /forum/ and /user/ need a digit after the slash so that
+                /forum/?action=reply (posting, which must stay in the browser) is never claimed.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:scheme="http" />
+                <data android:host="forums.whirlpool.net.au" />
+                <data android:pathPrefix="/thread/" />
+                <data android:pathPrefix="/archive/" />
+                <data android:pathPrefix="/forum-replies.cfm" />
+                <data android:pathPattern="/forum/1.*" />
+                <data android:pathPattern="/forum/2.*" />
+                <data android:pathPattern="/forum/3.*" />
+                <data android:pathPattern="/forum/4.*" />
+                <data android:pathPattern="/forum/5.*" />
+                <data android:pathPattern="/forum/6.*" />
+                <data android:pathPattern="/forum/7.*" />
+                <data android:pathPattern="/forum/8.*" />
+                <data android:pathPattern="/forum/9.*" />
+                <data android:pathPattern="/user/1.*" />
+                <data android:pathPattern="/user/2.*" />
+                <data android:pathPattern="/user/3.*" />
+                <data android:pathPattern="/user/4.*" />
+                <data android:pathPattern="/user/5.*" />
+                <data android:pathPattern="/user/6.*" />
+                <data android:pathPattern="/user/7.*" />
+                <data android:pathPattern="/user/8.*" />
+                <data android:pathPattern="/user/9.*" />
+            </intent-filter>
+            <!-- Whirldroid's thread links, so old shortcuts and links keep working. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="whirldroid-thread" />
             </intent-filter>
         </activity>
     </application>

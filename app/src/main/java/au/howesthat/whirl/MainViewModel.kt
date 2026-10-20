@@ -6,8 +6,10 @@ import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.network.WhirlpoolApi
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
@@ -26,4 +28,16 @@ class MainViewModel @Inject constructor(settings: SettingsRepository, api: Whirl
 
     /** Whirlpool's site notice from the last API call. */
     val alert = api.alert
+
+    private val _link = MutableStateFlow<Any?>(null)
+    /** A route from a link the app was opened with, waiting for the NavHost (which may still be behind setup). */
+    val link: StateFlow<Any?> = _link.asStateFlow()
+
+    fun openLink(route: Any?) {
+        if (route != null) _link.value = route
+    }
+
+    fun linkHandled() {
+        _link.value = null
+    }
 }
