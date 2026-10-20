@@ -1,0 +1,569 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "986116024de67afda8052d9917ebeb46",
+    "entities": [
+      {
+        "tableName": "forums",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `title` TEXT NOT NULL, `section` TEXT NOT NULL, `sort` INTEGER NOT NULL, `is_private` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "section",
+            "columnName": "section",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sort",
+            "columnName": "sort",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isPrivate",
+            "columnName": "is_private",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "favourite_forums",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`forum_id` INTEGER NOT NULL, `added_at` INTEGER NOT NULL, PRIMARY KEY(`forum_id`))",
+        "fields": [
+          {
+            "fieldPath": "forumId",
+            "columnName": "forum_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "addedAt",
+            "columnName": "added_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "forum_id"
+          ]
+        }
+      },
+      {
+        "tableName": "threads",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `forum_id` INTEGER NOT NULL DEFAULT 0, `forum_name` TEXT NOT NULL DEFAULT '', `group_name` TEXT, `replies` INTEGER NOT NULL DEFAULT 0, `page_count` INTEGER, `first_user_id` INTEGER, `first_user_name` TEXT, `first_date` INTEGER, `last_user_id` INTEGER, `last_user_name` TEXT, `last_date` INTEGER, `is_unread` INTEGER, `unread_count` INTEGER, `last_read_post` INTEGER, `last_page` INTEGER, `is_sticky` INTEGER NOT NULL DEFAULT 0, `is_closed` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "forumId",
+            "columnName": "forum_id",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "forumName",
+            "columnName": "forum_name",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "groupName",
+            "columnName": "group_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "replies",
+            "columnName": "replies",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "pageCount",
+            "columnName": "page_count",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "firstUserId",
+            "columnName": "first_user_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "firstUserName",
+            "columnName": "first_user_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "firstDate",
+            "columnName": "first_date",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastUserId",
+            "columnName": "last_user_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastUserName",
+            "columnName": "last_user_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastDate",
+            "columnName": "last_date",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "isUnread",
+            "columnName": "is_unread",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "unreadCount",
+            "columnName": "unread_count",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastReadPost",
+            "columnName": "last_read_post",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastPage",
+            "columnName": "last_page",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "isSticky",
+            "columnName": "is_sticky",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "isClosed",
+            "columnName": "is_closed",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_threads_forum_id",
+            "unique": false,
+            "columnNames": [
+              "forum_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_threads_forum_id` ON `${TABLE_NAME}` (`forum_id`)"
+          }
+        ]
+      },
+      {
+        "tableName": "thread_source",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`source` TEXT NOT NULL, `key` TEXT NOT NULL, `thread_id` TEXT NOT NULL, `position` INTEGER NOT NULL, PRIMARY KEY(`source`, `key`, `thread_id`))",
+        "fields": [
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "threadId",
+            "columnName": "thread_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "source",
+            "key",
+            "thread_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_thread_source_thread_id",
+            "unique": false,
+            "columnNames": [
+              "thread_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_thread_source_thread_id` ON `${TABLE_NAME}` (`thread_id`)"
+          }
+        ]
+      },
+      {
+        "tableName": "news",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `title` TEXT NOT NULL, `source` TEXT NOT NULL, `blurb` TEXT NOT NULL, `date` INTEGER NOT NULL, `offset_seconds` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "blurb",
+            "columnName": "blurb",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "offsetSeconds",
+            "columnName": "offset_seconds",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "notified",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`thread_id` TEXT NOT NULL, `last_date` INTEGER NOT NULL, PRIMARY KEY(`thread_id`))",
+        "fields": [
+          {
+            "fieldPath": "threadId",
+            "columnName": "thread_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastDate",
+            "columnName": "last_date",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "thread_id"
+          ]
+        }
+      },
+      {
+        "tableName": "fetch_log",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `fetched_at` INTEGER NOT NULL, PRIMARY KEY(`key`))",
+        "fields": [
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fetchedAt",
+            "columnName": "fetched_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "key"
+          ]
+        }
+      },
+      {
+        "tableName": "thread_pages",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`thread_id` TEXT NOT NULL, `filter` TEXT NOT NULL, `page` INTEGER NOT NULL, `page_count` INTEGER NOT NULL, `title` TEXT NOT NULL, `forum_id` INTEGER, `forum_title` TEXT, `group_id` INTEGER, `moderator_note_html` TEXT, `parts` TEXT NOT NULL, `fetched_at` INTEGER NOT NULL, `accessed_at` INTEGER NOT NULL, PRIMARY KEY(`thread_id`, `filter`, `page`))",
+        "fields": [
+          {
+            "fieldPath": "threadId",
+            "columnName": "thread_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "filter",
+            "columnName": "filter",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "page",
+            "columnName": "page",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pageCount",
+            "columnName": "page_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "forumId",
+            "columnName": "forum_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "forumTitle",
+            "columnName": "forum_title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "groupId",
+            "columnName": "group_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "moderatorNoteHtml",
+            "columnName": "moderator_note_html",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "parts",
+            "columnName": "parts",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fetchedAt",
+            "columnName": "fetched_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accessedAt",
+            "columnName": "accessed_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "thread_id",
+            "filter",
+            "page"
+          ]
+        }
+      },
+      {
+        "tableName": "posts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`thread_id` TEXT NOT NULL, `filter` TEXT NOT NULL, `page` INTEGER NOT NULL, `reply_id` INTEGER NOT NULL, `reply_num` INTEGER NOT NULL, `user_id` INTEGER NOT NULL, `user_name` TEXT NOT NULL, `user_group` TEXT, `quip` TEXT, `post_count` INTEGER, `posted_text` TEXT, `posted_at` INTEGER, `edited_text` TEXT, `is_op` INTEGER NOT NULL, `hidden_reason` TEXT, `is_deleted` INTEGER NOT NULL, `short_url` TEXT, `body_html` TEXT NOT NULL, PRIMARY KEY(`thread_id`, `filter`, `page`, `reply_id`), FOREIGN KEY(`thread_id`, `filter`, `page`) REFERENCES `thread_pages`(`thread_id`, `filter`, `page`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "threadId",
+            "columnName": "thread_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "filter",
+            "columnName": "filter",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "page",
+            "columnName": "page",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "replyId",
+            "columnName": "reply_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "replyNum",
+            "columnName": "reply_num",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userId",
+            "columnName": "user_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userName",
+            "columnName": "user_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userGroup",
+            "columnName": "user_group",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "quip",
+            "columnName": "quip",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "postCount",
+            "columnName": "post_count",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "postedText",
+            "columnName": "posted_text",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "postedAt",
+            "columnName": "posted_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "editedText",
+            "columnName": "edited_text",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isOp",
+            "columnName": "is_op",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hiddenReason",
+            "columnName": "hidden_reason",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isDeleted",
+            "columnName": "is_deleted",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "shortUrl",
+            "columnName": "short_url",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "bodyHtml",
+            "columnName": "body_html",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "thread_id",
+            "filter",
+            "page",
+            "reply_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "thread_pages",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "thread_id",
+              "filter",
+              "page"
+            ],
+            "referencedColumns": [
+              "thread_id",
+              "filter",
+              "page"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '986116024de67afda8052d9917ebeb46')"
+    ]
+  }
+}

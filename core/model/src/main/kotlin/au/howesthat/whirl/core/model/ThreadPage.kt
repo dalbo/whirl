@@ -44,3 +44,20 @@ data class Post(
     val isEdited: Boolean get() = editedText != null
     val isHidden: Boolean get() = hiddenReason != null
 }
+
+/** The thread view's post filter, as the site's URL parameters (`ux=<userid>`, `um=1`, `ur=1`). */
+sealed interface PostFilter {
+    data object All : PostFilter
+    data class ByUser(val userId: Long) : PostFilter
+    data object Moderators : PostFilter
+    data object Reps : PostFilter
+
+    /** A stable key for caching ("" for [All]). */
+    val key: String
+        get() = when (this) {
+            All -> ""
+            is ByUser -> "u$userId"
+            Moderators -> "m"
+            Reps -> "r"
+        }
+}

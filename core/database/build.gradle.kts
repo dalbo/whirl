@@ -8,6 +8,13 @@ android {
     namespace = "au.howesthat.whirl.core.database"
 }
 
+// MigrationTestHelper reads the exported schemas from assets; Robolectric serves unit-test assets.
+androidComponents {
+    onVariants { variant ->
+        variant.hostTests.values.forEach { it.sources.assets?.addStaticSourceDirectory("$projectDir/schemas") }
+    }
+}
+
 room {
     schemaDirectory("$projectDir/schemas")
 }

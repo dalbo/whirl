@@ -1,6 +1,7 @@
 package au.howesthat.whirl.core.database
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -20,9 +21,15 @@ import javax.inject.Singleton
         NewsEntity::class,
         NotifiedEntity::class,
         FetchLogEntity::class,
+        ThreadPageEntity::class,
+        PostEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
+    autoMigrations = [
+        // v2: thread page cache (thread_pages, posts).
+        AutoMigration(from = 1, to = 2),
+    ],
 )
 abstract class WhirlDatabase : RoomDatabase() {
     abstract fun forumDao(): ForumDao
@@ -30,6 +37,7 @@ abstract class WhirlDatabase : RoomDatabase() {
     abstract fun newsDao(): NewsDao
     abstract fun fetchLogDao(): FetchLogDao
     abstract fun notifiedDao(): NotifiedDao
+    abstract fun threadPageDao(): ThreadPageDao
 
     /** Clears everything tied to the signed-in account (on log out or key change). Favourites are kept. */
     suspend fun clearAccountData() {
@@ -54,4 +62,5 @@ object DatabaseModule {
     @Provides fun newsDao(db: WhirlDatabase) = db.newsDao()
     @Provides fun fetchLogDao(db: WhirlDatabase) = db.fetchLogDao()
     @Provides fun notifiedDao(db: WhirlDatabase) = db.notifiedDao()
+    @Provides fun threadPageDao(db: WhirlDatabase) = db.threadPageDao()
 }
