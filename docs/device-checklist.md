@@ -10,7 +10,7 @@ Run on a real phone before tagging a release (PLAN.md §8). Debug builds install
 
 **Lists**
 - [ ] Forums: sections load; long-press adds/removes a favourite (Favourites section at the top); a private forum (Feedback, Private Messages) opens in the browser.
-- [ ] Forum (e.g. Choosing an ISP): swipe between pages; "Page N of M" picker jumps; group picker on a forum with groups (Broadband, forum 7); sticky/closed/moved/deleted rows look right; search icon searches within the forum.
+- [ ] Forum (e.g. Choosing an ISP): swipe between pages; "Page N of M" picker jumps; group picker on a forum with groups (Desktops, forum 7); sticky/closed/moved/deleted rows look right; search icon searches within the forum.
 - [ ] Watched: Unread and All tabs; "N unread" in the title; unread counts.
 - [ ] Recent (may be empty), Latest activity, Popular (forum sections) load; tapping a section header opens the forum.
 - [ ] Long-press a thread row: jump to last post, open in browser, go to forum.
