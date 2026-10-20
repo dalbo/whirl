@@ -154,6 +154,8 @@ class ThreadViewModel @Inject constructor(
             } else {
                 start(page, maxOf(page, known ?: 1))
             }
+            // Offline, the fetch below fails; the cached page still knows the thread's title.
+            _startPage.value?.let { start -> repo.page(threadId, start, filter).first()?.value?.title?.let { _title.value = it } }
             load(page, force = false)
         }
     }
