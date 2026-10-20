@@ -1,4 +1,4 @@
-package au.howesthat.whirl.ui.theme
+package au.howesthat.whirl.core.ui
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme

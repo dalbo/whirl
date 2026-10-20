@@ -30,6 +30,7 @@ class JvmLibraryConventionPlugin : Plugin<Project> {
         tasks.withType<Test>().configureEach {
             useJUnitPlatform()
             systemProperty("whirl.fixtures", fixturesDir.asFile.absolutePath)
+            timeout.set(java.time.Duration.ofMinutes(10))
             inputs.dir(fixturesDir).withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
         }
     }

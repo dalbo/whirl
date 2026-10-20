@@ -1,0 +1,28 @@
+<resources>
+    <string name="setup_intro_title">Welcome to Whirl</string>
+    <string name="setup_intro_body">Whirl is an unofficial app for the Whirlpool forums.\n\nIt signs in with your Whirlpool API key rather than your password. The key stays on this phone and is only ever sent to Whirlpool.</string>
+    <string name="setup_key_title">Your API key</string>
+    <string name="setup_key_body">Log in to Whirlpool in your browser, open your account settings and copy the API key shown there, including the dashes.</string>
+    <string name="setup_key_open_profile">Open account settings</string>
+    <string name="setup_key_label">API key</string>
+    <string name="setup_key_check">Log in</string>
+    <string name="setup_key_rejected_title">Key not accepted</string>
+    <string name="setup_key_rejected_body">Whirlpool said: \"%1$s\"\n\nCheck that you copied the whole key, including the dashes.</string>
+    <string name="setup_notify_title">Notifications</string>
+    <string name="setup_logged_in_as">Logged in as %1$s (#%2$d)</string>
+    <string name="setup_notify_watched">Tell me about new replies in watched threads</string>
+    <string name="setup_notify_interval">Check every</string>
+    <string name="setup_theme_title">Theme</string>
+    <string name="setup_done_title">All set</string>
+    <string name="setup_done_body">You can change any of this later in Settings.</string>
+    <string name="setup_next">Next</string>
+    <string name="setup_back">Back</string>
+    <string name="setup_start">Start</string>
+    <string name="ok">OK</string>
+    <string name="minutes_short">%1$d min</string>
+    <string name="hours_short">%1$d h</string>
+    <string name="theme_system">Follow system</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_dark_at_night">Dark at night</string>
+</resources>

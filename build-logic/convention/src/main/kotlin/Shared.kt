@@ -20,3 +20,8 @@ internal fun Project.configureKotlinJvmTarget() {
         }
     }
 }
+
+internal val Project.libs
+    get() = extensions.getByType(org.gradle.api.artifacts.VersionCatalogsExtension::class.java).named("libs")
+
+internal fun Project.lib(alias: String) = libs.findLibrary(alias).get()

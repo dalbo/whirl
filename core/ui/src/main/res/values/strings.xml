@@ -1,0 +1,17 @@
+<resources>
+    <string name="retry">Retry</string>
+    <string name="open_in_browser">Open in browser</string>
+    <string name="error_challenge">Whirlpool\'s Cloudflare protection blocked the request. Try again shortly, or open the page in your browser.</string>
+    <string name="error_bad_key">Whirlpool did not accept the API key.</string>
+    <string name="error_rate_limited">Whirlpool is limiting requests. Wait a minute and try again.</string>
+    <string name="error_maintenance">Whirlpool is unavailable at the moment (HTTP %1$d).</string>
+    <string name="error_network">Could not reach Whirlpool. Check your connection.</string>
+    <string name="error_not_signed_in">This page needs a Whirlpool login. Open it in your browser.</string>
+    <string name="error_drift">Whirlpool changed its layout and this page could not be read.</string>
+    <string name="error_unknown">Something went wrong.</string>
+    <string name="updated_just_now">Updated just now</string>
+    <string name="updated_minutes">Updated %1$d min ago</string>
+    <string name="updated_hours">Updated %1$d h ago</string>
+    <string name="updated_days">Updated %1$d d ago</string>
+    <string name="never_updated">Not loaded yet</string>
+</resources>

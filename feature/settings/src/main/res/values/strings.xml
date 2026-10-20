@@ -1,0 +1,42 @@
+<resources>
+    <string name="settings_title">Settings</string>
+    <string name="back">Back</string>
+    <string name="settings_account">Account</string>
+    <string name="settings_logged_in_as">Logged in as %1$s (#%2$d)</string>
+    <string name="settings_sign_out">Log out</string>
+    <string name="settings_sign_out_summary">Forget the API key and cached watched threads</string>
+    <string name="settings_general">General</string>
+    <string name="settings_homepage">Start screen</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_font_size">Post text size</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_threads">Threads</string>
+    <string name="settings_open_in_browser">Open threads in the browser</string>
+    <string name="settings_public_at_bottom">Open public forum threads at the last page</string>
+    <string name="settings_private_at_bottom">Open private forum threads at the last page</string>
+    <string name="settings_recent">Recent threads</string>
+    <string name="settings_recent_days">Show threads from the last</string>
+    <string name="settings_recent_at_top">Open at the first page</string>
+    <string name="settings_ignore_own_recent">Ignore my own replies</string>
+    <string name="settings_watched">Watched threads</string>
+    <string name="settings_watched_at_top">Open at the first page instead of the first unread post</string>
+    <string name="settings_ignore_own_watched">Don\'t notify about my own replies</string>
+    <string name="settings_auto_mark_read">Mark as read when opened</string>
+    <string name="settings_back_to_list">Return to the list after marking read</string>
+    <plurals name="days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <string name="home_news">Industry news</string>
+    <string name="home_recent">Recent threads</string>
+    <string name="home_watched">Watched threads</string>
+    <string name="home_popular">Popular threads</string>
+    <string name="home_forums">Forums</string>
+    <string name="font_smallest">Smallest</string>
+    <string name="font_smaller">Smaller</string>
+    <string name="font_normal">Normal</string>
+    <string name="font_larger">Larger</string>
+    <string name="font_large">Large</string>
+    <string name="font_largest">Largest</string>
+    <string name="cancel">Cancel</string>
+</resources>

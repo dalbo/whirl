@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.whirl.android.application)
-    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.whirl.android.compose)
+    alias(libs.plugins.whirl.hilt)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 // Release builds get their version from the tag: ./gradlew -Pwhirl.version=1.2.3 → versionName 1.2.3, versionCode 10203.
@@ -46,7 +48,6 @@ android {
     }
 
     buildFeatures {
-        compose = true
         buildConfig = true
     }
 
@@ -64,12 +65,20 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:data"))
+    implementation(project(":core:ui"))
+    implementation(project(":feature:setup"))
+    implementation(project(":feature:settings"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(platform(libs.compose.bom))
-    implementation(libs.compose.ui)
-    implementation(libs.compose.material3)
-    implementation(libs.compose.ui.tooling.preview)
-    debugImplementation(libs.compose.ui.tooling)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.hilt.viewmodel.compose)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.compose.material.icons.core)
+
+    testImplementation(libs.junit4)
+    testImplementation(libs.kotlin.test.junit)
 }
