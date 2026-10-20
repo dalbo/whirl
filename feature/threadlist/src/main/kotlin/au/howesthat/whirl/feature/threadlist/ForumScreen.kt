@@ -10,15 +10,12 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,7 +23,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,6 +45,7 @@ import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
+import au.howesthat.whirl.core.ui.PagePickerDialog
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -66,7 +63,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import kotlin.math.roundToInt
 import javax.inject.Inject
 
 /** A forum's thread list, optionally narrowed to a group. */
@@ -191,7 +187,7 @@ fun ForumScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: ForumViewModel 
                             else Row(Modifier.weight(1f)) {}
                             if (pageCount > 1) {
                                 TextButton(onClick = { picking = true }) {
-                                    Text(stringResource(R.string.page_of, pager.currentPage + 1, pageCount))
+                                    Text(stringResource(au.howesthat.whirl.core.ui.R.string.page_of, pager.currentPage + 1, pageCount))
                                 }
                             }
                         }
@@ -233,7 +229,7 @@ fun ForumScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: ForumViewModel 
     }
 
     if (picking) {
-        PagePicker(
+        PagePickerDialog(
             pageCount = pageCount,
             current = pager.currentPage + 1,
             onDismiss = { picking = false },
@@ -267,27 +263,4 @@ private fun Overflow(onOpenInBrowser: () -> Unit) {
     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
         DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser)) }, onClick = { open = false; onOpenInBrowser() })
     }
-}
-
-/** "Page N of M": a slider, since forums run to hundreds of pages. */
-@Composable
-internal fun PagePicker(pageCount: Int, current: Int, onDismiss: () -> Unit, onPick: (Int) -> Unit) {
-    var value by remember { mutableFloatStateOf(current.toFloat()) }
-    val page = value.roundToInt().coerceIn(1, pageCount)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.go_to_page)) },
-        text = {
-            Column {
-                Text(stringResource(R.string.page_of, page, pageCount), style = MaterialTheme.typography.titleMedium)
-                Slider(value = value, onValueChange = { value = it }, valueRange = 1f..pageCount.toFloat(), steps = if (pageCount <= 100) pageCount - 2 else 0)
-                Row {
-                    TextButton(onClick = { onPick(1) }) { Text(stringResource(R.string.first_page)) }
-                    TextButton(onClick = { onPick(pageCount) }) { Text(stringResource(R.string.last_page)) }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = { onPick(page) }) { Text(stringResource(R.string.go)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) } },
-    )
 }

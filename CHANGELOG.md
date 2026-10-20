@@ -7,6 +7,7 @@ Release notes for each tag are taken from the matching `## vX.Y.Z` section below
 - About screen with the version, source code and issue tracker links.
 - Thread lists: Latest activity, Recent (honours the history length and "ignore my own replies"), Watched (Unread/All tabs), Popular, and forum pages with swipeable pages, a page picker and a group selector. Sticky, closed, moved and deleted threads are marked; unread threads (from the API) are bold. Long-press a thread to jump to its last post, open it in the browser or go to its forum. Private forums list through the API and open threads in the browser.
 - Forums screen with a Favourites section (long-press a forum to add or remove it). Private forums are marked and open in the browser.
+- Thread view: swipe between pages, jump to the first, last or any page; posts are rendered natively with coloured quotes, tap-to-reveal spoilers and lists. Tapping a quote goes to the quoted post, on another page if needed. Links to Whirlpool threads, forums, users and whrl.pl open in the app. Filter by your posts, moderators, reps or one user; long-press a post to reply or edit in the browser, see the poster, or see their posts. The post text size setting applies. Thread pages are cached for reading offline (the last 50 opened).
 
 ## v0.0.2
 - Pipeline proof (v0.0.1's run failed at the signature check; nothing was published from it).

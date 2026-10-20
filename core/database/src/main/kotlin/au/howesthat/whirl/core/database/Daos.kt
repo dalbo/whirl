@@ -198,6 +198,9 @@ interface ThreadPageDao {
     @Query("SELECT * FROM posts WHERE thread_id = :threadId AND filter = :filter AND page = :page ORDER BY reply_num")
     fun observePosts(threadId: String, filter: String, page: Int): Flow<List<PostEntity>>
 
+    @Query("SELECT * FROM posts WHERE thread_id = :threadId AND filter = :filter AND page = :page ORDER BY reply_num")
+    suspend fun posts(threadId: String, filter: String, page: Int): List<PostEntity>
+
     @Query("SELECT fetched_at FROM thread_pages WHERE thread_id = :threadId AND filter = :filter AND page = :page")
     suspend fun fetchedAt(threadId: String, filter: String, page: Int): Long?
 

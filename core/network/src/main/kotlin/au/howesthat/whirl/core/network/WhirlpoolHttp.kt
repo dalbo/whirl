@@ -2,6 +2,7 @@ package au.howesthat.whirl.core.network
 
 import au.howesthat.whirl.core.model.WhirlpoolError
 import kotlinx.coroutines.delay
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -33,7 +34,8 @@ data class RetryPolicy(val maxRetries: Int = 2, val baseDelay: Duration = 2.seco
     }
 }
 
-internal class HttpBody(val code: Int, val body: String)
+/** A response body; [finalUrl] is where redirects ended. */
+internal class HttpBody(val code: Int, val body: String, val finalUrl: HttpUrl)
 
 /**
  * Executes [request], retrying transient failures per [retry], and returns the body of any response that is not a
@@ -67,7 +69,7 @@ private fun classify(response: Response): HttpBody {
     }
     val body = response.body.string()
     if (isChallengePage(body)) throw WhirlpoolError.Challenge()
-    return HttpBody(code, body)
+    return HttpBody(code, body, response.request.url)
 }
 
 /** Cloudflare's interstitial, in case it arrives without the `cf-mitigated` header. */

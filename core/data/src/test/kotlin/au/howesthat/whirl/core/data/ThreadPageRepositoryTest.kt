@@ -146,4 +146,27 @@ class ThreadPageRepositoryTest {
         val parsed = au.howesthat.whirl.core.scraper.WhirlpoolTime.parseAbsolute(first.postedText!!)
         assertEquals<LocalDateTime?>(parsed, first.postedAt)
     }
+
+    @Test
+    fun `locating a reply caches its page and finds the post number`() = runTest {
+        // The live locator redirects to the thread page; MockWebServer follows the same redirect.
+        server.enqueue(MockResponse.Builder().code(302).addHeader("Location", "/thread/3pxj858k?p=2#r21").build())
+        enqueueHtml("thread_3pxj858k_p2.html")
+        val located = repo.locate(75543951)
+        assertEquals("/forum/?action=replies&r=75543951", server.takeRequest().target)
+        assertEquals(ThreadPageRepository.Located(nbn, 2, 21), located)
+        assertNotNull(repo.page(nbn, 2).first())
+
+        enqueueHtml("thread_3pxj858k_p2.html")
+        assertFailsWith<WhirlpoolError.Drift> { repo.locate(1) }
+    }
+
+    @Test
+    fun `short links resolve to where they redirect`() = runTest {
+        server.enqueue(MockResponse.Builder().code(301).addHeader("Location", server.url("/thread/3pxj858k?p=2").toString()).build())
+        server.enqueue(MockResponse.Builder().body("<html></html>").build())
+        val link = repo.resolveShortLink(server.url("/RgPkJ5").toString())
+        // MockWebServer is not forums.whirlpool.net.au, so the classifier sees an external URL with the right path.
+        assertTrue((link as WhirlpoolLink.External).url.contains("/thread/3pxj858k?p=2"))
+    }
 }

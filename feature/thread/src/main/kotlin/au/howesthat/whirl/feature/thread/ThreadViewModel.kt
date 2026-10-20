@@ -1,0 +1,305 @@
+package au.howesthat.whirl.feature.thread
+
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.navigation.toRoute
+import au.howesthat.whirl.core.data.Settings
+import au.howesthat.whirl.core.data.SettingsRepository
+import au.howesthat.whirl.core.data.ThreadPageRepository
+import au.howesthat.whirl.core.data.ThreadPageRepository.Companion.LAST_PAGE
+import au.howesthat.whirl.core.data.WhirlpoolLink
+import au.howesthat.whirl.core.model.ForumRef
+import au.howesthat.whirl.core.model.Post
+import au.howesthat.whirl.core.model.PostBody
+import au.howesthat.whirl.core.model.PostFilter
+import au.howesthat.whirl.core.model.ThreadId
+import au.howesthat.whirl.core.model.ThreadPage
+import au.howesthat.whirl.core.network.WhirlpoolUrls
+import au.howesthat.whirl.core.scraper.PostBodyParser
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import java.time.Instant
+import javax.inject.Inject
+
+/**
+ * A thread, opened at [page] (1-based, or -1 for the last page). [scrollToPost] is a post number, [scrollToReply] a
+ * reply id; [userId] opens it filtered to one user's posts (`ux=`).
+ */
+@Serializable
+data class ThreadRoute(
+    val threadId: String,
+    val page: Int = 1,
+    val scrollToPost: Int? = null,
+    val scrollToReply: Long? = null,
+    val forumId: Int? = null,
+    val userId: Long? = null,
+)
+
+/** A post ready to draw: its body parsed into blocks. */
+data class UiPost(val post: Post, val body: PostBody)
+
+data class UiPage(val page: ThreadPage, val posts: List<UiPost>, val note: PostBody?, val updatedAt: Instant?)
+
+/** A post to bring into view once its page is showing. */
+data class ScrollTarget(val page: Int, val postNumber: Int? = null, val replyId: Long? = null)
+
+/** One-off navigation out of the thread. */
+sealed interface ThreadEvent {
+    data class OpenThread(val route: ThreadRoute) : ThreadEvent
+    data class OpenForum(val forum: ForumRef) : ThreadEvent
+    data class OpenUser(val userId: Long) : ThreadEvent
+    data class Browser(val url: String) : ThreadEvent
+    data class Failed(val error: Throwable) : ThreadEvent
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+@HiltViewModel
+class ThreadViewModel @Inject constructor(
+    savedState: SavedStateHandle,
+    private val repo: ThreadPageRepository,
+    settingsRepo: SettingsRepository,
+) : ViewModel() {
+    private val route = savedState.toRoute<ThreadRoute>()
+    val threadId = ThreadId(route.threadId)
+    private val urls = WhirlpoolUrls()
+
+    val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(viewModelScope, SharingStarted.Eagerly, Settings())
+    val myUserId: StateFlow<Long?> = settingsRepo.account.map { it?.userId }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    private val _filter = MutableStateFlow<PostFilter>(route.userId?.let(PostFilter::ByUser) ?: PostFilter.All)
+    val filter: StateFlow<PostFilter> = _filter.asStateFlow()
+
+    /** The first page to show; null until it is known (from the cache or the first fetch). */
+    private val _startPage = MutableStateFlow<Int?>(null)
+    val startPage: StateFlow<Int?> = _startPage.asStateFlow()
+
+    private val _pageCount = MutableStateFlow(1)
+    val pageCount: StateFlow<Int> = _pageCount.asStateFlow()
+
+    private val _title = MutableStateFlow<String?>(null)
+    val title: StateFlow<String?> = _title.asStateFlow()
+
+    /** Set when the pager should move (a quote on another page, "last page" turning out to be later). */
+    private val _jumpTo = MutableStateFlow<Int?>(null)
+    val jumpTo: StateFlow<Int?> = _jumpTo.asStateFlow()
+
+    private val _scrollTarget = MutableStateFlow(
+        when {
+            route.scrollToReply != null -> ScrollTarget(route.page, replyId = route.scrollToReply)
+            route.scrollToPost != null -> ScrollTarget(route.page, postNumber = route.scrollToPost)
+            else -> null
+        },
+    )
+    val scrollTarget: StateFlow<ScrollTarget?> = _scrollTarget.asStateFlow()
+
+    private val currentPage = MutableStateFlow<Int?>(null)
+
+    private val _refreshing = MutableStateFlow(false)
+    val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
+
+    private val _error = MutableStateFlow<Throwable?>(null)
+    /** The last failure for the page on screen (or for opening the thread). */
+    val error: StateFlow<Throwable?> = _error.asStateFlow()
+
+    private val events = Channel<ThreadEvent>(Channel.BUFFERED)
+    val navigation: Flow<ThreadEvent> = events.receiveAsFlow()
+
+    private var loadJob: Job? = null
+
+    init {
+        open(route.page)
+    }
+
+    /** Pages of the current filter; bodies are parsed off the main thread. */
+    fun page(page: Int): Flow<UiPage?> = _filter.flatMapLatest { filter ->
+        repo.page(threadId, page, filter).map { cached ->
+            cached?.let { c ->
+                UiPage(
+                    page = c.value,
+                    posts = c.value.posts.map { UiPost(it, PostBodyParser.parse(it.bodyHtml)) },
+                    note = c.value.moderatorNoteHtml?.let(PostBodyParser::parse),
+                    updatedAt = c.updatedAt,
+                )
+            }
+        }.flowOn(Dispatchers.Default)
+    }
+
+    /** Resolves the start page (cache first, then the network) and loads it. */
+    private fun open(page: Int) {
+        _startPage.value = null
+        currentPage.value = null
+        viewModelScope.launch {
+            val filter = _filter.value
+            val known = repo.lastKnownPage(threadId, filter)
+            if (page == LAST_PAGE) {
+                known?.let { start(it, it) }
+            } else {
+                start(page, maxOf(page, known ?: 1))
+            }
+            load(page, force = false)
+        }
+    }
+
+    private fun start(page: Int, count: Int) {
+        _pageCount.value = count
+        if (_startPage.value == null) _startPage.value = page
+        currentPage.value = currentPage.value ?: page
+    }
+
+    /** Called when the pager settles on a page. */
+    fun showPage(page: Int) {
+        if (currentPage.value == page) return
+        currentPage.value = page
+        _error.value = null
+        load(page, force = false)
+    }
+
+    fun refresh() {
+        load(currentPage.value ?: route.page, force = true)
+    }
+
+    private fun load(page: Int, force: Boolean) {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            _refreshing.value = true
+            try {
+                val filter = _filter.value
+                val resolved = repo.load(threadId, page, filter, route.forumId, force)
+                val loaded = repo.page(threadId, resolved, filter).first()?.value
+                if (loaded != null) {
+                    _pageCount.value = loaded.pageCount
+                    _title.value = loaded.title
+                }
+                if (_startPage.value == null) {
+                    start(resolved, loaded?.pageCount ?: resolved)
+                } else if (page == LAST_PAGE && resolved != currentPage.value) {
+                    // The cached "last page" was stale: move to the real one.
+                    currentPage.value = resolved
+                    _jumpTo.value = resolved
+                }
+                _error.value = null
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _error.value = e
+            } finally {
+                _refreshing.value = false
+            }
+        }
+    }
+
+    fun jumpHandled() {
+        _jumpTo.value = null
+    }
+
+    fun scrollHandled() {
+        _scrollTarget.value = null
+    }
+
+    fun goToPage(page: Int) {
+        _jumpTo.value = page.coerceIn(1, _pageCount.value)
+    }
+
+    /** Loads `?p=-1`; [load] then moves the pager to the page it resolves to. */
+    fun lastPage() {
+        load(LAST_PAGE, force = false)
+    }
+
+    fun setFilter(filter: PostFilter) {
+        if (_filter.value == filter) return
+        _filter.value = filter
+        _scrollTarget.value = null
+        open(1)
+    }
+
+    /** A quote attribution: scroll if the quoted post is on [onPage], else find its page through the site. */
+    fun openQuote(replyId: Long, onPage: UiPage?) {
+        if (onPage?.posts?.any { it.post.replyId == replyId } == true) {
+            _scrollTarget.value = ScrollTarget(onPage.page.page, replyId = replyId)
+            return
+        }
+        locate(replyId)
+    }
+
+    private fun locate(replyId: Long) {
+        viewModelScope.launch {
+            try {
+                val at = repo.locate(replyId)
+                showPost(at.threadId, at.page, ScrollTarget(at.page, postNumber = at.postNumber))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                events.send(ThreadEvent.Failed(e))
+            }
+        }
+    }
+
+    /** Moves within this thread when possible, otherwise opens the other thread. */
+    private suspend fun showPost(id: ThreadId, page: Int, target: ScrollTarget?) {
+        if (id == threadId && _filter.value == PostFilter.All) {
+            if (page > _pageCount.value) _pageCount.value = page
+            _scrollTarget.value = target
+            _jumpTo.value = page
+        } else {
+            events.send(
+                ThreadEvent.OpenThread(ThreadRoute(id.value, page, scrollToPost = target?.postNumber, scrollToReply = target?.replyId)),
+            )
+        }
+    }
+
+    /** Routes a link from a post: Whirlpool pages in the app, everything else to the browser. */
+    fun openLink(url: String) {
+        viewModelScope.launch {
+            try {
+                handle(WhirlpoolLink.parse(url))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                events.send(ThreadEvent.Failed(e))
+            }
+        }
+    }
+
+    private suspend fun handle(link: WhirlpoolLink) {
+        when (link) {
+            is WhirlpoolLink.Thread -> {
+                val page = link.page ?: 1
+                val target = link.anchor?.let {
+                    if (link.isReplyIdAnchor) ScrollTarget(page, replyId = it) else ScrollTarget(page, postNumber = it.toInt())
+                }
+                showPost(link.id, page, target)
+            }
+            // The archive is the whole thread on one page; the paged view shows the same posts.
+            is WhirlpoolLink.Archive -> events.send(ThreadEvent.OpenThread(ThreadRoute(link.id.value)))
+            is WhirlpoolLink.Forum -> events.send(ThreadEvent.OpenForum(ForumRef(link.id, "", link.groupId)))
+            is WhirlpoolLink.User -> events.send(ThreadEvent.OpenUser(link.id))
+            is WhirlpoolLink.Reply -> locate(link.replyId)
+            is WhirlpoolLink.Short -> handle(repo.resolveShortLink(link.url).let { if (it is WhirlpoolLink.Short) WhirlpoolLink.External(link.url) else it })
+            is WhirlpoolLink.External -> events.send(ThreadEvent.Browser(link.url))
+        }
+    }
+
+    fun threadUrl(page: Int? = currentPage.value): String = urls.thread(threadId, page ?: 1).toString()
+    fun postUrl(post: Post, page: Int): String = urls.thread(threadId, page).newBuilder().fragment("r${post.number}").build().toString()
+    fun replyToThreadUrl(): String = urls.replyToThread(threadId).toString()
+    fun replyToPostUrl(post: Post): String = urls.replyToPost(post.replyId).toString()
+    fun editPostUrl(post: Post): String = urls.editPost(post.replyId).toString()
+}

@@ -19,6 +19,13 @@ class WhirlpoolWeb(
         if (response.code !in 200..299) throw WhirlpoolError.Api("HTTP ${response.code}", response.code)
         return response.body
     }
+
+    /** Follows [url]'s redirects (whrl.pl short links, the reply locator) and returns where they end. */
+    suspend fun resolve(url: HttpUrl): HttpUrl {
+        val response = client.fetch(Request.Builder().url(url).build(), retry)
+        if (response.code !in 200..299) throw WhirlpoolError.Api("HTTP ${response.code}", response.code)
+        return response.finalUrl
+    }
 }
 
 /** URL forms verified against the live site (PLAN.md §2.3). */
@@ -49,8 +56,19 @@ class WhirlpoolUrls(val forums: HttpUrl = "https://forums.whirlpool.net.au/".toH
         .addQueryParameter("action", "popular_views").build()
 
     /** Locates a post by id: redirects to the thread page that contains it. */
-    fun reply(postId: Long): HttpUrl = forums.newBuilder().addPathSegment("forum").addPathSegment("")
+    fun locateReply(postId: Long): HttpUrl = forums.newBuilder().addPathSegment("forum").addPathSegment("")
         .addQueryParameter("action", "replies").addQueryParameter("r", postId.toString()).build()
+
+    /** Reply to a post, in the browser (seen in the thread page markup). */
+    fun replyToPost(replyId: Long): HttpUrl = action("reply").addQueryParameter("r", replyId.toString()).build()
+
+    /** Reply to a thread, in the browser (2.14.12's URL; not in logged-out markup). */
+    fun replyToThread(id: ThreadId): HttpUrl = action("reply").addQueryParameter("t", id.value).build()
+
+    /** Edit one's own post, in the browser (2.14.12's URL; only shown to the author when logged in). */
+    fun editPost(replyId: Long): HttpUrl = action("edit").addQueryParameter("e", replyId.toString()).build()
+
+    private fun action(name: String) = forums.newBuilder().addPathSegment("forum").addPathSegment("").addQueryParameter("action", name)
 
     fun user(id: Long, days: Int? = null): HttpUrl = forums.newBuilder()
         .addPathSegments("user/$id")
