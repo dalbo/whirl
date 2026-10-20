@@ -184,11 +184,11 @@ From 1.8.12 and 2.14.12 code:
 3. `:core:network` with typed errors; `:core:scraper` parsers + tests against fixtures; `:core:database`; `:core:data` for forums, latest, watched, news.
 4. Setup wizard (API key → `get=user`), settings scaffold, theme.
 
-**Phase 2 — read-only parity (≈2.5 weeks)** → **milestone v0.1 on GitHub Releases**
+**Phase 2 — done** (2026-10-21, v0.1.0 on GitHub Releases): read-only parity (HANDOFF.md "Phase 2" lists what was built and decided). Was: **read-only parity (≈2.5 weeks)** → **milestone v0.1 on GitHub Releases**
 Drawer + homepage; Forums with favourites and private-forum handling; Thread lists for forum/watched/recent/popular/latest/search with groups, paging, sticky/closed/moved/deleted styling, Unread/All tabs; Thread view with inline-var paging, block renderer, notebars (public/parts), quote navigation, post filters, user's posts; search (list view); News; User profile; deep links; opening-position rules; all read-side settings.
 
 **Phase 3 — actions and notifications (≈1.5 weeks)** → **v0.2**
-Watch/unwatch/mark read with Undo; WorkManager polling, channel, actions, permission prompt, boot re-arm; Reply / New thread / Edit via Custom Tabs; night-mode schedule; font size; back-to-list option.
+Watch/unwatch/mark read with Undo; WorkManager polling, channel, actions, permission prompt, boot re-arm (WorkManager handles it); New thread via Custom Tabs (Reply and Edit landed in Phase 2); night-mode schedule; back-to-list and auto-mark-read options. (Post font size landed in Phase 2.)
 
 **Phase 4 — polish and release (≈1 week)** → **v1.0**
 Accessibility (TalkBack, font scaling), landscape, Material You, store listing text/screenshots in `fastlane/`, Play internal track, F-Droid submission, post in the Whirlpool API thread and ask to be listed on the third-party clients wiki page.
