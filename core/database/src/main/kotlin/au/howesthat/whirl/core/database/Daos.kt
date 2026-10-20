@@ -204,6 +204,10 @@ interface NotifiedDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun put(entries: List<NotifiedEntity>)
+
+    /** Forgets threads that are no longer unread; a later reply is then newer than nothing. */
+    @Query("DELETE FROM notified WHERE thread_id NOT IN (:ids)")
+    suspend fun keepOnly(ids: List<String>)
 }
 
 @Dao

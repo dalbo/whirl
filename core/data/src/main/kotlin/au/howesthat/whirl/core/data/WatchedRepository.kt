@@ -14,6 +14,7 @@ import au.howesthat.whirl.core.network.WhirlpoolApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -45,6 +46,11 @@ class PendingWatch internal constructor(
 
     internal val state = AtomicReference(State.WAITING)
     internal val go = CompletableDeferred<Unit>()
+
+    /** Why sending failed (the change was rolled back); null while waiting or once sent. */
+    @Volatile
+    var error: Throwable? = null
+        internal set
 }
 
 sealed interface WatchEvent {
@@ -105,6 +111,20 @@ class WatchedRepository @Inject constructor(
         }
     }
 
+    /**
+     * Fetches the unread list now (no max age; the notification check) and stores it as the cached Unread list.
+     * Returns what Whirlpool sent, before any pending local changes are reapplied.
+     */
+    suspend fun fetchUnread(): List<WatchedThread> {
+        val list = api.watched(unreadOnly = true)
+        mutex.withLock {
+            dao.replaceWatchedList(key(unreadOnly = true), list.map { it.toColumns() })
+            log.put(FetchLogEntity(logKey(key(unreadOnly = true)), clock.millis()))
+            reapplyPending()
+        }
+        return list
+    }
+
     /** Fetches the All list if it is stale, so screens outside Watched know what is watched. Errors are ignored. */
     suspend fun ensureKnown() {
         try {
@@ -118,7 +138,8 @@ class WatchedRepository @Inject constructor(
 
     /**
      * Applies [action] to the cached lists now and sends it after its Undo window. Emits [WatchEvent.Applied] so the
-     * UI can offer Undo. With [undoable] false (auto mark read, notification actions) it is sent at once, silently.
+     * UI can offer Undo. With [undoable] false (auto mark read, notification actions) it is sent at once, silently,
+     * and this returns once it has been sent (or failed and rolled back); the send itself is not cancelled with the caller.
      */
     suspend fun perform(action: WatchAction, ids: List<ThreadId>, undoable: Boolean = true): PendingWatch {
         require(ids.isNotEmpty())
@@ -136,7 +157,7 @@ class WatchedRepository @Inject constructor(
             }
             _events.emit(WatchEvent.Applied(p))
         } else {
-            scope.launch { send(p) }
+            scope.async { send(p) }.await()
         }
         return p
     }
@@ -170,6 +191,7 @@ class WatchedRepository @Inject constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            p.error = e
             mutex.withLock { rollBack(p) }
             _events.emit(WatchEvent.Failed(p.action, e))
         } finally {

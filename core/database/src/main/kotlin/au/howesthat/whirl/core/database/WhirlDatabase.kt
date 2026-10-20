@@ -45,6 +45,7 @@ abstract class WhirlDatabase : RoomDatabase() {
         threadDao().clearSource(ThreadSource.WATCHED.name, "all")
         threadDao().clearSource(ThreadSource.RECENT.name, "")
         threadDao().deleteOrphans()
+        notifiedDao().keepOnly(emptyList())
         fetchLogDao().clear()
     }
 }
