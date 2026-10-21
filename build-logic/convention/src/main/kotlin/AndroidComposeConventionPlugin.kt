@@ -18,6 +18,10 @@ class AndroidComposeConventionPlugin : Plugin<Project> {
             add("implementation", lib("compose-material3"))
             add("implementation", lib("compose-ui-tooling-preview"))
             add("debugImplementation", lib("compose-ui-tooling"))
+            // Compose UI tests run under Robolectric with the unit tests.
+            add("testImplementation", bom)
+            add("testImplementation", lib("compose-ui-test-junit4"))
+            add("debugImplementation", lib("compose-ui-test-manifest"))
         }
     }
 }

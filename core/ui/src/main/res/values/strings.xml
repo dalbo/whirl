@@ -17,6 +17,7 @@
     <string name="no_browser">No app can open this link.</string>
     <string name="open_menu">Open menu</string>
     <string name="back">Back</string>
+    <string name="show_actions">show actions</string>
     <string name="page_of">Page %1$d of %2$d</string>
     <string name="go_to_page">Go to page</string>
     <string name="first_page">First page</string>

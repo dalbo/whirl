@@ -1,9 +1,7 @@
 package au.howesthat.whirl.feature.threadlist
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,8 +11,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Badge
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
@@ -34,6 +30,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -43,7 +43,10 @@ import au.howesthat.whirl.core.data.OpenThread
 import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.RowKind
+import au.howesthat.whirl.core.ui.ActionsMenu
 import au.howesthat.whirl.core.ui.EmptyState
+import au.howesthat.whirl.core.ui.MenuAction
+import au.howesthat.whirl.core.ui.menuClickable
 import au.howesthat.whirl.core.ui.ErrorState
 import au.howesthat.whirl.core.ui.errorMessage
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
@@ -157,14 +160,13 @@ private fun SectionHeader(forum: ForumRef, onClick: () -> Unit) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
         Text(
             forum.title,
-            Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
+            Modifier.fillMaxWidth().semantics { heading() }.clickable(role = Role.Button, onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
         )
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ThreadRowItem(
     item: ThreadItem,
@@ -179,10 +181,20 @@ fun ThreadRowItem(
     var menu by remember { mutableStateOf(false) }
     val openable = item.openId != null
     val inactive = item.kind != RowKind.THREAD
+    val actions = watchActions.map { action -> MenuAction(watchActionLabel(action)) { onWatchAction(action) } } +
+        MenuAction(stringResource(R.string.row_last_post), enabled = openable, onClick = onLastPost) +
+        MenuAction(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser), onClick = onOpenInBrowser) +
+        listOfNotNull(onOpenForum?.let { MenuAction(stringResource(R.string.row_go_to_forum, item.forum?.title.orEmpty()), onClick = it) })
     Box {
         ListItem(
             modifier = Modifier
-                .combinedClickable(enabled = openable, onClick = onOpen, onLongClick = { menu = true })
+                .menuClickable(
+                    actions,
+                    enabled = openable,
+                    onLongClick = { menu = true },
+                    onClick = onOpen,
+                    onLongClickLabel = stringResource(au.howesthat.whirl.core.ui.R.string.show_actions),
+                )
                 .alpha(if (inactive) 0.6f else 1f),
             colors = if (item.isSticky) ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else ListItemDefaults.colors(),
             overlineContent = labels(item)?.let { { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
@@ -197,21 +209,15 @@ fun ThreadRowItem(
             },
             supportingContent = { Text(details(item, now), maxLines = 2, overflow = TextOverflow.Ellipsis) },
             trailingContent = if (item.unreadCount > 0) {
-                { Badge { Text(item.unreadCount.toString()) } }
+                {
+                    val unread = pluralStringResource(R.plurals.row_unread, item.unreadCount, item.unreadCount)
+                    Badge(Modifier.clearAndSetSemantics { contentDescription = unread }) { Text(item.unreadCount.toString()) }
+                }
             } else {
                 null
             },
         )
-        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            watchActions.forEach { action ->
-                DropdownMenuItem(text = { Text(watchActionLabel(action)) }, onClick = { menu = false; onWatchAction(action) })
-            }
-            DropdownMenuItem(text = { Text(stringResource(R.string.row_last_post)) }, onClick = { menu = false; onLastPost() }, enabled = openable)
-            DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser)) }, onClick = { menu = false; onOpenInBrowser() })
-            onOpenForum?.let { go ->
-                DropdownMenuItem(text = { Text(stringResource(R.string.row_go_to_forum, item.forum?.title.orEmpty())) }, onClick = { menu = false; go() })
-            }
-        }
+        ActionsMenu(menu, onDismiss = { menu = false }, actions)
     }
 }
 

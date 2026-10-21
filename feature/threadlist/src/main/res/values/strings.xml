@@ -20,6 +20,7 @@
     <string name="empty_forum">No threads on this page.</string>
     <string name="empty_private_forum">This forum needs a Whirlpool login. Open it in your browser.</string>
     <string name="all_groups">All groups</string>
+    <string name="choose_group">choose a group</string>
     <string name="new_thread">New thread in browser</string>
     <string name="row_watch">Watch</string>
     <string name="row_mark_read">Mark as read</string>
@@ -35,6 +36,10 @@
     <plurals name="row_replies">
         <item quantity="one">%1$d reply</item>
         <item quantity="other">%1$d replies</item>
+    </plurals>
+    <plurals name="row_unread">
+        <item quantity="one">%1$d unread post</item>
+        <item quantity="other">%1$d unread posts</item>
     </plurals>
     <plurals name="row_pages">
         <item quantity="one">%1$d page</item>

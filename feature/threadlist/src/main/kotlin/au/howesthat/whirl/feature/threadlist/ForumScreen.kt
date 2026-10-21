@@ -31,6 +31,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
@@ -204,7 +209,11 @@ fun ForumScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: ForumViewModel 
                             if (groups.isNotEmpty()) GroupPicker(groups, group, viewModel::selectGroup, Modifier.weight(1f))
                             else Row(Modifier.weight(1f)) {}
                             if (pageCount > 1) {
-                                TextButton(onClick = { picking = true }) {
+                                // Announced when a swipe changes the page.
+                                TextButton(
+                                    onClick = { picking = true },
+                                    Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                                ) {
                                     Text(stringResource(au.howesthat.whirl.core.ui.R.string.page_of, pager.currentPage + 1, pageCount))
                                 }
                             }
@@ -263,8 +272,14 @@ fun ForumScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: ForumViewModel 
 private fun GroupPicker(groups: List<ForumGroup>, selected: Int?, onSelect: (Int?) -> Unit, modifier: Modifier) {
     var open by remember { mutableStateOf(false) }
     Row(modifier) {
-        TextButton(onClick = { open = true }) {
-            Text(groups.firstOrNull { it.id == selected }?.name ?: stringResource(R.string.all_groups), maxLines = 1)
+        val choose = stringResource(R.string.choose_group)
+        TextButton(onClick = { open = true }, Modifier.semantics { onClick(label = choose, action = null) }) {
+            Text(
+                groups.firstOrNull { it.id == selected }?.name ?: stringResource(R.string.all_groups),
+                Modifier.weight(1f, fill = false),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Icon(Icons.Default.ArrowDropDown, contentDescription = null)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {

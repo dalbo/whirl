@@ -1,9 +1,7 @@
 package au.howesthat.whirl.feature.thread
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,7 +47,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -62,12 +63,15 @@ import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.Post
 import au.howesthat.whirl.core.model.PostFilter
+import au.howesthat.whirl.core.ui.ActionsMenu
 import au.howesthat.whirl.core.ui.ErrorState
+import au.howesthat.whirl.core.ui.MenuAction
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.PagePickerDialog
 import au.howesthat.whirl.core.ui.PostBodyView
 import au.howesthat.whirl.core.ui.errorMessage
+import au.howesthat.whirl.core.ui.menuClickable
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 import au.howesthat.whirl.core.ui.timeAgo
 import kotlinx.coroutines.launch
@@ -161,13 +165,19 @@ private fun ThreadPager(
     Column(modifier) {
         TopAppBar(
             title = {
-                Column(Modifier.clickable(role = Role.Button) { picking = true }) {
+                Column(Modifier.clickable(role = Role.Button, onClickLabel = stringResource(au.howesthat.whirl.core.ui.R.string.go_to_page)) { picking = true }) {
                     Text(title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     val sub = listOfNotNull(
                         stringResource(au.howesthat.whirl.core.ui.R.string.page_of, pager.currentPage + 1, pageCount),
                         filterLabel(filter).takeIf { filter != PostFilter.All },
                     ).joinToString(" · ")
-                    Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    // Announced when a swipe changes the page.
+                    Text(
+                        sub,
+                        Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             },
             navigationIcon = { NavIconButton(navIcon) },
@@ -315,7 +325,6 @@ private fun PostList(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PostItem(
     post: UiPost,
@@ -331,11 +340,23 @@ private fun PostItem(
 ) {
     val p = post.post
     var menu by remember { mutableStateOf(false) }
+    val actions = listOfNotNull(
+        MenuAction(stringResource(R.string.post_reply), onClick = onReply),
+        MenuAction(stringResource(R.string.post_edit), onClick = onEdit).takeIf { isMine },
+        MenuAction(stringResource(R.string.post_user_info, p.author.name), onClick = onUser),
+        MenuAction(stringResource(R.string.post_users_posts, p.author.name), onClick = onUsersPosts),
+        MenuAction(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser), onClick = onOpenInBrowser),
+    )
     Box {
         Column(
             Modifier
                 .fillMaxWidth()
-                .combinedClickable(onClick = {}, onLongClick = { menu = true })
+                .menuClickable(
+                    actions,
+                    onLongClick = { menu = true },
+                    onClick = {},
+                    onLongClickLabel = stringResource(au.howesthat.whirl.core.ui.R.string.show_actions),
+                )
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -356,20 +377,14 @@ private fun PostItem(
                 else -> PostBodyView(post.body, onLink = onLink, onQuote = onQuote, textStyle = textStyle)
             }
         }
-        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            DropdownMenuItem(text = { Text(stringResource(R.string.post_reply)) }, onClick = { menu = false; onReply() })
-            if (isMine) DropdownMenuItem(text = { Text(stringResource(R.string.post_edit)) }, onClick = { menu = false; onEdit() })
-            DropdownMenuItem(text = { Text(stringResource(R.string.post_user_info, p.author.name)) }, onClick = { menu = false; onUser() })
-            DropdownMenuItem(text = { Text(stringResource(R.string.post_users_posts, p.author.name)) }, onClick = { menu = false; onUsersPosts() })
-            DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser)) }, onClick = { menu = false; onOpenInBrowser() })
-        }
+        ActionsMenu(menu, onDismiss = { menu = false }, actions)
     }
 }
 
 @Composable
 private fun PostHeader(p: Post, onUser: () -> Unit) {
     Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(
                 p.author.name,
                 Modifier.weight(1f, fill = false).clickable(role = Role.Button, onClick = onUser),
@@ -378,13 +393,11 @@ private fun PostHeader(p: Post, onUser: () -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            p.userGroup?.let {
-                Text(" · $it", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-            }
-            Box(Modifier.weight(1f))
-            Text("#${p.number}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("#${p.number}", Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        // The user group sits here rather than beside the name, which large text would squeeze to nothing.
         val meta = listOfNotNull(
+            p.userGroup,
             stringResource(R.string.post_op).takeIf { p.isOp },
             p.postedText,
             p.editedText?.let { stringResource(R.string.post_edited, it) },
