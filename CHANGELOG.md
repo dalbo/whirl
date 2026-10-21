@@ -2,7 +2,8 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
-## Unreleased
+## v1.0.0
+First stable release: polish, accessibility and large screens on top of v0.2.
 - Fixed: the moderator note kept a pale orange background with hard-to-read links in some colour schemes; it now uses the theme's colours.
 - A thread split into many parts shows one row (previous part, "Part N of M" with a list of every part, next part) instead of a button per part.
 - "Dark at night" now has settings for when the night starts and ends (they could not be changed before; 22:00 to 07:00).
