@@ -126,12 +126,37 @@ Google Play's Data safety section", read 2026-10-21).
 > way, (2) is "an unofficial client for the Whirlpool forums" in the store description OK, and (3) may I start a
 > thread in Android to find testers? I'd also like it listed on the 3rd Party Clients page once it's out.
 
-## 7. Automating later releases
-Once the app exists on Play: Google Cloud → enable the **Google Play Android Developer API**, create a service account,
-download its JSON key; Play Console → Users and permissions → invite the service account with **Release to testing
-tracks** (and later production). Add the JSON as the GitHub secret `PLAY_SERVICE_ACCOUNT_JSON`
-(`gh secret set PLAY_SERVICE_ACCOUNT_JSON < key.json`, then delete the file). From then on each tag's AAB goes to the
-`alpha` track (`PLAY_TRACK` in `release.yml`; switch it to `production` after Play grants production access) with the R8
-mapping file and `fastlane/metadata/android/en-AU/changelogs/<versionCode>.txt` as release notes (versionCode =
-major×10000 + minor×100 + patch, so v0.3.0 → `300.txt`). With the secret set, a tag without that file fails the release
-before anything is published to Play. Without the secret the Play steps are skipped.
+## 7. Automating later releases (keyless)
+Each tag's AAB is uploaded by `release.yml` to the `alpha` track (`PLAY_TRACK`; switch it to `production` after Play
+grants production access), with the R8 mapping file and `fastlane/metadata/android/en-AU/changelogs/<versionCode>.txt`
+as release notes. A tag without that file fails before anything reaches Play. The workflow signs in to Google Cloud with
+GitHub's OIDC token (**Workload Identity Federation**): there is no service-account key anywhere. (Dallin's Cloud
+organisation blocks key creation, `iam.managed.disableServiceAccountKeyCreation`, 2026-10-22; keyless is better anyway.)
+Without the two repository variables below, the Play steps are skipped.
+
+1. Google Cloud console, project `whirl-release`: **APIs & Services → Library → Google Play Android Developer API →
+   Enable**; **IAM & Admin → Service accounts → Create service account** `whirl-github-release`, no roles. (No key.)
+2. Play Console → **Users and permissions → Invite new users**: the service account's email, App permissions → Whirl →
+   **Release apps to testing tracks** (add production later) → Invite.
+3. Open **Cloud Shell** (the `>_` icon at the top of the Cloud console) and paste:
+
+       PROJECT_ID=whirl-release
+       SA=whirl-github-release@$PROJECT_ID.iam.gserviceaccount.com
+       gcloud config set project $PROJECT_ID
+       gcloud services enable iamcredentials.googleapis.com sts.googleapis.com
+       gcloud iam workload-identity-pools create github --location=global --display-name="GitHub Actions"
+       gcloud iam workload-identity-pools providers create-oidc whirl --location=global --workload-identity-pool=github \
+         --display-name="dalbo/whirl" --issuer-uri="https://token.actions.githubusercontent.com" \
+         --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref" \
+         --attribute-condition="assertion.repository=='dalbo/whirl' && assertion.ref.startsWith('refs/tags/v')"
+       PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+       gcloud iam service-accounts add-iam-policy-binding $SA --role=roles/iam.workloadIdentityUser \
+         --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/dalbo/whirl"
+       echo "PLAY_WIF_PROVIDER=projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/whirl"
+       echo "PLAY_SERVICE_ACCOUNT=$SA"
+
+   Only GitHub Actions runs of `dalbo/whirl` on a `v…` tag can obtain a token, and only for this service account.
+4. Set the two printed values as repository **variables** (not secrets; neither is sensitive):
+   `gh variable set PLAY_WIF_PROVIDER --body "<value>"` and `gh variable set PLAY_SERVICE_ACCOUNT --body "<value>"`.
+5. The next tag (a new versionCode; Play refuses one it already has) uploads to Alpha. A failure at "Sign in to Google
+   Cloud" is the federation; at "Upload to Google Play" with 403, the Play Console permission.
