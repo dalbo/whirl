@@ -86,7 +86,7 @@ Google Play's Data safety section", read 2026-10-21).
    Recruit 15–20 to be safe, and ask them to actually use it: Google weighs engagement and feedback when you apply.
 5. After 14 days: **Dashboard → Apply for production**, answering the questions about the test.
 
-### Tester post (Android forum; the community rules allow this for Australian individual developers)
+### Tester post (Android › Apps forum, where the Whirldroid thread is; the community rules allow this for Australian individual developers)
 > **Whirl: a new open-source Android app for Whirlpool (testers wanted)**
 >
 > Whirldroid hasn't been updated since 2021, so I've rewritten it for current Android as Whirl: free, open source (MIT),
