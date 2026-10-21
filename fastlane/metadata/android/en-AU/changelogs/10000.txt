@@ -1,7 +1,8 @@
 Whirl 1.0
-- Works with TalkBack: long-press menus are in TalkBack's actions, headings and page changes are announced
-- Large text, landscape and tablets: readable post width, nothing cut off
+- Text size setting for the whole app; posts back to Whirldroid's size
+- Watched refreshes whenever you open the app
+- TalkBack: long-press menus in TalkBack's actions, headings, page changes announced
+- Large text, landscape and tablets: readable posts, nothing cut off
 - "Use wallpaper colours" setting; clearer quote colours
 - "Dark at night" start and end times
 - Multi-part threads: one row with previous/next and a list of parts
-- Moderator notes and the status bar follow the theme

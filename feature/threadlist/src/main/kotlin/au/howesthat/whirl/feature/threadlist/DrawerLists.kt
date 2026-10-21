@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import au.howesthat.whirl.core.data.Cached
@@ -197,9 +198,11 @@ class WatchedViewModel @Inject constructor(deps: ListDeps, private val repo: Wat
         .map { cached -> cached.value.count { it.unreadCount > 0 } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
-    init {
-        refresh(force = false)
-    }
+    /**
+     * Watched is checked every time it comes on screen: opening the app, returning to it, or coming back from a
+     * thread. One API call, at most every 10 s (the manual refresh throttle); the list shows from the cache meanwhile.
+     */
+    fun onShown() = refresh(force = true)
 
     fun showUnreadOnly(unread: Boolean) {
         _unreadOnly.value = unread
@@ -219,6 +222,10 @@ fun WatchedScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: WatchedViewMo
     val unread by viewModel.unreadThreads.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    LifecycleResumeEffect(viewModel) {
+        viewModel.onShown()
+        onPauseOrDispose {}
+    }
     Scaffold(
         topBar = {
             Column {
