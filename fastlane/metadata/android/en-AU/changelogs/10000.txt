@@ -1,4 +1,5 @@
 Whirl 1.0
+- New icon
 - Text size setting for the whole app; posts back to Whirldroid's size
 - Watched refreshes whenever you open the app
 - TalkBack: long-press menus in TalkBack's actions, headings, page changes announced
