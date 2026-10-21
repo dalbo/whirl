@@ -6,6 +6,8 @@ Release notes for each tag are taken from the matching `## vX.Y.Z` section below
 - Fixed: the moderator note kept a pale orange background with hard-to-read links in some colour schemes; it now uses the theme's colours.
 - A thread split into many parts shows one row (previous part, "Part N of M" with a list of every part, next part) instead of a button per part.
 - "Dark at night" now has settings for when the night starts and ends (they could not be changed before; 22:00 to 07:00).
+- TalkBack: a thread's, forum's or post's long-press menu is also offered under TalkBack's actions; unread badges read as "N unread posts"; section headers are headings; swiping pages announces the new page; the page slider reads "Page N of M".
+- Large text: post headers keep the poster's name readable (the user group moved to the line below), and the notification interval choices wrap instead of running off screen.
 - The status bar icons follow Whirl's theme, so they stay visible when Whirl is dark and the phone is light (and the other way round).
 
 ## v0.2.1

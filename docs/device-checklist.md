@@ -2,6 +2,18 @@
 
 Run on a real phone before tagging a release (PLAN.md §8). Debug builds install beside the release app as `au.howesthat.whirl.debug`. Note the build, the phone and its Android version, and the network (Wi-Fi or mobile data) with the result.
 
+## v1.0 (polish)
+**TalkBack** (Settings → Accessibility → TalkBack; or hold both volume keys if the shortcut is on)
+- [ ] Watched, a forum and a thread: every button is read with a name (menu, back, search, refresh, more options, previous/next part).
+- [ ] On a thread row, a forum and a post, swipe up then right (or three-finger tap) → Actions lists the long-press menu entries, and choosing one works.
+- [ ] Section headers (forum names in Watched/Popular, sections in Forums, days in News, Settings sections) are read as headings; swiping up/down with "Headings" navigation jumps between them.
+- [ ] A watched row with unread posts reads "N unread posts".
+- [ ] Swiping to the next page of a forum or thread announces "Page N of M"; the Go to page slider reads "Page N of M" as it moves.
+
+**Large text and display size** (Settings → Display → Font size at maximum, Display size at maximum)
+- [ ] Watched, Forums, a forum with groups, a thread with a moderator note and parts, News, Settings and About: no text cut off or overlapping; names in post headers stay readable.
+- [ ] A watched-thread notification at maximum font size still shows the title and the buttons.
+
 ## v0.2 (actions and notifications)
 **Watch actions** (use a thread you are happy to watch, e.g. `3pxj858k`)
 - [ ] Long-press a thread in a forum: Watch → "Thread watched · Undo"; Undo, then pull to refresh Watched (All): not there. Watch again and let the snackbar go: it appears in Watched (All).

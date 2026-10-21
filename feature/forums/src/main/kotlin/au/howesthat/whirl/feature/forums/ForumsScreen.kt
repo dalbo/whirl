@@ -1,7 +1,5 @@
 package au.howesthat.whirl.feature.forums
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,8 +11,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,6 +28,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -41,11 +39,14 @@ import au.howesthat.whirl.core.data.ForumListItem
 import au.howesthat.whirl.core.data.ForumRepository
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.network.WhirlpoolUrls
+import au.howesthat.whirl.core.ui.ActionsMenu
 import au.howesthat.whirl.core.ui.ErrorState
+import au.howesthat.whirl.core.ui.MenuAction
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.UpdatedAgo
 import au.howesthat.whirl.core.ui.errorMessage
+import au.howesthat.whirl.core.ui.menuClickable
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -166,20 +167,27 @@ private fun Header(title: String) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
         Text(
             title,
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            Modifier.fillMaxWidth().semantics { heading() }.padding(horizontal = 16.dp, vertical = 8.dp),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
         )
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ForumRow(item: ForumListItem, onOpen: () -> Unit, onToggleFavourite: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
+    val actions = listOf(
+        MenuAction(stringResource(if (item.isFavourite) R.string.remove_favourite else R.string.add_favourite), onClick = onToggleFavourite),
+    )
     Box {
         ListItem(
-            modifier = Modifier.combinedClickable(onClick = onOpen, onLongClick = { menu = true }),
+            modifier = Modifier.menuClickable(
+                actions,
+                onLongClick = { menu = true },
+                onClick = onOpen,
+                onLongClickLabel = stringResource(au.howesthat.whirl.core.ui.R.string.show_actions),
+            ),
             headlineContent = { Text(item.forum.title) },
             supportingContent = if (item.isPrivate) {
                 { Text(stringResource(R.string.private_forum)) }
@@ -188,16 +196,12 @@ private fun ForumRow(item: ForumListItem, onOpen: () -> Unit, onToggleFavourite:
             },
             trailingContent = {
                 when {
-                    item.isPrivate -> Icon(Icons.Default.Lock, stringResource(R.string.private_forum))
+                    // The supporting line already says "Private forum".
+                    item.isPrivate -> Icon(Icons.Default.Lock, contentDescription = null)
                     item.isFavourite -> Icon(Icons.Default.Star, stringResource(R.string.favourite))
                 }
             },
         )
-        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            DropdownMenuItem(
-                text = { Text(stringResource(if (item.isFavourite) R.string.remove_favourite else R.string.add_favourite)) },
-                onClick = { menu = false; onToggleFavourite() },
-            )
-        }
+        ActionsMenu(menu, onDismiss = { menu = false }, actions)
     }
 }
