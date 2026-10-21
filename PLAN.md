@@ -88,7 +88,7 @@ All claims below were checked against live captures in `fixtures/`. Where someth
   - **Three kinds of `.notebar`**: `#watchbar.notebar.marker` (hidden "You have read to here", first child of `#replylist`, must be skipped), `#top_notebar_public.notebar.public` (moderator note; JS copies it into `#foot_notebar_public`), `div.notebar.parts` (links to parts 1..N of a multi-part thread). The legacy `.notebar` / `#replylist > div` selectors are wrong now.
   - Not captured: a deleted post (none found; 2.14.12 treats a post without `.date` as deleted, but hidden posts also lack `.date`, so check `.hiddenpostnotice` first), a closed thread's page, a post with an image.
 - **User profile** (`user_30703.html`): `#userprofile` → `h2 "Recent activity"` + `div#threads table` (thread-list rows, `?days=N` filters) then `h2 "About this user"` + a table of `td b "Status:"` / value rows. The legacy `#userprofile > div` index-1 parsing is wrong now.
-- **Site AJAX (needs a logged-in web session, not the key)**: POST `/forum/ajax.cfm` with `action=startWatching|stopWatching|markAtPoint&thread_id=&point=<replynum>` (from `fixtures/html/whirlpool_skin_script.js`). "Mark read to here" is therefore unavailable without web login; the API `watchedread` marks the whole thread.
+- **Site AJAX (needs a logged-in web session, not the key; not used, see Decisions "Web session in the app")**: POST `/forum/ajax.cfm` with `action=startWatching|stopWatching|markAtPoint&thread_id=&point=<replynum>` (from `fixtures/html/whirlpool_skin_script.js`). "Mark read to here" is therefore unavailable without web login; the API `watchedread` marks the whole thread.
 
 ---
 
@@ -140,7 +140,8 @@ From 1.8.12 and 2.14.12 code:
 | Post rendering | jsoup → block model → Compose; not one giant `AnnotatedString`; images as tappable placeholders until a fixture with images exists. |
 | Error UX | Typed `WhirlpoolError` (Challenge, BadKey, RateLimited, Maintenance, Network, Parse/Drift, NotSignedIn); API `ALERT`/`ERROR` strings shown verbatim; every scraped screen has Retry and Open in browser. |
 | Whims / PMs | Dropped. "Private Messages" is forum 1 → browser. |
-| Mark read to here | Not available without web login → "Mark thread read" (API) only. Backlog: web-session login. |
+| Mark read to here | Not available without web login → "Mark thread read" (API) only. |
+| Web session in the app | **None** (Dallin, 2026-10-21): no in-app Whirlpool login, cookies, site AJAX or posting. In the past Whirlpool has not allowed posting from apps, and the app must not get the site offside. Posting, private forums and private messages stay in the user's browser. Revisit only with written approval from Whirlpool's moderators. |
 | Release channel | GitHub Releases (signed APK) first; Play internal → production once a developer account exists (new personal accounts need 12 testers for 14 days of closed testing, a privacy policy and the data-safety form); F-Droid after v1.0. |
 | Analytics / crash | None by default; optional opt-in ACRA-to-email or a self-hosted Sentry later. |
 | Minimum Android | 26 (8.0). |
@@ -193,7 +194,9 @@ Watch/unwatch/mark read with Undo; WorkManager polling, channel, actions, permis
 **Phase 4 — polish and release (≈1 week)** → **v1.0**
 Accessibility (TalkBack, font scaling), landscape, Material You, store listing text/screenshots in `fastlane/`, Play internal track, F-Droid submission, post in the Whirlpool API thread and ask to be listed on the third-party clients wiki page.
 
-**Backlog** (not in v1): web-session login (unlocks private forums, PMs, mark-read-to-here, native posting), whole-thread `/archive/` reading mode for small threads, app widget, tablet two-pane, image loading once a fixture exists.
+**Parked until Whirlpool's moderators approve** (see Decisions, "Web session in the app"): any in-app web login, and everything it would unlock (private forums, PMs, mark-read-to-here, native posting). Ask in the API thread or of the moderators before any work on it.
+
+**Backlog** (not in v1): whole-thread `/archive/` reading mode for small threads, app widget, tablet two-pane, image loading once a fixture exists.
 
 ---
 
@@ -204,4 +207,4 @@ Accessibility (TalkBack, font scaling), landscape, Material You, store listing t
 - **Markup drift** will recur; mitigated by section 8.
 - **Name/licence**: contacting gregdev is a courtesy and avoids confusion on Whirlpool; not a blocker.
 - **Play account**: closed-testing requirement delays Play availability; GitHub Releases/Obtainium cover early users.
-- **Posting** stays in the browser for v1; users must be logged in there separately.
+- **Posting** stays in the browser, users logged in there separately; in-app posting has historically been a no-go with Whirlpool and needs moderator approval first (Decisions).
