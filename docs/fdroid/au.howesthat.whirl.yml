@@ -1,0 +1,35 @@
+# Draft for fdroiddata (metadata/au.howesthat.whirl.yml). Dallin opens the merge request; see docs/fdroid/README.md.
+Categories:
+  - Forum
+License: MIT
+AuthorName: Dallin Howes
+AuthorEmail: whirl@howesthat.net.au
+WebSite: https://dalbo.github.io/whirl/
+SourceCode: https://github.com/dalbo/whirl
+IssueTracker: https://github.com/dalbo/whirl/issues
+Changelog: https://github.com/dalbo/whirl/blob/HEAD/CHANGELOG.md
+
+AutoName: Whirl
+
+RepoType: git
+Repo: https://github.com/dalbo/whirl.git
+Binaries: https://github.com/dalbo/whirl/releases/download/v%v/whirl-v%v.apk
+AllowedAPKSigningKeys: ebf77bd82e548b81d7a2b8913a5e5cba5bea0624898c89707c24969d89d65ae8
+
+AntiFeatures:
+  NonFreeNet:
+    en-US: Whirl reads the Whirlpool forums (whirlpool.net.au), a proprietary service, with the user's own API key.
+
+Builds:
+  - versionName: 1.0.0
+    versionCode: 10000
+    commit: v1.0.0
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$
+UpdateCheckData: app/version.properties|versionCode=(\d+)|.|versionName=(.+)
+CurrentVersion: 1.0.0
+CurrentVersionCode: 10000

@@ -20,6 +20,9 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v6
+      - name: Store listing copies match
+        # en-AU is the Play listing; en-US is F-Droid's fallback locale. Edit en-AU and copy it over.
+        run: diff -r fastlane/metadata/android/en-AU fastlane/metadata/android/en-US
       - name: Lint, unit tests, debug build
         run: ./gradlew lint test assembleDebug --stacktrace
       - name: Upload test and lint reports
