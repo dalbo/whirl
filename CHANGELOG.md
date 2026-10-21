@@ -2,6 +2,11 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v0.2.1
+- Fixed: opening a Whirlpool thread link from another app did nothing while a thread was already showing in Whirl.
+- Whirl no longer declares the foreground-service permission it never used.
+- Privacy policy published at https://dalbo.github.io/whirl/privacy/ (no data is collected by the developer; the app talks only to Whirlpool).
+
 ## v0.2.0
 Actions and notifications.
 - Watch, mark as read and unwatch from a thread's long-press menu and from the thread view's menu. Each shows "Undo" for a few seconds; nothing is sent to Whirlpool until the Undo offer closes, and a failure puts things back and says so.
