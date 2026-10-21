@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  # Google Play upload signs in to Google Cloud with GitHub's OIDC token (Workload Identity Federation): no key file.
+  id-token: write
 
 env:
   # Google Play's minimum targetSdk for new apps and updates (raised each August).
@@ -84,25 +86,35 @@ jobs:
           pre=""; [[ "$GITHUB_REF_NAME" == v0.* ]] && pre="--prerelease"
           gh release create "$GITHUB_REF_NAME" dist/* --title "Whirl $GITHUB_REF_NAME" --notes-file notes.md $pre
 
-      # Google Play: only once the app exists on Play and the PLAY_SERVICE_ACCOUNT_JSON secret is set (docs/play-console.md
-      # §7). The first release on Play is uploaded by hand. Release notes come from fastlane's changelog for this versionCode.
+      # Google Play: only once the app exists on Play and the PLAY_WIF_PROVIDER and PLAY_SERVICE_ACCOUNT repository
+      # variables are set (docs/play-console.md §7; no key file, Workload Identity Federation). The first release on Play is uploaded by hand. Release notes come from fastlane's changelog for this versionCode.
       - name: Play release notes
         id: play
         env:
-          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          PLAY_WIF_PROVIDER: ${{ vars.PLAY_WIF_PROVIDER }}
         run: |
-          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then echo "No PLAY_SERVICE_ACCOUNT_JSON secret: skipping Google Play"; exit 0; fi
+          if [ -z "$PLAY_WIF_PROVIDER" ]; then echo "No PLAY_WIF_PROVIDER variable: skipping Google Play"; exit 0; fi
           notes="fastlane/metadata/android/en-AU/changelogs/${{ steps.version.outputs.code }}.txt"
           [ -s "$notes" ] || { echo "$notes is missing (Play release notes for this version)"; exit 1; }
           mkdir whatsnew && cp "$notes" whatsnew/whatsnew-en-AU
           echo "upload=true" >> "$GITHUB_OUTPUT"
+
+      - name: Sign in to Google Cloud
+        id: gcloud
+        if: steps.play.outputs.upload == 'true'
+        # v3.0.0, pinned by commit because it mints the Play credentials. Short-lived token for the service account,
+        # allowed only for this repository's version tags (attribute condition on the provider; docs/play-console.md §7).
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          workload_identity_provider: ${{ vars.PLAY_WIF_PROVIDER }}
+          service_account: ${{ vars.PLAY_SERVICE_ACCOUNT }}
 
       - name: Upload to Google Play
         if: steps.play.outputs.upload == 'true'
         # v1.1.5, pinned by commit because this step holds the Play credentials.
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5
         with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          serviceAccountJson: ${{ steps.gcloud.outputs.credentials_file_path }}
           packageName: au.howesthat.whirl
           releaseFiles: dist/whirl-${{ github.ref_name }}.aab
           track: ${{ env.PLAY_TRACK }}
