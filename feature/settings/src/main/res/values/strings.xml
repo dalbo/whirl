@@ -11,6 +11,7 @@
     <string name="settings_dynamic_color">Use wallpaper colours</string>
     <string name="settings_night_start">Night starts</string>
     <string name="settings_night_end">Night ends</string>
+    <string name="settings_text_scale">Text size</string>
     <string name="settings_font_size">Post text size</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_threads">Threads</string>

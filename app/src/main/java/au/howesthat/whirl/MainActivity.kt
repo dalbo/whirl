@@ -56,7 +56,7 @@ class MainActivity : ComponentActivity() {
                 enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
                 onDispose {}
             }
-            WhirlTheme(darkTheme = dark, dynamicColor = loaded.settings.dynamicColor) {
+            WhirlTheme(darkTheme = dark, dynamicColor = loaded.settings.dynamicColor, textScale = loaded.settings.textScale.factor) {
                 val account by viewModel.account.collectAsStateWithLifecycle()
                 val alert by viewModel.alert.collectAsStateWithLifecycle()
                 if (!loaded.setupDone) {

@@ -4,6 +4,7 @@ Release notes for each tag are taken from the matching `## vX.Y.Z` section below
 
 ## v1.0.0
 First stable release: polish, accessibility and large screens on top of v0.2.
+- Bigger text: a new "Text size" setting (Normal, Large, Larger, Largest) scales all of Whirl's text on top of Android's font size, and posts at the "Normal" post text size are 17 sp again, as in Whirldroid (they were 14 sp, smaller than "Smaller"). The post sizes "Large" and "Larger" were labelled the wrong way round.
 - Fixed: the moderator note kept a pale orange background with hard-to-read links in some colour schemes; it now uses the theme's colours.
 - A thread split into many parts shows one row (previous part, "Part N of M" with a list of every part, next part) instead of a button per part.
 - "Dark at night" now has settings for when the night starts and ends (they could not be changed before; 22:00 to 07:00).

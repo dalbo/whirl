@@ -111,6 +111,15 @@ class RepositoryTest {
     }
 
     @Test
+    fun `text sizes default to Whirldroid's 17 sp posts and the system size elsewhere`() = runTest {
+        val d = settings.settings.first()
+        assertEquals(17f, d.postFontSize.sp)
+        assertEquals(TextScale.DEFAULT, d.textScale)
+        settings.update { it.copy(textScale = TextScale.LARGER) }
+        assertEquals(1.3f, settings.settings.first().textScale.factor)
+    }
+
+    @Test
     fun `night window round trip`() = runTest {
         settings.update { it.copy(theme = ThemeMode.DARK_AT_NIGHT, nightStart = LocalTime.of(15, 5), nightEnd = LocalTime.of(6, 30)) }
         val s = settings.settings.first()

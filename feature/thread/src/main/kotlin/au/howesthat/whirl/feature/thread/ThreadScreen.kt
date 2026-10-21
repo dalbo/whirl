@@ -234,7 +234,8 @@ private fun PageContent(page: Int, viewModel: ThreadViewModel, error: Throwable?
     val browser = rememberOpenInBrowser()
     val list = rememberLazyListState()
     val base = MaterialTheme.typography.bodyMedium
-    val textStyle = settings.postFontSize.sp?.let { base.copy(fontSize = it.sp, lineHeight = (it * 1.4f).sp) } ?: base
+    val size = settings.postFontSize.sp
+    val textStyle = base.copy(fontSize = size.sp, lineHeight = (size * 1.4f).sp)
 
     val loaded = ui
     // Header rows before the posts: updated line, moderator note, parts.
