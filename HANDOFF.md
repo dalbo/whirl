@@ -1,6 +1,6 @@
 # Handoff brief: building the Whirlpool client
 
-Read in this order: this file → `PLAN.md` → `fixtures/README.md` → `tools/capture/README.md` → `docs/device-checklist.md`. Then the two reference trees only when a behaviour question is not answered by `PLAN.md`.
+Read in this order: this file → `PLAN.md` → `fixtures/README.md` → `tools/capture/README.md` → `docs/device-checklist.md` (and `docs/play-console.md` for anything about Google Play). Then the two reference trees only when a behaviour question is not answered by `PLAN.md`.
 
 ## What exists in this directory
 | Path | What it is | In git? |
