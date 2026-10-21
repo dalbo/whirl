@@ -189,10 +189,10 @@ From 1.8.12 and 2.14.12 code:
 **Phase 2 — done** (2026-10-21, v0.1.0 on GitHub Releases): read-only parity (HANDOFF.md "Phase 2" lists what was built and decided). Was: **read-only parity (≈2.5 weeks)** → **milestone v0.1 on GitHub Releases**
 Drawer + homepage; Forums with favourites and private-forum handling; Thread lists for forum/watched/recent/popular/latest/search with groups, paging, sticky/closed/moved/deleted styling, Unread/All tabs; Thread view with inline-var paging, block renderer, notebars (public/parts), quote navigation, post filters, user's posts; search (list view); News; User profile; deep links; opening-position rules; all read-side settings.
 
-**Phase 3 — actions and notifications (≈1.5 weeks)** → **v0.2**
+**Phase 3 — done** (2026-10-21, v0.2.0, then v0.2.1 with a link fix): actions and notifications (HANDOFF.md "Phase 3"). Was: **actions and notifications (≈1.5 weeks)** → **v0.2**
 Watch/unwatch/mark read with Undo; WorkManager polling, channel, actions, permission prompt, boot re-arm (WorkManager handles it); New thread via Custom Tabs (Reply and Edit landed in Phase 2); night-mode schedule; back-to-list and auto-mark-read options. (Post font size landed in Phase 2.)
 
-**Phase 4 — polish and release (≈1 week)** → **v1.0**
+**Phase 4 — polish and release (≈1 week; started 2026-10-21 with Play prep)** → **v1.0**. Task list in HANDOFF.md "Phase 4 tasks".
 Accessibility (TalkBack, font scaling), landscape, Material You, store listing text/screenshots in `fastlane/`, Play internal track, F-Droid submission, post in the Whirlpool API thread and ask to be listed on the third-party clients wiki page.
 
 **Parked until Whirlpool's moderators approve** (see Decisions, "Web session in the app"): any in-app web login, and everything it would unlock (private forums, PMs, mark-read-to-here, native posting). Ask in the API thread or of the moderators before any work on it.
