@@ -1,0 +1,3 @@
+- Report a post to Whirlpool's moderators from its long-press menu
+- Report a concern to the developer from About
+- Child safety standards published at dalbo.github.io/whirl/child-safety
