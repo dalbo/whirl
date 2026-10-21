@@ -31,11 +31,22 @@ from 2027; register the package `au.howesthat.whirl` against it when Play prompt
 become paid: Whirlpool's API terms), accept the declarations.
 
 ## 3. App signing (decide before the first upload)
-Recommended: **use the existing release key as Play's app signing key** ("Use existing app signing key from Java
-keystore" with Google's PEPK tool, from `~/.config/whirldroid/release.jks`). Then the Play build and the GitHub APK carry
-the same signature and people can move between them without uninstalling. If Google generates a new key instead, the
-GitHub APK and the Play build cannot update each other. The same `release.jks` then acts as the upload key, which is
-what the release workflow already signs the AAB with.
+Use the existing release key as Play's app signing key, so the Play build and the GitHub APK carry the same signature
+and people can move between them without uninstalling (if Google generated a new key, they could not update each
+other). The same `release.jks` then acts as the upload key, which is what the release workflow signs the AAB with.
+
+**Where it is now (2026-10-21):** not a settings page for a new app, but the **App signing** section at the top of the
+first release (create a release on a track → **Change app signing key** → the Java keystore export option). Play offers
+`pepk.jar` and an encryption public key; from Claude Code's `!` prompt (no terminal) pepk cannot prompt for passwords,
+so pass them from the signing file:
+
+    cd /mnt/c/Users/dalli/Downloads && set -a && . ~/.config/whirldroid/release-signing.env && set +a && \
+      java -jar pepk.jar --keystore=$HOME/.config/whirldroid/release.jks --alias="$SIGNING_KEY_ALIAS" \
+      --keystore-pass="$SIGNING_STORE_PASSWORD" --key-pass="$SIGNING_KEY_PASSWORD" --output=whirl-signing-key.zip \
+      --include-cert --rsa-aes-encryption --encryption-key-path=encryption_public_key.pem
+
+Upload the zip, then delete it. Its certificate must be SHA-256 `ebf77bd8…65ae8` (the GitHub releases'; checked
+2026-10-21), and App integrity → App signing should show the same fingerprint afterwards.
 
 ## 4. Store presence → Main store listing
 - App name: `fastlane/metadata/android/en-AU/title.txt`
@@ -74,6 +85,11 @@ Google Play's Data safety section", read 2026-10-21).
   - **App activity → App interactions**: collected, not shared, **required**, purpose **App functionality** (watching,
     unwatching and marking threads read are sent to Whirlpool).
   - Nothing else: no location, contacts, device IDs, analytics, crash logs or diagnostics.
+
+## Status
+- 2026-10-21: account verified; app created; `v1.0.0` (10000) released to **Internal testing** (testers must be on the
+  internal list for the opt-in link to work). Internal testing does not count towards the 14-day requirement: next,
+  promote the same build to **Closed testing → Alpha**.
 
 ## 6. Closed testing (personal accounts: 12 testers for 14 days)
 1. **Testing → Closed testing**: use the built-in track (**Closed testing – Alpha**, API name `alpha`, which the release
