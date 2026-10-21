@@ -46,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.howesthat.whirl.core.data.Homepage
 import au.howesthat.whirl.core.data.PostFontSize
 import au.howesthat.whirl.core.data.Settings
+import au.howesthat.whirl.core.data.TextScale
 import au.howesthat.whirl.core.data.ThemeMode
 import au.howesthat.whirl.feature.setup.NotificationOptions
 import au.howesthat.whirl.feature.setup.themeLabel
@@ -85,6 +86,7 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, viewModel: Setti
                 TimeSetting(stringResource(R.string.settings_night_start), settings.nightStart) { v -> update { it.copy(nightStart = v) } }
                 TimeSetting(stringResource(R.string.settings_night_end), settings.nightEnd) { v -> update { it.copy(nightEnd = v) } }
             }
+            Choice(stringResource(R.string.settings_text_scale), TextScale.entries, settings.textScale, { scaleLabel(it) }) { v -> update { it.copy(textScale = v) } }
             Choice(stringResource(R.string.settings_font_size), PostFontSize.entries, settings.postFontSize, { fontLabel(it) }) { v -> update { it.copy(postFontSize = v) } }
 
             Section(stringResource(R.string.settings_notifications))
@@ -210,9 +212,19 @@ private fun fontLabel(f: PostFontSize) = stringResource(
         PostFontSize.SMALLEST -> R.string.font_smallest
         PostFontSize.SMALLER -> R.string.font_smaller
         PostFontSize.NORMAL -> R.string.font_normal
-        PostFontSize.LARGER -> R.string.font_larger
-        PostFontSize.LARGE -> R.string.font_large
+        PostFontSize.LARGER -> R.string.font_large
+        PostFontSize.LARGE -> R.string.font_larger
         PostFontSize.LARGEST -> R.string.font_largest
+    },
+)
+
+@Composable
+private fun scaleLabel(t: TextScale) = stringResource(
+    when (t) {
+        TextScale.DEFAULT -> R.string.font_normal
+        TextScale.LARGE -> R.string.font_large
+        TextScale.LARGER -> R.string.font_larger
+        TextScale.LARGEST -> R.string.font_largest
     },
 )
 

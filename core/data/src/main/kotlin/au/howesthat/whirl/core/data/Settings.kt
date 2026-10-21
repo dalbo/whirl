@@ -11,6 +11,8 @@ data class Settings(
     val nightStart: LocalTime = LocalTime.of(22, 0),
     val nightEnd: LocalTime = LocalTime.of(7, 0),
     val postFontSize: PostFontSize = PostFontSize.NORMAL,
+    /** Scales all text in the app on top of Android's font size. */
+    val textScale: TextScale = TextScale.DEFAULT,
     // Notifications
     val watchedNotify: Boolean = false,
     val notifyIntervalMinutes: Int = 60,
@@ -40,8 +42,14 @@ enum class Homepage { NEWS, RECENT, LATEST, WATCHED, POPULAR, FORUMS }
 /** 2.14.12 offered Light, Dark and "Dark at night"; following the system is the modern default. */
 enum class ThemeMode { SYSTEM, LIGHT, DARK, DARK_AT_NIGHT }
 
-/** 2.14.12's −2/−1/0/0.5/1/2 steps, as text sizes in sp (null = the theme's body size). */
-enum class PostFontSize(val sp: Float?) { SMALLEST(14f), SMALLER(16f), NORMAL(null), LARGER(19f), LARGE(20f), LARGEST(22f) }
+/**
+ * 2.14.12's −2/−1/0/0.5/1/2 steps as post text sizes in sp; its "normal" was 17 sp (`post_font_size_normal`). The names
+ * are stored, so LARGER (19) and LARGE (20) keep their names although their labels read Large and Larger.
+ */
+enum class PostFontSize(val sp: Float) { SMALLEST(14f), SMALLER(16f), NORMAL(17f), LARGER(19f), LARGE(20f), LARGEST(22f) }
+
+/** App-wide text size, multiplied with Android's font size. */
+enum class TextScale(val factor: Float) { DEFAULT(1f), LARGE(1.15f), LARGER(1.3f), LARGEST(1.5f) }
 
 /** The account the API key belongs to. */
 data class Account(val userId: Long, val userName: String)
