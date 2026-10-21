@@ -19,9 +19,8 @@ moderators").
 ## 1. Developer account
 1. <https://play.google.com/console/signup> with the Google account that will own Whirl → **Yourself** (personal).
 2. Pay the US$25 registration fee; verify identity (government ID) and the contact phone number.
-3. Developer name shown on the listing (e.g. "Dallin Howes" or "howesthat"), a public **contact email** (the dedicated
-   address, once it exists; also add it to `site/privacy/index.html`) and, for a personal account, no public address is
-   required.
+3. Developer name shown on the listing (e.g. "Dallin Howes" or "howesthat") and the public **contact email**
+   `whirl@howesthat.net.au` (also on the privacy page); a personal account needs no public postal address.
 4. New personal accounts must also confirm access to a real Android device through the Play Console app.
 
 This account also covers Google's developer verification, which applies to sideloaded apps (the GitHub APK) worldwide
@@ -42,9 +41,10 @@ what the release workflow already signs the AAB with.
 - App name: `fastlane/metadata/android/en-AU/title.txt`
 - Short description: `short_description.txt`; full description: `full_description.txt`
 - App icon: `images/icon.png` (512×512); feature graphic: `images/featureGraphic.png` (1024×500)
-- Phone screenshots: `images/phoneScreenshots/` (2–8, at most 2:1)
+- Phone screenshots: `images/phoneScreenshots/1.png`–`6.png` in order (thread, forum, forums, popular, news, thread in
+  dark theme; 1008×2016, Pixel 9 Pro XL, cropped to Play's 2:1 limit)
 - Category: **Social** (Whirlpool is a discussion community); tags: forums, community, broadband
-- Contact: email (required), website `https://dalbo.github.io/whirl/`
+- Contact: email `whirl@howesthat.net.au`, website `https://dalbo.github.io/whirl/`
 - Privacy policy: `https://dalbo.github.io/whirl/privacy/`
 
 ## 5. Policy → App content
@@ -76,7 +76,8 @@ Google Play's Data safety section", read 2026-10-21).
   - Nothing else: no location, contacts, device IDs, analytics, crash logs or diagnostics.
 
 ## 6. Closed testing (personal accounts: 12 testers for 14 days)
-1. **Testing → Closed testing → Create track** ("Whirlpool testers"). Countries: Australia (add others if testers ask).
+1. **Testing → Closed testing**: use the built-in track (**Closed testing – Alpha**, API name `alpha`, which the release
+   workflow uploads to). Countries: Australia (add others if testers ask).
 2. Testers: a Google Group (e.g. `whirl-testers@googlegroups.com`) is easiest; testers join the group, then open the
    opt-in link from the track.
 3. **Create release** → upload `whirl-vX.Y.Z.aab` from the GitHub Release (the first upload must be manual), release
@@ -111,5 +112,9 @@ Google Play's Data safety section", read 2026-10-21).
 ## 7. Automating later releases
 Once the app exists on Play: Google Cloud → enable the **Google Play Android Developer API**, create a service account,
 download its JSON key; Play Console → Users and permissions → invite the service account with **Release to testing
-tracks** (and later production). Add the JSON as the GitHub secret `PLAY_SERVICE_ACCOUNT_JSON`; the release workflow then
-uploads each tag's AAB to the closed-testing track with the matching `changelogs/<versionCode>.txt`.
+tracks** (and later production). Add the JSON as the GitHub secret `PLAY_SERVICE_ACCOUNT_JSON`
+(`gh secret set PLAY_SERVICE_ACCOUNT_JSON < key.json`, then delete the file). From then on each tag's AAB goes to the
+`alpha` track (`PLAY_TRACK` in `release.yml`; switch it to `production` after Play grants production access) with the R8
+mapping file and `fastlane/metadata/android/en-AU/changelogs/<versionCode>.txt` as release notes (versionCode =
+major×10000 + minor×100 + patch, so v0.3.0 → `300.txt`). With the secret set, a tag without that file fails the release
+before anything is published to Play. Without the secret the Play steps are skipped.
