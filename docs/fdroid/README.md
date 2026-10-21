@@ -29,7 +29,7 @@ F-Droid builds Whirl from the source at each `vX.Y.Z` tag. Everything it needs i
 - Tag `v0.2.1` built locally (JDK 21) accepted the signature copied from the GitHub release APK (built in CI on
   Temurin 17) with F-Droid's own tool: `apksigcopier copy whirl-v0.2.1.apk app-release-unsigned.apk out.apk` then
   `apksigner verify out.apk`. That is the check F-Droid runs for `Binaries`. Re-run it before each release if the
-  build changes (new AGP, R8 rules, baseline profiles).
+  build changes (new AGP, R8 rules, baseline profiles). Re-checked on `v1.0.0` (2026-10-21): passes.
 
 ## Signing
 `AllowedAPKSigningKeys` is the SHA-256 of Whirl's release certificate,
