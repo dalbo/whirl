@@ -20,7 +20,7 @@ Run on a real phone before tagging a release (PLAN.md §8). Debug builds install
 
 **Other**
 - [ ] Forum overflow → New thread in browser opens the new-thread form (logged in to Whirlpool in the browser).
-- [ ] "Dark at night" with a window starting a minute from now: the theme switches while the app is open.
+- [ ] "Dark at night": set Night starts (Settings → Theme) a minute or two from now; the theme switches while the app is open. The times show in the phone's 12/24-hour format.
 
 ## v0.1 (read-only parity)
 **Start**

@@ -1,5 +1,6 @@
 package au.howesthat.whirl.feature.settings
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,7 +22,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +32,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -41,6 +46,8 @@ import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.ThemeMode
 import au.howesthat.whirl.feature.setup.NotificationOptions
 import au.howesthat.whirl.feature.setup.themeLabel
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,6 +74,10 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, viewModel: Setti
             Section(stringResource(R.string.settings_general))
             Choice(stringResource(R.string.settings_homepage), Homepage.entries, settings.homepage, { homepageLabel(it) }) { v -> update { it.copy(homepage = v) } }
             Choice(stringResource(R.string.settings_theme), ThemeMode.entries, settings.theme, { themeLabel(it) }) { v -> update { it.copy(theme = v) } }
+            if (settings.theme == ThemeMode.DARK_AT_NIGHT) {
+                TimeSetting(stringResource(R.string.settings_night_start), settings.nightStart) { v -> update { it.copy(nightStart = v) } }
+                TimeSetting(stringResource(R.string.settings_night_end), settings.nightEnd) { v -> update { it.copy(nightEnd = v) } }
+            }
             Choice(stringResource(R.string.settings_font_size), PostFontSize.entries, settings.postFontSize, { fontLabel(it) }) { v -> update { it.copy(postFontSize = v) } }
 
             Section(stringResource(R.string.settings_notifications))
@@ -148,6 +159,28 @@ private fun <T> Choice(title: String, options: List<T>, selected: T, label: @Com
                 }
             },
             confirmButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimeSetting(title: String, time: LocalTime, onSet: (LocalTime) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    // The phone's 12/24-hour setting, not the locale's default.
+    val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
+    val pattern = DateFormat.getBestDateTimePattern(LocalConfiguration.current.locales[0], if (is24Hour) "Hm" else "hma")
+    SettingRow(title, time.format(DateTimeFormatter.ofPattern(pattern))) { open = true }
+    if (open) {
+        val state = rememberTimePickerState(time.hour, time.minute, is24Hour)
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text(title) },
+            text = { TimePicker(state) },
+            confirmButton = {
+                TextButton(onClick = { onSet(LocalTime.of(state.hour, state.minute)); open = false }) { Text(stringResource(R.string.ok)) }
+            },
+            dismissButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }

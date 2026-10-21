@@ -7,7 +7,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
@@ -38,7 +37,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -281,25 +279,22 @@ private fun PostList(
         }
         ui.note?.let { note ->
             item(key = "note") {
-                Surface(color = MaterialTheme.colorScheme.tertiaryContainer, modifier = Modifier.fillMaxWidth()) {
+                // Theme colours only: the note's site styling (pale orange) does not survive a dark scheme.
+                Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(stringResource(R.string.moderator_note), style = MaterialTheme.typography.labelMedium)
+                        Text(
+                            stringResource(R.string.moderator_note),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
                         PostBodyView(note, onLink = viewModel::openLink, onQuote = { viewModel.openQuote(it, ui) }, textStyle = textStyle)
                     }
                 }
             }
         }
-        if (ui.page.parts.isNotEmpty()) {
+        partsNav(ui.page.parts)?.let { parts ->
             item(key = "parts") {
-                FlowRow(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.parts), Modifier.align(Alignment.CenterVertically).padding(start = 8.dp), style = MaterialTheme.typography.labelLarge)
-                    ui.page.parts.forEach { part ->
-                        TextButton(
-                            onClick = { viewModel.openLink("https://forums.whirlpool.net.au/thread/${part.threadId.value}") },
-                            enabled = !part.isCurrent,
-                        ) { Text(stringResource(R.string.part_n, part.number)) }
-                    }
-                }
+                PartsRow(parts, onOpen = { viewModel.openLink("https://forums.whirlpool.net.au/thread/${it.threadId.value}") })
             }
         }
         items(ui.posts, key = { it.post.replyId }) { post ->

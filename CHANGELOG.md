@@ -2,6 +2,12 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## Unreleased
+- Fixed: the moderator note kept a pale orange background with hard-to-read links in some colour schemes; it now uses the theme's colours.
+- A thread split into many parts shows one row (previous part, "Part N of M" with a list of every part, next part) instead of a button per part.
+- "Dark at night" now has settings for when the night starts and ends (they could not be changed before; 22:00 to 07:00).
+- The status bar icons follow Whirl's theme, so they stay visible when Whirl is dark and the phone is light (and the other way round).
+
 ## v0.2.1
 - Fixed: opening a Whirlpool thread link from another app did nothing while a thread was already showing in Whirl.
 - Whirl no longer declares the foreground-service permission it never used.

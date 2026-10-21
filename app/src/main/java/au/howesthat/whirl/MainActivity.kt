@@ -1,13 +1,16 @@
 package au.howesthat.whirl
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,7 +49,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             val state by viewModel.state.collectAsStateWithLifecycle()
             val loaded = state ?: return@setContent
-            WhirlTheme(darkTheme = isDark(loaded.settings)) {
+            val dark = isDark(loaded.settings)
+            // The bars follow the app's theme, not the system's (Dark in the app with a light phone kept dark icons).
+            DisposableEffect(dark) {
+                val style = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark }
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                onDispose {}
+            }
+            WhirlTheme(darkTheme = dark) {
                 val account by viewModel.account.collectAsStateWithLifecycle()
                 val alert by viewModel.alert.collectAsStateWithLifecycle()
                 if (!loaded.setupDone) {
