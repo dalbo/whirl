@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- WorkManager adds these for long-running foreground work, which Whirl never does; Play lists every permission. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
 
     <application
         android:name=".WhirlApplication"
@@ -64,6 +66,10 @@
                 <data android:scheme="whirldroid-thread" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            tools:node="remove" />
 
         <!-- WhirlApplication configures WorkManager (Hilt worker factory), so its startup initializer is removed. -->
         <provider
