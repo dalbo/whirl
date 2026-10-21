@@ -8,6 +8,7 @@ Release notes for each tag are taken from the matching `## vX.Y.Z` section below
 - "Dark at night" now has settings for when the night starts and ends (they could not be changed before; 22:00 to 07:00).
 - TalkBack: a thread's, forum's or post's long-press menu is also offered under TalkBack's actions; unread badges read as "N unread posts"; section headers are headings; swiping pages announces the new page; the page slider reads "Page N of M".
 - Large text: post headers keep the poster's name readable (the user group moved to the line below), and the notification interval choices wrap instead of running off screen.
+- Landscape and large screens: posts keep a readable width (centred, at most 640 dp wide) and the thread's top bar no longer doubles the camera-cutout margin.
 - The status bar icons follow Whirl's theme, so they stay visible when Whirl is dark and the phone is light (and the other way round).
 
 ## v0.2.1

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +37,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -72,10 +74,15 @@ import au.howesthat.whirl.core.ui.PagePickerDialog
 import au.howesthat.whirl.core.ui.PostBodyView
 import au.howesthat.whirl.core.ui.errorMessage
 import au.howesthat.whirl.core.ui.menuClickable
+import au.howesthat.whirl.core.ui.readableWidth
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 import au.howesthat.whirl.core.ui.timeAgo
 import kotlinx.coroutines.launch
 import java.time.Instant
+
+/** The Scaffold already pads for the sides (display cutout in landscape); the bars add only the status bar. */
+private val TopBarInsets: WindowInsets
+    @Composable get() = TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Top)
 
 /** Navigation out of a thread, implemented by the app's NavHost. */
 class ThreadNav(
@@ -119,7 +126,7 @@ fun ThreadScreen(navIcon: NavIcon, nav: ThreadNav, viewModel: ThreadViewModel = 
         val start = startPage
         if (start == null) {
             Column(Modifier.padding(outer)) {
-                TopAppBar(title = { Text(title.orEmpty()) }, navigationIcon = { NavIconButton(navIcon) })
+                TopAppBar(title = { Text(title.orEmpty()) }, navigationIcon = { NavIconButton(navIcon) }, windowInsets = TopBarInsets)
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     val failed = error
                     if (failed != null) {
@@ -164,6 +171,7 @@ private fun ThreadPager(
 
     Column(modifier) {
         TopAppBar(
+            windowInsets = TopBarInsets,
             title = {
                 Column(Modifier.clickable(role = Role.Button, onClickLabel = stringResource(au.howesthat.whirl.core.ui.R.string.go_to_page)) { picking = true }) {
                     Text(title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -280,7 +288,7 @@ private fun PostList(
                 ui.updatedAt?.let {
                     Text(
                         stringResource(R.string.updated_ago, timeAgo(it, now)),
-                        Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        Modifier.readableWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -290,7 +298,7 @@ private fun PostList(
         ui.note?.let { note ->
             item(key = "note") {
                 // Theme colours only: the note's site styling (pale orange) does not survive a dark scheme.
-                Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+                Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.readableWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
                             stringResource(R.string.moderator_note),
@@ -304,23 +312,30 @@ private fun PostList(
         }
         partsNav(ui.page.parts)?.let { parts ->
             item(key = "parts") {
-                PartsRow(parts, onOpen = { viewModel.openLink("https://forums.whirlpool.net.au/thread/${it.threadId.value}") })
+                PartsRow(
+                    parts,
+                    onOpen = { viewModel.openLink("https://forums.whirlpool.net.au/thread/${it.threadId.value}") },
+                    modifier = Modifier.readableWidth(),
+                )
             }
         }
         items(ui.posts, key = { it.post.replyId }) { post ->
-            PostItem(
-                post = post,
-                textStyle = textStyle,
-                isMine = myUserId != null && post.post.author.id == myUserId,
-                onLink = viewModel::openLink,
-                onQuote = { viewModel.openQuote(it, ui) },
-                onUser = { viewModel.openLink("https://forums.whirlpool.net.au/user/${post.post.author.id}") },
-                onUsersPosts = { viewModel.setFilter(PostFilter.ByUser(post.post.author.id)) },
-                onReply = { browser(viewModel.replyToPostUrl(post.post)) },
-                onEdit = { browser(viewModel.editPostUrl(post.post)) },
-                onOpenInBrowser = { browser(viewModel.postUrl(post.post, page)) },
-            )
-            HorizontalDivider()
+            // Posts stay a readable width in landscape and on large screens.
+            Column(Modifier.readableWidth()) {
+                PostItem(
+                    post = post,
+                    textStyle = textStyle,
+                    isMine = myUserId != null && post.post.author.id == myUserId,
+                    onLink = viewModel::openLink,
+                    onQuote = { viewModel.openQuote(it, ui) },
+                    onUser = { viewModel.openLink("https://forums.whirlpool.net.au/user/${post.post.author.id}") },
+                    onUsersPosts = { viewModel.setFilter(PostFilter.ByUser(post.post.author.id)) },
+                    onReply = { browser(viewModel.replyToPostUrl(post.post)) },
+                    onEdit = { browser(viewModel.editPostUrl(post.post)) },
+                    onOpenInBrowser = { browser(viewModel.postUrl(post.post, page)) },
+                )
+                HorizontalDivider()
+            }
         }
     }
 }
