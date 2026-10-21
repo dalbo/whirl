@@ -153,7 +153,7 @@ From 1.8.12 and 2.14.12 code:
 - Public GitHub repo from day one with the licence, `fixtures/`, `tools/capture/`, this plan. `reference/` git-ignored.
 - **CI on every push/PR** (GitHub Actions, `ubuntu-latest`, `actions/setup-java` 17, `gradle/actions/setup-gradle`): `./gradlew lint testDebugUnitTest assembleDebug`. Parser tests run against `fixtures/`, so markup drift fails CI first.
 - **Releases only from tags**: `release.yml` on `v*` builds signed release APK + AAB with a keystore from GitHub Secrets (`SIGNING_KEYSTORE_B64`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`, `SIGNING_STORE_PASSWORD`), `versionName`/`versionCode` from `app/version.properties` (bumped in the release PR; the tag must match; `v1.2.3` → `10203`), changelog from `CHANGELOG.md`, attaches APK + SHA-256 to a GitHub Release. Developer-machine builds are never published.
-- **Play** from the same workflow (`r0adkll/upload-google-play` with a service-account secret) to the internal track; promotion manual. Play App Signing enrolled; CI checks `targetSdk` against the current Play deadline.
+- **Play** from the same workflow (`r0adkll/upload-google-play`, signed in keylessly with Workload Identity Federation; Dallin's Cloud organisation forbids service-account keys) to the closed-testing `alpha` track; production once Play grants it. Play App Signing enrolled; CI checks `targetSdk` against the current Play deadline.
 - **F-Droid** builds from source itself (strongest proof binary = source): no proprietary deps, `fastlane/metadata/android/en-AU/` listing, reproducible Gradle build.
 - Branch protection on `main` (PRs + green CI); Renovate/Dependabot for AGP, Kotlin, Compose.
 - Secrets hygiene: no API key in repo or CI; fixtures captured with a throwaway key contain only the capturing user's public name/ID and watched-thread titles.
@@ -192,7 +192,7 @@ Drawer + homepage; Forums with favourites and private-forum handling; Thread lis
 **Phase 3 — done** (2026-10-21, v0.2.0, then v0.2.1 with a link fix): actions and notifications (HANDOFF.md "Phase 3"). Was: **actions and notifications (≈1.5 weeks)** → **v0.2**
 Watch/unwatch/mark read with Undo; WorkManager polling, channel, actions, permission prompt, boot re-arm (WorkManager handles it); New thread via Custom Tabs (Reply and Edit landed in Phase 2); night-mode schedule; back-to-list and auto-mark-read options. (Post font size landed in Phase 2.)
 
-**Phase 4 — polish and release (≈1 week; started 2026-10-21 with Play prep)** → **v1.0**. Task list in HANDOFF.md "Phase 4 tasks".
+**Phase 4 — done** (2026-10-21/22, v1.0.0 and v1.0.1 on GitHub; Play closed test in review; F-Droid and community posts wait for Whirlpool's moderators): HANDOFF.md "Phase 4 tasks" and "Where Phase 4 left things". Was: **polish and release (≈1 week)** → **v1.0**.
 Accessibility (TalkBack, font scaling), landscape, Material You, store listing text/screenshots in `fastlane/`, Play internal track, F-Droid submission, post in the Whirlpool API thread and ask to be listed on the third-party clients wiki page.
 
 **Parked until Whirlpool's moderators approve** (see Decisions, "Web session in the app"): any in-app web login, and everything it would unlock (private forums, PMs, mark-read-to-here, native posting). Ask in the API thread or of the moderators before any work on it.
