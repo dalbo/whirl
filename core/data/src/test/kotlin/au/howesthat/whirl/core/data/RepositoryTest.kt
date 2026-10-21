@@ -27,6 +27,7 @@ import org.robolectric.annotation.Config
 import java.io.File
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalTime
 import java.time.ZoneId
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -100,6 +101,14 @@ class RepositoryTest {
         assertEquals(ThemeMode.DARK, s.theme)
         assertEquals(14, s.recentHistoryDays)
         assertTrue(s.watchedNotify)
+    }
+
+    @Test
+    fun `night window round trip`() = runTest {
+        settings.update { it.copy(theme = ThemeMode.DARK_AT_NIGHT, nightStart = LocalTime.of(15, 5), nightEnd = LocalTime.of(6, 30)) }
+        val s = settings.settings.first()
+        assertEquals(LocalTime.of(15, 5), s.nightStart)
+        assertEquals(LocalTime.of(6, 30), s.nightEnd)
     }
 
     @Test

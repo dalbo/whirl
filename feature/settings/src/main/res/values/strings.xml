@@ -8,6 +8,8 @@
     <string name="settings_general">General</string>
     <string name="settings_homepage">Start screen</string>
     <string name="settings_theme">Theme</string>
+    <string name="settings_night_start">Night starts</string>
+    <string name="settings_night_end">Night ends</string>
     <string name="settings_font_size">Post text size</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_threads">Threads</string>
@@ -40,4 +42,5 @@
     <string name="font_large">Large</string>
     <string name="font_largest">Largest</string>
     <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
 </resources>

@@ -4,7 +4,12 @@
     <string name="updated_ago">Updated %1$s</string>
     <string name="link_failed">Could not open that link.</string>
     <string name="moderator_note">Moderator note</string>
-    <string name="parts">Parts:</string>
+    <string name="parts_title">Parts of this thread</string>
+    <string name="parts_count">%1$d parts</string>
+    <string name="part_of">Part %1$d of %2$d</string>
+    <string name="part_previous">Previous part</string>
+    <string name="part_next">Next part</string>
+    <string name="part_current">Current part</string>
     <string name="part_n">Part %1$d</string>
     <string name="post_hidden">This post was hidden by a moderator (%1$s).</string>
     <string name="post_deleted">This post was deleted.</string>
