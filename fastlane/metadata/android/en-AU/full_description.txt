@@ -1,0 +1,23 @@
+Whirl is a free, open-source reader for the Whirlpool forums (forums.whirlpool.net.au), Australia's broadband and technology community. It rewrites Whirldroid, the much-loved app that stopped being updated, for current Android.
+
+Whirl is unofficial: it is not made by or endorsed by Whirlpool. You sign in with your own Whirlpool API key (Whirlpool → Account settings → API key).
+
+<b>Read</b>
+• Forums with favourites, group filters and page jumps
+• Watched threads with Unread and All tabs, Recent threads, Popular threads and site-wide Latest activity
+• Threads rendered natively, with coloured quotes, tap-to-reveal spoilers and links that stay in the app
+• Tap a quote to go to the quoted post, even on another page
+• Filter a thread to your posts, moderators, reps or one user
+• Industry news, title search and user profiles
+• Recently read pages are kept for reading offline
+
+<b>Keep up</b>
+• Watch, unwatch and mark threads read, with Undo
+• Notifications for new replies in watched threads, checked at the interval you choose, with Mark read and Unwatch buttons
+
+<b>Respectful of Whirlpool and of you</b>
+• Posting, private forums and private messages open in your browser, where you log in to Whirlpool yourself; Whirl never asks for your password
+• No ads, no analytics, no tracking; Whirl talks only to Whirlpool
+• Free software under the MIT licence: github.com/dalbo/whirl
+
+Light, dark, follow-the-system and "dark at night" themes; adjustable post text size; Whirlpool links can open straight in the app.

@@ -1,0 +1,5 @@
+• Watch, mark as read and unwatch threads, with Undo
+• Notifications for new replies in watched threads, with Mark read and Unwatch buttons
+• "Mark as read when opened" and "back to the list" options now work
+• New thread opens in your browser
+• "Dark at night" switches theme while the app is open
