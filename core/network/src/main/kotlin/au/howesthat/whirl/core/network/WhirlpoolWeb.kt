@@ -71,6 +71,15 @@ class WhirlpoolUrls(val forums: HttpUrl = "https://forums.whirlpool.net.au/".toH
     /** Reply to a thread, in the browser (2.14.12's URL; not in logged-out markup; logged out it is "Not signed in", not a 404). */
     fun replyToThread(id: ThreadId): HttpUrl = action("reply").addQueryParameter("t", id.value).build()
 
+    /**
+     * Alert the moderators to a post ("herring"), in the browser where the user is logged in. In the markup of every
+     * post (`thread_3pxj858k_p2.html`): `?action=herring&r=<replyid>&tpr=<thread>,<page>,<post number>`.
+     */
+    fun reportPost(replyId: Long, thread: ThreadId, page: Int, number: Int): HttpUrl = action("herring")
+        .addQueryParameter("r", replyId.toString())
+        // Literal commas as in the site's link (OkHttp would send %2C); the parts are alphanumeric, so nothing needs escaping.
+        .addEncodedQueryParameter("tpr", "${thread.value},$page,$number").build()
+
     /** Edit one's own post, in the browser (2.14.12's URL; only shown to the author when logged in). */
     fun editPost(replyId: Long): HttpUrl = action("edit").addQueryParameter("e", replyId.toString()).build()
 

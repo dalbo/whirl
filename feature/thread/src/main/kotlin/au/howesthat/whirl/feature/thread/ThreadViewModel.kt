@@ -334,4 +334,11 @@ class ThreadViewModel @Inject constructor(
     fun replyToThreadUrl(): String = urls.replyToThread(threadId).toString()
     fun replyToPostUrl(post: Post): String = urls.replyToPost(post.replyId).toString()
     fun editPostUrl(post: Post): String = urls.editPost(post.replyId).toString()
+
+    /** Whirlpool's "alert moderators" form; its page is the post's page in the unfiltered thread. */
+    fun reportPostUrl(post: Post): String =
+        urls.reportPost(post.replyId, threadId, (post.number - 1) / POSTS_PER_PAGE + 1, post.number).toString()
 }
+
+/** Whirlpool shows 20 posts per thread page. */
+private const val POSTS_PER_PAGE = 20

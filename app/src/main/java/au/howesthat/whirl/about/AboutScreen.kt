@@ -1,5 +1,7 @@
 package au.howesthat.whirl.about
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -13,8 +15,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.compose.foundation.clickable
 import au.howesthat.whirl.BuildConfig
 import au.howesthat.whirl.R
@@ -25,11 +29,16 @@ import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 const val REPO_URL = "https://github.com/dalbo/whirl"
 const val ISSUES_URL = "$REPO_URL/issues"
 private const val WHIRLDROID_THREAD_URL = "https://forums.whirlpool.net.au/thread/97q1vrm9"
+private const val CONTACT_EMAIL = "whirl@howesthat.net.au"
+/** Google Play's Child Safety Standards (Social apps): published standards and an in-app way to report. */
+private const val CHILD_SAFETY_URL = "https://dalbo.github.io/whirl/child-safety/"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutScreen(navIcon: NavIcon) {
     val open = rememberOpenInBrowser()
+    val context = LocalContext.current
+    val subject = stringResource(R.string.about_concern_subject)
     Scaffold(
         topBar = { TopAppBar(title = { Text(stringResource(R.string.nav_about)) }, navigationIcon = { NavIconButton(navIcon) }) },
     ) { padding ->
@@ -41,6 +50,16 @@ fun AboutScreen(navIcon: NavIcon) {
             }
             Link(stringResource(R.string.about_source), REPO_URL) { open(REPO_URL) }
             Link(stringResource(R.string.about_issues), ISSUES_URL) { open(ISSUES_URL) }
+            Link(stringResource(R.string.about_concern), stringResource(R.string.about_concern_summary, CONTACT_EMAIL)) {
+                val email = Intent(Intent.ACTION_SENDTO, "mailto:$CONTACT_EMAIL".toUri()).putExtra(Intent.EXTRA_SUBJECT, subject)
+                // Without an email app, the standards page shows the address and the other ways to report.
+                try {
+                    context.startActivity(email)
+                } catch (_: ActivityNotFoundException) {
+                    open(CHILD_SAFETY_URL)
+                }
+            }
+            Link(stringResource(R.string.about_child_safety), CHILD_SAFETY_URL) { open(CHILD_SAFETY_URL) }
             Link(stringResource(R.string.about_whirldroid), stringResource(R.string.about_whirldroid_summary)) { open(WHIRLDROID_THREAD_URL) }
             Text(
                 stringResource(R.string.about_disclaimer),

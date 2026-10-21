@@ -2,6 +2,9 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## Unreleased
+- Report a post to Whirlpool's moderators from its long-press menu (opens Whirlpool's report form in your browser), and report a concern to the developer from About. Whirl's child safety standards are published at https://dalbo.github.io/whirl/child-safety/.
+
 ## v1.0.0
 First stable release: polish, accessibility and large screens on top of v0.2.
 - New icon: a speech bubble with a spiral, also on the splash screen and in notifications, with a themed-icon version for Android 13+.

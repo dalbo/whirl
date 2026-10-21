@@ -333,6 +333,7 @@ private fun PostList(
                     onUsersPosts = { viewModel.setFilter(PostFilter.ByUser(post.post.author.id)) },
                     onReply = { browser(viewModel.replyToPostUrl(post.post)) },
                     onEdit = { browser(viewModel.editPostUrl(post.post)) },
+                    onReport = { browser(viewModel.reportPostUrl(post.post)) },
                     onOpenInBrowser = { browser(viewModel.postUrl(post.post, page)) },
                 )
                 HorizontalDivider()
@@ -352,6 +353,7 @@ private fun PostItem(
     onUsersPosts: () -> Unit,
     onReply: () -> Unit,
     onEdit: () -> Unit,
+    onReport: () -> Unit,
     onOpenInBrowser: () -> Unit,
 ) {
     val p = post.post
@@ -362,6 +364,7 @@ private fun PostItem(
         MenuAction(stringResource(R.string.post_user_info, p.author.name), onClick = onUser),
         MenuAction(stringResource(R.string.post_users_posts, p.author.name), onClick = onUsersPosts),
         MenuAction(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser), onClick = onOpenInBrowser),
+        MenuAction(stringResource(R.string.post_report), onClick = onReport),
     )
     Box {
         Column(

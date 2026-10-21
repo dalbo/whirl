@@ -71,6 +71,7 @@ Upload the zip, then delete it. Its certificate must be SHA-256 `ebf77bd8…65ae
 | Government, financial, health, COVID-19 | None / not applicable. |
 | Advertising ID | Not used (no `AD_ID` permission). |
 | Foreground services | None (no foreground service in the manifest; WorkManager's is removed). |
+| Child safety standards (required because the category is Social) | Published standards: `https://dalbo.github.io/whirl/child-safety/`. In-app mechanism: **Yes** (each post's menu → *Report to Whirlpool moderators*, which opens Whirlpool's report form; About → *Report a concern*, which emails the developer). Point of contact: **Dallin Howes**, `whirl@howesthat.net.au`. Needs v1.0.1 or later in the reviewed build. |
 
 ### Data safety answers
 Play counts any data sent off the device as **collected**, even straight to a third party; sending it to Whirlpool is
