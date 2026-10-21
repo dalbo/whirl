@@ -11,6 +11,8 @@ permissions:
 env:
   # Google Play's minimum targetSdk for new apps and updates (raised each August).
   PLAY_MIN_TARGET_SDK: 36
+  # Play track for each tag's AAB: "alpha" is the built-in closed-testing track (docs/play-console.md).
+  PLAY_TRACK: alpha
 
 jobs:
   release:
@@ -32,6 +34,8 @@ jobs:
           v="${GITHUB_REF_NAME#v}"
           [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Tag $GITHUB_REF_NAME is not vMAJOR.MINOR.PATCH"; exit 1; }
           echo "name=$v" >> "$GITHUB_OUTPUT"
+          IFS=. read -r major minor patch <<< "$v"
+          echo "code=$((major * 10000 + minor * 100 + patch))" >> "$GITHUB_OUTPUT"
 
       - name: Release notes from CHANGELOG.md
         run: |
@@ -78,4 +82,28 @@ jobs:
           pre=""; [[ "$GITHUB_REF_NAME" == v0.* ]] && pre="--prerelease"
           gh release create "$GITHUB_REF_NAME" dist/* --title "Whirl $GITHUB_REF_NAME" --notes-file notes.md $pre
 
-      # Play upload (r0adkll/upload-google-play to the internal track) is added once a Play developer account exists.
+      # Google Play: only once the app exists on Play and the PLAY_SERVICE_ACCOUNT_JSON secret is set (docs/play-console.md
+      # §7). The first release on Play is uploaded by hand. Release notes come from fastlane's changelog for this versionCode.
+      - name: Play release notes
+        id: play
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then echo "No PLAY_SERVICE_ACCOUNT_JSON secret: skipping Google Play"; exit 0; fi
+          notes="fastlane/metadata/android/en-AU/changelogs/${{ steps.version.outputs.code }}.txt"
+          [ -s "$notes" ] || { echo "$notes is missing (Play release notes for this version)"; exit 1; }
+          mkdir whatsnew && cp "$notes" whatsnew/whatsnew-en-AU
+          echo "upload=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Google Play
+        if: steps.play.outputs.upload == 'true'
+        # v1.1.5, pinned by commit because this step holds the Play credentials.
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: au.howesthat.whirl
+          releaseFiles: dist/whirl-${{ github.ref_name }}.aab
+          track: ${{ env.PLAY_TRACK }}
+          status: completed
+          whatsNewDirectory: whatsnew
+          mappingFile: app/build/outputs/mapping/release/mapping.txt
