@@ -36,6 +36,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
         val setupDone = booleanPreferencesKey("setup_done")
         val homepage = stringPreferencesKey("homepage")
         val theme = stringPreferencesKey("theme")
+        val dynamicColor = booleanPreferencesKey("dynamic_color")
         val nightStart = stringPreferencesKey("night_start")
         val nightEnd = stringPreferencesKey("night_end")
         val postFontSize = stringPreferencesKey("post_font_size")
@@ -58,6 +59,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
         Settings(
             homepage = p[Keys.homepage].toEnum(d.homepage),
             theme = p[Keys.theme].toEnum(d.theme),
+            dynamicColor = p[Keys.dynamicColor] ?: d.dynamicColor,
             nightStart = p[Keys.nightStart]?.let(LocalTime::parse) ?: d.nightStart,
             nightEnd = p[Keys.nightEnd]?.let(LocalTime::parse) ?: d.nightEnd,
             postFontSize = p[Keys.postFontSize].toEnum(d.postFontSize),
@@ -114,6 +116,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
         store.edit { p ->
             p[Keys.homepage] = s.homepage.name
             p[Keys.theme] = s.theme.name
+            p[Keys.dynamicColor] = s.dynamicColor
             p[Keys.nightStart] = s.nightStart.toString()
             p[Keys.nightEnd] = s.nightEnd.toString()
             p[Keys.postFontSize] = s.postFontSize.name

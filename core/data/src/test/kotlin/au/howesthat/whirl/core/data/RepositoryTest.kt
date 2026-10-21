@@ -104,6 +104,13 @@ class RepositoryTest {
     }
 
     @Test
+    fun `wallpaper colours default on and can be turned off`() = runTest {
+        assertTrue(settings.settings.first().dynamicColor)
+        settings.update { it.copy(dynamicColor = false) }
+        assertFalse(settings.settings.first().dynamicColor)
+    }
+
+    @Test
     fun `night window round trip`() = runTest {
         settings.update { it.copy(theme = ThemeMode.DARK_AT_NIGHT, nightStart = LocalTime.of(15, 5), nightEnd = LocalTime.of(6, 30)) }
         val s = settings.settings.first()
