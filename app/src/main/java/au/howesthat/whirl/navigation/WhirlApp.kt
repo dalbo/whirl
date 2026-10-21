@@ -89,10 +89,11 @@ fun WhirlApp(
         )
     }
 
-    // Links open on top of the start screen, so Back returns to it.
+    // Links open on top of the start screen, so Back returns to it. A drawer destination (Watched, from the notification)
+    // opens like a drawer tap; anything else is pushed, so a second thread link opens even while a thread is showing.
     LaunchedEffect(link) {
         link?.let {
-            nav.navigate(it) { launchSingleTop = true }
+            if (isTopLevelRoute(it)) nav.navigateTopLevel(it) else nav.navigate(it)
             onLinkHandled()
         }
     }
@@ -142,12 +143,14 @@ fun WhirlApp(
 
 /** Drawer destinations replace each other above the start screen; Settings and About push on top. */
 private fun NavHostController.navigateTopLevel(route: Any) {
-    val isTopLevel = TOP_LEVEL.any { it.route == route }
     navigate(route) {
         launchSingleTop = true
-        if (isTopLevel) {
+        if (isTopLevelRoute(route)) {
             popUpTo(graph.findStartDestination().id) { saveState = true }
             restoreState = true
         }
     }
 }
+
+/** Drawer destinations (not Settings or About, which push on top). */
+internal fun isTopLevelRoute(route: Any): Boolean = TOP_LEVEL.any { it.route == route }
