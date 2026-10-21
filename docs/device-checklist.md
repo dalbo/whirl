@@ -14,6 +14,9 @@ Run on a real phone before tagging a release (PLAN.md §8). Debug builds install
 - [ ] Watched, Forums, a forum with groups, a thread with a moderator note and parts, News, Settings and About: no text cut off or overlapping; names in post headers stay readable.
 - [ ] A watched-thread notification at maximum font size still shows the title and the buttons.
 
+**Colours**
+- [ ] Settings → Use wallpaper colours off: Whirl's blue scheme; on: the wallpaper's. Quotes stay blue/brown and readable in light and dark either way.
+
 **Landscape**
 - [ ] Rotate on Watched, a forum, a thread, Settings: nothing cut off; the thread's posts sit in a centred column; the back arrow lines up with other screens; swipe pages and pull to refresh still work; rotating keeps the page you were on.
 

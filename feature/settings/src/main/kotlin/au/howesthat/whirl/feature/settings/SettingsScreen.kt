@@ -1,5 +1,6 @@
 package au.howesthat.whirl.feature.settings
 
+import android.os.Build
 import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -76,6 +77,10 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, viewModel: Setti
             Section(stringResource(R.string.settings_general))
             Choice(stringResource(R.string.settings_homepage), Homepage.entries, settings.homepage, { homepageLabel(it) }) { v -> update { it.copy(homepage = v) } }
             Choice(stringResource(R.string.settings_theme), ThemeMode.entries, settings.theme, { themeLabel(it) }) { v -> update { it.copy(theme = v) } }
+            // Material You needs Android 12; older phones always get Whirl's own colours.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Toggle(stringResource(R.string.settings_dynamic_color), settings.dynamicColor) { v -> update { it.copy(dynamicColor = v) } }
+            }
             if (settings.theme == ThemeMode.DARK_AT_NIGHT) {
                 TimeSetting(stringResource(R.string.settings_night_start), settings.nightStart) { v -> update { it.copy(nightStart = v) } }
                 TimeSetting(stringResource(R.string.settings_night_end), settings.nightEnd) { v -> update { it.copy(nightEnd = v) } }

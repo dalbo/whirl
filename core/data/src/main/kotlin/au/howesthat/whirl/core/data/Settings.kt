@@ -6,6 +6,8 @@ import java.time.LocalTime
 data class Settings(
     val homepage: Homepage = Homepage.FORUMS,
     val theme: ThemeMode = ThemeMode.SYSTEM,
+    /** Material You colours from the wallpaper (Android 12+); off uses Whirl's own blue scheme. */
+    val dynamicColor: Boolean = true,
     val nightStart: LocalTime = LocalTime.of(22, 0),
     val nightEnd: LocalTime = LocalTime.of(7, 0),
     val postFontSize: PostFontSize = PostFontSize.NORMAL,
