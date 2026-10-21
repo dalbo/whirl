@@ -16,6 +16,7 @@
     <string name="post_op">OP</string>
     <string name="post_edited">edited %1$s</string>
     <string name="post_reply">Reply in browser</string>
+    <string name="post_report">Report to Whirlpool moderators</string>
     <string name="post_edit">Edit in browser</string>
     <string name="post_user_info">About %1$s</string>
     <string name="post_users_posts">Posts by %1$s in this thread</string>

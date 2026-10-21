@@ -13,6 +13,10 @@
     <string name="about_summary">An unofficial Android client for the Whirlpool forums, rewritten from Whirldroid. Free software under the MIT licence.</string>
     <string name="about_source">Source code</string>
     <string name="about_issues">Report a problem or suggest a feature</string>
+    <string name="about_concern">Report a concern</string>
+    <string name="about_concern_summary">Email the developer (%1$s) about harmful content, including anything that endangers children. To report a post, long-press it and choose Report to Whirlpool moderators.</string>
+    <string name="about_concern_subject">Whirl: report a concern</string>
+    <string name="about_child_safety">Child safety standards</string>
     <string name="about_whirldroid">Whirldroid</string>
     <string name="about_whirldroid_summary">The original app by Greg Smith, which Whirl rewrites</string>
     <string name="about_disclaimer">Whirl is not made by or affiliated with Whirlpool. Posting, private forums and private messages open in your browser, where you log in to Whirlpool.</string>
