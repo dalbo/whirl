@@ -70,6 +70,12 @@ PLAN.md §1.1–1.3 are the spec and §9 the scope. One PR per task, tests for e
 5. **Dark at night live switch** (done): `rememberIsNight` in `MainActivity.kt` re-evaluates at the next window edge (`untilNextEdge`, plus 0.5 s) and on every resume (a timer can run late while the phone sleeps).
 6. **Release v0.2** (done 2026-10-21: `v0.2.0` tagged from `main`, signed APK/AAB on GitHub Releases as a pre-release; Dallin chose to keep `v0.*` as pre-releases. Not yet checked on the phone, so carry into the next device pass: Mark as read with "back to list", offline rollback of an action, the live dark-at-night switch; Dallin confirmed auto-mark-read on open and the logged-in New thread form the same day). Was: device checklist v0.2 section with Dallin, `## v0.2.0` in CHANGELOG.md, ask before tagging.
 
+## Phase 4: Play prep done, found while taking screenshots (2026-10-21)
+- **Done:** privacy policy and project page on GitHub Pages (`site/`, https://dalbo.github.io/whirl/privacy/); fastlane listing in `fastlane/metadata/android/en-AU/` (text, icon, feature graphic, six screenshots); `docs/play-console.md` (Dallin's steps, form answers, tester post, moderator note); release workflow uploads to Play's `alpha` track once `PLAY_SERVICE_ACCOUNT_JSON` exists; WorkManager's unused foreground service removed. Contact: whirl@howesthat.net.au. Decided: personal account, listing "Whirl: forum reader", reviewer key from a separate Whirlpool account, no in-app web session (PLAN.md §5).
+- **Dark theme bug:** the moderator note keeps its light orange background in dark mode, and its links (pale green) are nearly unreadable on it (thread `9nznpky9`, last page). Use theme colours for the note.
+- **Layout bug:** a thread with many parts (`9nznpky9` has 58) fills the first screen with "Part N" links before any post. Collapse it (e.g. one row with the current part and a picker).
+- **Regression fixed in #31:** a second thread link opened from outside the app did nothing while a thread was showing (`launchSingleTop` on links, from #17). Check on the phone: open a thread link, then another one.
+
 ## Known unknowns to resolve as you go
 - Shape of `get=recent` when non-empty (assumed to match `THREADS`; the Recent screen must cope with it failing as Drift).
 - Markup of a deleted post and of a post with an image (capture when found: add the URL to `tools/capture/public.json`, run `npm run public`).
