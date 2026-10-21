@@ -1,0 +1,115 @@
+# Google Play: account, listing and first release
+
+The steps only Dallin can do, in order, with the answers to each Play Console form. Decisions already taken
+(2026-10-21): a **personal** developer account; listing name **"Whirl: forum reader"**, with Whirlpool named only in the
+description; reviewers get a key from a **separate Whirlpool account**; privacy policy at
+<https://dalbo.github.io/whirl/privacy/>; v0.* stay pre-releases on GitHub. Nothing in the app uses a Whirlpool web
+session (PLAN.md §5).
+
+Listing text and images live in `fastlane/metadata/android/en-AU/` (copy them in by hand for the first release;
+the release workflow can upload later ones, see the end).
+
+## 0. Before Play: talk to Whirlpool
+Whirlpool's API terms forbid revenue from API apps (Whirl is free, no ads) and say apps are not endorsed but may be
+listed on the 3rd Party Clients wiki page; the community rules let an Australian individual developer start a thread
+about their app (PLAN.md §2.1). Two things they do not cover, worth a moderator's view before a public listing: an app
+that also reads public forum pages, and an app store listing that names Whirlpool. Draft below ("Note to the
+moderators").
+
+## 1. Developer account
+1. <https://play.google.com/console/signup> with the Google account that will own Whirl → **Yourself** (personal).
+2. Pay the US$25 registration fee; verify identity (government ID) and the contact phone number.
+3. Developer name shown on the listing (e.g. "Dallin Howes" or "howesthat"), a public **contact email** (the dedicated
+   address, once it exists; also add it to `site/privacy/index.html`) and, for a personal account, no public address is
+   required.
+4. New personal accounts must also confirm access to a real Android device through the Play Console app.
+
+This account also covers Google's developer verification, which applies to sideloaded apps (the GitHub APK) worldwide
+from 2027; register the package `au.howesthat.whirl` against it when Play prompts.
+
+## 2. Create the app
+**Create app**: name `Whirl: forum reader`, default language English (Australia) – en-AU, **App**, **Free** (it can never
+become paid: Whirlpool's API terms), accept the declarations.
+
+## 3. App signing (decide before the first upload)
+Recommended: **use the existing release key as Play's app signing key** ("Use existing app signing key from Java
+keystore" with Google's PEPK tool, from `~/.config/whirldroid/release.jks`). Then the Play build and the GitHub APK carry
+the same signature and people can move between them without uninstalling. If Google generates a new key instead, the
+GitHub APK and the Play build cannot update each other. The same `release.jks` then acts as the upload key, which is
+what the release workflow already signs the AAB with.
+
+## 4. Store presence → Main store listing
+- App name: `fastlane/metadata/android/en-AU/title.txt`
+- Short description: `short_description.txt`; full description: `full_description.txt`
+- App icon: `images/icon.png` (512×512); feature graphic: `images/featureGraphic.png` (1024×500)
+- Phone screenshots: `images/phoneScreenshots/` (2–8, at most 2:1)
+- Category: **Social** (Whirlpool is a discussion community); tags: forums, community, broadband
+- Contact: email (required), website `https://dalbo.github.io/whirl/`
+- Privacy policy: `https://dalbo.github.io/whirl/privacy/`
+
+## 5. Policy → App content
+| Form | Answer |
+|---|---|
+| Privacy policy | `https://dalbo.github.io/whirl/privacy/` |
+| Ads | No ads |
+| App access | **All or some functionality is restricted.** Instructions: "Whirl reads the Whirlpool forums with a personal API key. On the first screen choose Log in and paste this key: `<key of the review account>`. No password is needed. Whirlpool → Account settings → API key is where users find their own." Give the key of the separate review account here only, never in the repo. |
+| Content rating (IARC) | Category: **Social / communication** style app. Violence, sex, language, drugs, gambling: none produced by the app. "Users can interact or exchange content": **No** in the app (posting happens on Whirlpool's website in the browser), but it **displays user-generated content** from a moderated forum; say so where asked. Expect a teen-level rating. |
+| Target audience | **18 and over** (keeps Whirl outside the Families policy; Whirlpool is a general-audience adult community). Not appealing to children: yes. |
+| News apps | **No** (industry news is one screen, not the app's purpose). |
+| Data safety | See below. |
+| Government, financial, health, COVID-19 | None / not applicable. |
+| Advertising ID | Not used (no `AD_ID` permission). |
+| Foreground services | None (no foreground service in the manifest; WorkManager's is removed). |
+
+### Data safety answers
+Play counts any data sent off the device as **collected**, even straight to a third party; sending it to Whirlpool is
+not **sharing**, because it is a user-initiated transfer the user expects (Play Console help, "Provide information for
+Google Play's Data safety section", read 2026-10-21).
+- Does the app collect or share any required user data types? **Yes.**
+- Is all collected data encrypted in transit? **Yes** (HTTPS only).
+- Do you provide a way to request deletion? **Yes**: log out in Settings or uninstall; the developer holds no data.
+- Data types:
+  - **Personal info → User IDs**: collected, not shared, **required**, purpose **App functionality** (the API key and the
+    Whirlpool account name and number it belongs to).
+  - **App activity → App interactions**: collected, not shared, **required**, purpose **App functionality** (watching,
+    unwatching and marking threads read are sent to Whirlpool).
+  - Nothing else: no location, contacts, device IDs, analytics, crash logs or diagnostics.
+
+## 6. Closed testing (personal accounts: 12 testers for 14 days)
+1. **Testing → Closed testing → Create track** ("Whirlpool testers"). Countries: Australia (add others if testers ask).
+2. Testers: a Google Group (e.g. `whirl-testers@googlegroups.com`) is easiest; testers join the group, then open the
+   opt-in link from the track.
+3. **Create release** → upload `whirl-vX.Y.Z.aab` from the GitHub Release (the first upload must be manual), release
+   notes from `changelogs/<versionCode>.txt`, roll out to the track.
+4. At least **12 testers opted in for 14 consecutive days**; someone who leaves and rejoins restarts their 14 days.
+   Recruit 15–20 to be safe, and ask them to actually use it: Google weighs engagement and feedback when you apply.
+5. After 14 days: **Dashboard → Apply for production**, answering the questions about the test.
+
+### Tester post (Android forum; the community rules allow this for Australian individual developers)
+> **Whirl: a new open-source Android app for Whirlpool (testers wanted)**
+>
+> Whirldroid hasn't been updated since 2021, so I've rewritten it for current Android as Whirl: free, open source (MIT),
+> no ads or tracking, using your own API key. It does forums, watched threads with notifications, recent/popular,
+> native thread reading with quotes and spoilers, news, search and offline reading. Posting and private forums still open
+> in your browser.
+>
+> I'd like to get it onto Google Play, which needs 12+ people in a 14-day closed test. If you'd use it day to day and
+> tell me what's broken or missing, join `<group link>` and then opt in at `<opt-in link>`. Source and APKs:
+> github.com/dalbo/whirl. Feedback here or on GitHub issues is very welcome.
+
+### Note to the moderators (before the public listing)
+> Hi, I'm d@llin (#216903). I've written Whirl, a free, open-source (MIT) Android reader for Whirlpool that replaces
+> Whirldroid. It uses the API with each user's own key for watched threads, news and actions, and reads public forum and
+> thread pages for display, at about the rate a person browses (no background scraping; notifications use one
+> `get=watched` call per interval). It never logs in to the site: posting, private forums and PMs open in the user's
+> browser. It's free with no ads, analytics or revenue.
+>
+> Before I publish it on Google Play I wanted to check: (1) are you comfortable with an app reading public pages this
+> way, (2) is "an unofficial client for the Whirlpool forums" in the store description OK, and (3) may I start a
+> thread in Android to find testers? I'd also like it listed on the 3rd Party Clients page once it's out.
+
+## 7. Automating later releases
+Once the app exists on Play: Google Cloud → enable the **Google Play Android Developer API**, create a service account,
+download its JSON key; Play Console → Users and permissions → invite the service account with **Release to testing
+tracks** (and later production). Add the JSON as the GitHub secret `PLAY_SERVICE_ACCOUNT_JSON`; the release workflow then
+uploads each tag's AAB to the closed-testing track with the matching `changelogs/<versionCode>.txt`.
