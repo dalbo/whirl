@@ -21,7 +21,7 @@ Read in this order: this file → `PLAN.md` → `fixtures/README.md` → `tools/
 4. **Skip `#watchbar`.** It is a hidden `.notebar.marker` inside `#replylist`. Moderator notes are `#top_notebar_public`; multi-part links are `.notebar.parts`.
 5. **API dates** are `yyyy-MM-dd'T'HH:mm:ssxx` (`+1000`, no colon). API titles are HTML-escaped. `WATCHED.UNREAD` is an int, `THREADS.UNREAD` a boolean. Always pass `watchedmode` explicitly.
 6. **The dev machine cannot reach Whirlpool** (Cloudflare blocks curl/OkHttp-from-desktop/headless). Live checks run on Dallin's phone; captures run through `tools/capture/`. Unit tests never touch the network.
-7. **Releases come only from the tag-driven GitHub Actions workflow** (PLAN.md §6). Never publish a local build.
+7. **Releases come only from the tag-driven GitHub Actions workflow** (PLAN.md §6). Never publish a local build. Each release needs `## vX.Y.Z` in CHANGELOG.md and, for Play, `fastlane/metadata/android/en-AU/changelogs/<versionCode>.txt` (≤500 characters).
 8. Nothing from `reference/` is copied into the new code; it is read for behaviour only.
 9. **`main` is protected**: no direct pushes (admins included), linear history, CI job `build` must pass on an up-to-date branch. Work on a branch, open a PR with `gh pr create`, merge with `gh pr merge --squash --auto`. Release tags (`vX.Y.Z`) are still pushed directly, from a commit on `main`.
 
