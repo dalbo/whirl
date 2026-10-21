@@ -36,6 +36,8 @@ jobs:
           echo "name=$v" >> "$GITHUB_OUTPUT"
           IFS=. read -r major minor patch <<< "$v"
           echo "code=$((major * 10000 + minor * 100 + patch))" >> "$GITHUB_OUTPUT"
+          # The version is committed in app/version.properties (F-Droid builds from it); the tag must agree.
+          grep -qx "versionName=$v" app/version.properties || { echo "app/version.properties is not at $v; bump it in the release PR"; exit 1; }
 
       - name: Release notes from CHANGELOG.md
         run: |
@@ -55,7 +57,7 @@ jobs:
           WHIRL_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           WHIRL_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           WHIRL_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-        run: ./gradlew -Pwhirl.version=${{ steps.version.outputs.name }} test assembleRelease bundleRelease --stacktrace
+        run: ./gradlew test assembleRelease bundleRelease --stacktrace
 
       - name: Verify signature and targetSdk
         run: |

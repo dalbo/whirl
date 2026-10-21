@@ -1,0 +1,2 @@
+• Fixed: a thread link opened from another app did nothing while a thread was already showing
+• No longer declares the unused foreground-service permission

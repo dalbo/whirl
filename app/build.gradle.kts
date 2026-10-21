@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.whirl.android.application)
     alias(libs.plugins.whirl.android.compose)
@@ -5,11 +7,15 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// Release builds get their version from the tag: ./gradlew -Pwhirl.version=1.2.3 → versionName 1.2.3, versionCode 10203.
-val whirlVersion = providers.gradleProperty("whirl.version").orElse("0.0.0").get()
-val whirlVersionCode = Regex("""^(\d+)\.(\d+)\.(\d+)$""").matchEntire(whirlVersion)
-    ?.destructured?.let { (major, minor, patch) -> major.toInt() * 10000 + minor.toInt() * 100 + patch.toInt() }
-    ?: error("whirl.version must be MAJOR.MINOR.PATCH, got '$whirlVersion'")
+// The version lives in app/version.properties (F-Droid reads it at each tag); the release workflow checks the tag.
+val versionProps = Properties().apply {
+    load(providers.fileContents(layout.projectDirectory.file("version.properties")).asText.get().reader())
+}
+val whirlVersion: String = versionProps.getProperty("versionName")
+val whirlVersionCode = versionProps.getProperty("versionCode").toInt()
+Regex("""^(\d+)\.(\d+)\.(\d+)$""").matchEntire(whirlVersion)?.destructured
+    ?.let { (major, minor, patch) -> major.toInt() * 10000 + minor.toInt() * 100 + patch.toInt() }
+    .let { check(it == whirlVersionCode) { "version.properties: versionCode $whirlVersionCode does not match versionName $whirlVersion" } }
 
 // Signing comes only from the environment of the release workflow; local release builds are unsigned.
 val keystoreFile = providers.environmentVariable("WHIRL_KEYSTORE_FILE").orNull
@@ -19,7 +25,7 @@ android {
 
     defaultConfig {
         applicationId = "au.howesthat.whirl"
-        versionCode = maxOf(whirlVersionCode, 1)
+        versionCode = whirlVersionCode
         versionName = whirlVersion
     }
 
