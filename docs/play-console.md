@@ -143,7 +143,7 @@ Without the two repository variables below, the Play steps are skipped.
        PROJECT_ID=whirl-release
        SA=whirl-github-release@$PROJECT_ID.iam.gserviceaccount.com
        gcloud config set project $PROJECT_ID
-       gcloud services enable iamcredentials.googleapis.com sts.googleapis.com
+       gcloud services enable iamcredentials.googleapis.com sts.googleapis.com androidpublisher.googleapis.com
        gcloud iam workload-identity-pools create github --location=global --display-name="GitHub Actions"
        gcloud iam workload-identity-pools providers create-oidc whirl --location=global --workload-identity-pool=github \
          --display-name="dalbo/whirl" --issuer-uri="https://token.actions.githubusercontent.com" \
@@ -159,4 +159,8 @@ Without the two repository variables below, the Play steps are skipped.
 4. Set the two printed values as repository **variables** (not secrets; neither is sensitive):
    `gh variable set PLAY_WIF_PROVIDER --body "<value>"` and `gh variable set PLAY_SERVICE_ACCOUNT --body "<value>"`.
 5. The next tag (a new versionCode; Play refuses one it already has) uploads to Alpha. A failure at "Sign in to Google
-   Cloud" is the federation; at "Upload to Google Play" with 403, the Play Console permission.
+   Cloud" is the federation; at "Upload to Google Play" with 403, the Play Console permission; "Google Play Android
+   Developer API has not been used in project … or it is disabled", step 1's API (v1.1.0 hit this, 2026-10-23).
+6. **Re-running a failed release**: "Re-run failed jobs" on the tag's run. "Publish GitHub Release" skips a release that
+   already exists, so the run goes on to Play. (Tags before v1.1.1 lack that skip: delete the GitHub release first, as
+   for v1.1.0, whose rebuild had identical checksums.) Keyless upload first worked on v1.1.0.

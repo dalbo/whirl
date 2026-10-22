@@ -83,6 +83,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # A re-run after a failed Play upload finds the release already published; keep it and go on to Play.
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then echo "Release $GITHUB_REF_NAME exists: kept"; exit 0; fi
           pre=""; [[ "$GITHUB_REF_NAME" == v0.* ]] && pre="--prerelease"
           gh release create "$GITHUB_REF_NAME" dist/* --title "Whirl $GITHUB_REF_NAME" --notes-file notes.md $pre
 
