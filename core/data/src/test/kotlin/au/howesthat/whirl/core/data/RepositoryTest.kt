@@ -122,6 +122,13 @@ class RepositoryTest {
     }
 
     @Test
+    fun `the app style defaults to Classic and is stored by id`() = runTest {
+        assertEquals("classic", settings.settings.first().style)
+        settings.update { it.copy(style = "silver-ember") }
+        assertEquals("silver-ember", settings.settings.first().style)
+    }
+
+    @Test
     fun `text sizes default to Whirldroid's 17 sp posts and the system size elsewhere`() = runTest {
         val d = settings.settings.first()
         assertEquals(17f, d.postFontSize.sp)

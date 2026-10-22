@@ -1,5 +1,6 @@
 package au.howesthat.whirl.feature.thread
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
@@ -53,6 +55,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -72,11 +76,13 @@ import au.howesthat.whirl.core.model.Post
 import au.howesthat.whirl.core.model.PostFilter
 import au.howesthat.whirl.core.ui.ActionsMenu
 import au.howesthat.whirl.core.ui.ErrorState
+import au.howesthat.whirl.core.ui.LocalAppStyle
 import au.howesthat.whirl.core.ui.MenuAction
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.PagePickerDialog
 import au.howesthat.whirl.core.ui.PostBodyView
+import au.howesthat.whirl.core.ui.Surfaces
 import au.howesthat.whirl.core.ui.errorMessage
 import au.howesthat.whirl.core.ui.menuClickable
 import au.howesthat.whirl.core.ui.readableWidth
@@ -314,7 +320,11 @@ private fun PostList(
         ui.note?.let { note ->
             item(key = "note") {
                 // Theme colours only: the note's site styling (pale orange) does not survive a dark scheme.
-                Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.readableWidth()) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shape = cardShape(),
+                    modifier = Modifier.readableWidth().cardGutter(),
+                ) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
                             stringResource(R.string.moderator_note),
@@ -331,13 +341,13 @@ private fun PostList(
                 PartsRow(
                     parts,
                     onOpen = { viewModel.openLink("https://forums.whirlpool.net.au/thread/${it.threadId.value}") },
-                    modifier = Modifier.readableWidth(),
+                    modifier = Modifier.readableWidth().cardGutter(),
                 )
             }
         }
         items(ui.posts, key = { it.post.replyId }) { post ->
             // Posts stay a readable width in landscape and on large screens.
-            Column(Modifier.readableWidth()) {
+            PostFrame {
                 PostItem(
                     post = post,
                     textStyle = textStyle,
@@ -351,7 +361,6 @@ private fun PostList(
                     onReport = { browser(viewModel.reportPostUrl(post.post)) },
                     onOpenInBrowser = { browser(viewModel.postUrl(post.post, page)) },
                 )
-                HorizontalDivider()
             }
         }
         // As on Whirlpool and in Whirldroid: mark a watched thread read at the end of its last page, for those who
@@ -368,6 +377,35 @@ private fun PostList(
             }
         }
     }
+}
+
+/** A post full width with a divider below, or an outlined card ([Surfaces.CARDS]). */
+@Composable
+private fun PostFrame(content: @Composable () -> Unit) {
+    if (LocalAppStyle.current.layout.posts != Surfaces.CARDS) {
+        Column(Modifier.readableWidth()) {
+            content()
+            HorizontalDivider()
+        }
+        return
+    }
+    val shape = cardShape()
+    Surface(
+        modifier = Modifier.readableWidth().cardGutter(),
+        shape = shape,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) { content() }
+}
+
+/** Card corners in styles with post cards, square otherwise. */
+@Composable
+private fun cardShape(): Shape = LocalAppStyle.current.layout.let { if (it.posts == Surfaces.CARDS) RoundedCornerShape(it.cornerDp) else RectangleShape }
+
+/** The space around a card in styles with post cards. */
+@Composable
+private fun Modifier.cardGutter(): Modifier = LocalAppStyle.current.layout.let {
+    if (it.posts == Surfaces.CARDS) padding(horizontal = it.gutterDp, vertical = 6.dp) else this
 }
 
 @Composable
@@ -394,34 +432,44 @@ private fun PostItem(
         MenuAction(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser), onClick = onOpenInBrowser),
         MenuAction(stringResource(R.string.post_report), onClick = onReport),
     )
+    val body: @Composable () -> Unit = {
+        when {
+            p.isHidden -> Text(
+                stringResource(R.string.post_hidden, p.hiddenReason.orEmpty()),
+                style = textStyle,
+                fontStyle = FontStyle.Italic,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            p.isDeleted && post.body.blocks.isEmpty() -> Text(
+                stringResource(R.string.post_deleted),
+                style = textStyle,
+                fontStyle = FontStyle.Italic,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            else -> PostBodyView(post.body, onLink = onLink, onQuote = onQuote, textStyle = textStyle)
+        }
+    }
+    val clickable = Modifier
+        .fillMaxWidth()
+        .menuClickable(
+            actions,
+            onLongClick = { menu = true },
+            onClick = {},
+            onLongClickLabel = stringResource(au.howesthat.whirl.core.ui.R.string.show_actions),
+        )
     Box {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .menuClickable(
-                    actions,
-                    onLongClick = { menu = true },
-                    onClick = {},
-                    onLongClickLabel = stringResource(au.howesthat.whirl.core.ui.R.string.show_actions),
-                )
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            PostHeader(p, onUser)
-            when {
-                p.isHidden -> Text(
-                    stringResource(R.string.post_hidden, p.hiddenReason.orEmpty()),
-                    style = textStyle,
-                    fontStyle = FontStyle.Italic,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                p.isDeleted && post.body.blocks.isEmpty() -> Text(
-                    stringResource(R.string.post_deleted),
-                    style = textStyle,
-                    fontStyle = FontStyle.Italic,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                else -> PostBodyView(post.body, onLink = onLink, onQuote = onQuote, textStyle = textStyle)
+        if (LocalAppStyle.current.layout.posts == Surfaces.CARDS) {
+            // In a card: the author on a deeper band above the body.
+            Column(clickable) {
+                Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    PostHeader(p, onUser)
+                }
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) { body() }
+            }
+        } else {
+            Column(clickable.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                PostHeader(p, onUser)
+                body()
             }
         }
         ActionsMenu(menu, onDismiss = { menu = false }, actions)

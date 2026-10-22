@@ -43,6 +43,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
         val textScale = stringPreferencesKey("text_scale")
         val screenAnimations = booleanPreferencesKey("screen_animations")
         val browserApp = booleanPreferencesKey("browser_app")
+        val style = stringPreferencesKey("style")
         val watchedNotify = booleanPreferencesKey("watched_notify")
         val notifyInterval = intPreferencesKey("notify_interval")
         val openThreadsInBrowser = booleanPreferencesKey("open_threads_in_browser")
@@ -69,6 +70,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
             nightEnd = p[Keys.nightEnd]?.let(LocalTime::parse) ?: d.nightEnd,
             postFontSize = p[Keys.postFontSize].toEnum(d.postFontSize),
             textScale = p[Keys.textScale].toEnum(d.textScale),
+            style = p[Keys.style] ?: d.style,
             watchedNotify = p[Keys.watchedNotify] ?: d.watchedNotify,
             notifyIntervalMinutes = p[Keys.notifyInterval] ?: d.notifyIntervalMinutes,
             openThreadsInBrowser = p[Keys.openThreadsInBrowser] ?: d.openThreadsInBrowser,
@@ -129,6 +131,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
             p[Keys.nightEnd] = s.nightEnd.toString()
             p[Keys.postFontSize] = s.postFontSize.name
             p[Keys.textScale] = s.textScale.name
+            p[Keys.style] = s.style
             p[Keys.watchedNotify] = s.watchedNotify
             p[Keys.notifyInterval] = s.notifyIntervalMinutes
             p[Keys.openThreadsInBrowser] = s.openThreadsInBrowser

@@ -54,4 +54,6 @@
     <string name="previous_page">Previous</string>
     <string name="next_page">Next</string>
     <string name="page_n">Page %1$d</string>
+    <!-- Unread count on a row in styles with an accent for unread rows (TalkBack still reads "N unread posts"). -->
+    <string name="row_new_count">%1$d new</string>
 </resources>

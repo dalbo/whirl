@@ -17,6 +17,8 @@ data class Settings(
     val screenAnimations: Boolean = true,
     /** Whirlpool pages (replies, private forums, "Open in browser") open in the browser app, not a Custom Tab. */
     val browserApp: Boolean = false,
+    /** The app style's id (`core/ui/src/main/assets/styles/<id>.json`); an unknown id shows Classic. */
+    val style: String = "classic",
     // Notifications
     val watchedNotify: Boolean = false,
     val notifyIntervalMinutes: Int = 60,

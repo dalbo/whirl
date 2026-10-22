@@ -1,12 +1,18 @@
 package au.howesthat.whirl.core.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
@@ -17,7 +23,6 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
@@ -39,27 +44,15 @@ import au.howesthat.whirl.core.model.PostBody
 import au.howesthat.whirl.core.model.QuoteKind
 import au.howesthat.whirl.core.model.Style
 
-/**
- * Whirldroid 2.14.12's quote colours (PLAN.md §1.5). They stay fixed under Material You so quotes look like
- * Whirlpool's; 2.14.12's single `#9F6E19` for other quotes was 4.2:1 on both light and dark surfaces, so it has a
- * darker and a lighter shade of the same hue that reach 4.5:1 (5.1 and 5.4).
- */
-private object QuoteColors {
-    val repliedUserLight = Color(0xFF4455AA)
-    val repliedUserDark = Color(0xFF7885C4)
-    val otherLight = Color(0xFF8D6216)
-    val otherDark = Color(0xFFD49221)
-}
-
 private class BodyColors(val repliedUser: Color, val other: Color, val link: Color, val spoiler: Color, val codeBackground: Color)
 
 @Composable
 private fun bodyColors(): BodyColors {
     val scheme = MaterialTheme.colorScheme
-    val dark = scheme.surface.luminance() < 0.5f
+    val style = LocalAppStyle.current
     return BodyColors(
-        repliedUser = if (dark) QuoteColors.repliedUserDark else QuoteColors.repliedUserLight,
-        other = if (dark) QuoteColors.otherDark else QuoteColors.otherLight,
+        repliedUser = style.quoteRepliedUser,
+        other = style.quoteOther,
         link = scheme.primary,
         spoiler = scheme.onSurfaceVariant,
         codeBackground = scheme.surfaceContainerHighest,
@@ -83,6 +76,7 @@ fun PostBodyView(
     val revealed = remember(body) { mutableStateListOf<Int>() }
     val reveal: (Int) -> Unit = { if (it !in revealed) revealed += it }
     val counter = SpoilerCounter()
+    val boxedQuotes = LocalAppStyle.current.layout.quotes == Quotes.BOXED
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         body.blocks.forEach { block ->
             when (block) {
@@ -93,7 +87,15 @@ fun PostBodyView(
                     fontWeight = FontWeight.Bold,
                     color = colors.repliedUser,
                 )
-                is Block.Paragraph -> Text(annotate(block.inlines, colors, onLink, revealed, reveal, counter), style = textStyle)
+                is Block.Paragraph -> {
+                    val text = annotate(block.inlines, colors, onLink, revealed, reveal, counter)
+                    val quote = if (boxedQuotes) wholeQuote(block.inlines) else null
+                    if (quote == null) {
+                        Text(text, style = textStyle)
+                    } else {
+                        QuoteBox(if (quote == QuoteKind.REPLIED_USER) colors.repliedUser else colors.other) { Text(text, style = textStyle) }
+                    }
+                }
                 is Block.ListBlock -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     block.items.forEachIndexed { i, item ->
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -124,6 +126,41 @@ fun PostBodyView(
                 }
             }
         }
+    }
+}
+
+/** A quoted paragraph in a recessed box with a rule in the quote's colour ([Quotes.BOXED]). */
+@Composable
+private fun QuoteBox(rule: Color, content: @Composable () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.height(IntrinsicSize.Min)) {
+            Box(Modifier.width(3.dp).fillMaxHeight().background(rule))
+            Box(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) { content() }
+        }
+    }
+}
+
+/**
+ * The quote kind of a paragraph that is all quote (ignoring blank text), the replied-to user's if any part is theirs;
+ * null for a paragraph with any unquoted text, which keeps its inline quote colours.
+ */
+internal fun wholeQuote(inlines: List<Inline>): QuoteKind? {
+    val kinds = mutableListOf<QuoteKind?>()
+    fun collect(list: List<Inline>) {
+        list.forEach { inline ->
+            when (inline) {
+                is Inline.Text -> if (inline.text.isNotBlank()) kinds += inline.style.quote
+                is Inline.Link -> if (inline.text.isNotBlank()) kinds += inline.style.quote
+                is Inline.Spoiler -> collect(inline.inlines)
+                Inline.LineBreak -> Unit
+            }
+        }
+    }
+    collect(inlines)
+    return when {
+        kinds.isEmpty() || null in kinds -> null
+        QuoteKind.REPLIED_USER in kinds -> QuoteKind.REPLIED_USER
+        else -> QuoteKind.OTHER
     }
 }
 

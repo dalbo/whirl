@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
@@ -17,7 +17,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -28,8 +27,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -44,6 +41,9 @@ import au.howesthat.whirl.core.ui.ErrorState
 import au.howesthat.whirl.core.ui.MenuAction
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
+import au.howesthat.whirl.core.ui.RowPosition
+import au.howesthat.whirl.core.ui.SectionHeading
+import au.howesthat.whirl.core.ui.SectionRow
 import au.howesthat.whirl.core.ui.UpdatedAgo
 import au.howesthat.whirl.core.ui.errorMessage
 import au.howesthat.whirl.core.ui.menuClickable
@@ -144,33 +144,23 @@ fun ForumsScreen(navIcon: NavIcon, onOpenForum: (ForumRef) -> Unit, onSearch: ()
                         failed?.let { Text(errorMessage(it), Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error) }
                     }
                     sections.orEmpty().forEach { section ->
-                        item(key = "h-${section.isFavourites}-${section.title}") { Header(section.title) }
-                        items(section.forums, key = { "${section.isFavourites}-${it.forum.id}" }) { item ->
-                            ForumRow(
-                                item,
-                                onOpen = {
-                                    if (item.isPrivate) browser(urls.forum(item.forum.id).toString())
-                                    else onOpenForum(ForumRef(item.forum.id, item.forum.title))
-                                },
-                                onToggleFavourite = { viewModel.setFavourite(item.forum.id, !item.isFavourite) },
-                            )
+                        item(key = "h-${section.isFavourites}-${section.title}") { SectionHeading(section.title) }
+                        itemsIndexed(section.forums, key = { _, it -> "${section.isFavourites}-${it.forum.id}" }) { i, item ->
+                            SectionRow(RowPosition.of(i, section.forums.size), flatDivider = false) {
+                                ForumRow(
+                                    item,
+                                    onOpen = {
+                                        if (item.isPrivate) browser(urls.forum(item.forum.id).toString())
+                                        else onOpenForum(ForumRef(item.forum.id, item.forum.title))
+                                    },
+                                    onToggleFavourite = { viewModel.setFavourite(item.forum.id, !item.isFavourite) },
+                                )
+                            }
                         }
                     }
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun Header(title: String) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-        Text(
-            title,
-            Modifier.fillMaxWidth().semantics { heading() }.padding(horizontal = 16.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-        )
     }
 }
 
