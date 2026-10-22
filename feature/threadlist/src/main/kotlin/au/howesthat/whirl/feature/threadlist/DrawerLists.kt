@@ -47,6 +47,7 @@ import au.howesthat.whirl.core.ui.LocalAppStyle
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.Tabs
+import au.howesthat.whirl.core.ui.whirlTopBarColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -171,6 +172,7 @@ private fun SimpleList(
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = whirlTopBarColors(),
                 title = { ListTitle(title, state.updatedAt) },
                 navigationIcon = { NavIconButton(navIcon) },
                 actions = { RefreshButton { viewModel.refresh() } },
@@ -253,6 +255,7 @@ fun WatchedScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: WatchedViewMo
         topBar = {
             Column {
                 TopAppBar(
+                    colors = whirlTopBarColors(),
                     title = {
                         ListTitle(
                             stringResource(R.string.watched_title),

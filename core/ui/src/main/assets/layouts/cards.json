@@ -1,0 +1,16 @@
+{
+  "id": "cards",
+  "name": "Cards",
+  "credit": "design by Jkill",
+  "layout": {
+    "corner": 18,
+    "gutter": 16,
+    "lists": "cards",
+    "posts": "cards",
+    "quotes": "boxed",
+    "headings": "marker",
+    "tabs": "pills",
+    "unread": "accent",
+    "boldTitles": true
+  }
+}

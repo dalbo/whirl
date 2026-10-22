@@ -6,8 +6,13 @@ import java.time.LocalTime
 data class Settings(
     val homepage: Homepage = Homepage.FORUMS,
     val theme: ThemeMode = ThemeMode.SYSTEM,
-    /** Material You colours from the wallpaper (Android 12+); off uses Whirl's own blue scheme. */
-    val dynamicColor: Boolean = true,
+    /**
+     * Settings › Colours: a palette id (`core/ui/src/main/assets/palettes/<id>.json`) or "wallpaper" (Material You,
+     * Android 12+). Replaces v1.0's "Use wallpaper colours" (`dynamic_color`), which it is read from until first saved.
+     */
+    val palette: String = "wallpaper",
+    /** Settings › Layout: a layout id (`core/ui/src/main/assets/layouts/<id>.json`). */
+    val layout: String = "classic",
     val nightStart: LocalTime = LocalTime.of(22, 0),
     val nightEnd: LocalTime = LocalTime.of(7, 0),
     val postFontSize: PostFontSize = PostFontSize.NORMAL,
@@ -17,8 +22,6 @@ data class Settings(
     val screenAnimations: Boolean = true,
     /** Whirlpool pages (replies, private forums, "Open in browser") open in the browser app, not a Custom Tab. */
     val browserApp: Boolean = false,
-    /** The app style's id (`core/ui/src/main/assets/styles/<id>.json`); an unknown id shows Classic. */
-    val style: String = "classic",
     // Notifications
     val watchedNotify: Boolean = false,
     val notifyIntervalMinutes: Int = 60,

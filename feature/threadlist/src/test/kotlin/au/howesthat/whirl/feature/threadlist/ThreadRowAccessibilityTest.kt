@@ -42,7 +42,7 @@ class ThreadRowAccessibilityTest {
     private fun row(fontScale: Float = 1f) = compose.setContent {
         val density = LocalDensity.current
         CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
-            WhirlTheme(darkTheme = false, dynamicColor = false) {
+            WhirlTheme(darkTheme = false) {
                 ThreadRowItem(
                     item = item,
                     now = Instant.now(),

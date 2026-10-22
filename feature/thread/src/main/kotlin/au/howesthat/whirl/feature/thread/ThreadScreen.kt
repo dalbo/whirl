@@ -88,6 +88,8 @@ import au.howesthat.whirl.core.ui.menuClickable
 import au.howesthat.whirl.core.ui.readableWidth
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 import au.howesthat.whirl.core.ui.timeAgo
+import au.howesthat.whirl.core.ui.topBarSubtleColor
+import au.howesthat.whirl.core.ui.whirlTopBarColors
 import kotlinx.coroutines.launch
 import java.time.Instant
 
@@ -137,7 +139,7 @@ fun ThreadScreen(navIcon: NavIcon, nav: ThreadNav, viewModel: ThreadViewModel = 
         val start = startPage
         if (start == null) {
             Column(Modifier.padding(outer)) {
-                TopAppBar(title = { Text(title.orEmpty()) }, navigationIcon = { NavIconButton(navIcon) }, windowInsets = TopBarInsets)
+                TopAppBar(colors = whirlTopBarColors(), title = { Text(title.orEmpty()) }, navigationIcon = { NavIconButton(navIcon) }, windowInsets = TopBarInsets)
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     val failed = error
                     if (failed != null) {
@@ -183,6 +185,7 @@ private fun ThreadPager(
 
     Column(modifier) {
         TopAppBar(
+            colors = whirlTopBarColors(),
             windowInsets = TopBarInsets,
             title = {
                 Column(Modifier.clickable(role = Role.Button, onClickLabel = stringResource(au.howesthat.whirl.core.ui.R.string.go_to_page)) { picking = true }) {
@@ -200,7 +203,7 @@ private fun ThreadPager(
                         sub,
                         Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = topBarSubtleColor(),
                     )
                 }
             },

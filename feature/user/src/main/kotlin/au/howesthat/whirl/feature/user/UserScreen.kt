@@ -37,6 +37,7 @@ import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
+import au.howesthat.whirl.core.ui.whirlTopBarColors
 import au.howesthat.whirl.feature.threadlist.ListDeps
 import au.howesthat.whirl.feature.threadlist.ListState
 import au.howesthat.whirl.feature.threadlist.ListTitle
@@ -94,6 +95,7 @@ fun UserScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: UserViewModel = 
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = whirlTopBarColors(),
                 title = { ListTitle(profile?.user?.name ?: stringResource(R.string.user_title), state.updatedAt, subtitle = "#${viewModel.userId}") },
                 navigationIcon = { NavIconButton(navIcon) },
                 actions = { IconButton(onClick = { viewModel.refresh() }) { Icon(Icons.Default.Refresh, stringResource(R.string.refresh)) } },

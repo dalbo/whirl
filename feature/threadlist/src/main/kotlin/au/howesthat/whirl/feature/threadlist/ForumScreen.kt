@@ -53,6 +53,7 @@ import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.PagePickerDialog
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
+import au.howesthat.whirl.core.ui.whirlTopBarColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -190,6 +191,7 @@ fun ForumScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: ForumViewModel 
         topBar = {
             Column {
                 TopAppBar(
+                    colors = whirlTopBarColors(),
                     title = { ListTitle(title, updatedAt = null, subtitle = groupName) },
                     navigationIcon = { NavIconButton(navIcon) },
                     actions = {

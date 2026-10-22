@@ -57,6 +57,7 @@ import au.howesthat.whirl.core.ui.ErrorState
 import au.howesthat.whirl.core.ui.errorMessage
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 import au.howesthat.whirl.core.ui.timeAgo
+import au.howesthat.whirl.core.ui.topBarSubtleColor
 import java.time.Instant
 
 /** Navigation out of a thread list, implemented by the app's NavHost. */
@@ -289,7 +290,7 @@ fun ListTitle(title: String, updatedAt: Instant?, subtitle: String? = null) {
         Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
         val line = listOfNotNull(subtitle, updatedAt?.let { timeAgoUpdated(it) }).joinToString(" · ")
         if (line.isNotEmpty()) {
-            Text(line, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            Text(line, style = MaterialTheme.typography.labelSmall, color = topBarSubtleColor(), maxLines = 1)
         }
     }
 }

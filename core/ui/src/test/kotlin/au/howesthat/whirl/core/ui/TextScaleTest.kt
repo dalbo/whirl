@@ -20,7 +20,7 @@ class TextScaleTest {
         var inside = 0f
         compose.setContent {
             outside = LocalDensity.current.fontScale
-            WhirlTheme(darkTheme = false, dynamicColor = false, textScale = textScale) { inside = LocalDensity.current.fontScale }
+            WhirlTheme(darkTheme = false, textScale = textScale) { inside = LocalDensity.current.fontScale }
         }
         compose.waitForIdle()
         return outside to inside

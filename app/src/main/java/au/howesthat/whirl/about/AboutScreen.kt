@@ -25,6 +25,7 @@ import au.howesthat.whirl.R
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
+import au.howesthat.whirl.core.ui.whirlTopBarColors
 
 const val REPO_URL = "https://github.com/dalbo/whirl"
 const val ISSUES_URL = "$REPO_URL/issues"
@@ -40,7 +41,7 @@ fun AboutScreen(navIcon: NavIcon) {
     val context = LocalContext.current
     val subject = stringResource(R.string.about_concern_subject)
     Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.nav_about)) }, navigationIcon = { NavIconButton(navIcon) }) },
+        topBar = { TopAppBar(colors = whirlTopBarColors(), title = { Text(stringResource(R.string.nav_about)) }, navigationIcon = { NavIconButton(navIcon) }) },
     ) { padding ->
         Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
