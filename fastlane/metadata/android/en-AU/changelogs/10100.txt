@@ -1,0 +1,7 @@
+Whirl 1.1
+- Layout and Colours settings: Classic or Cards layout; colours from your wallpaper, Whirl blue, Whirlpool, Whirldroid or Silver & ember
+- Mark as read button at the end of a watched thread
+- "Posts by OP" filter
+- Watched refreshes once when you open the app, not after every thread
+- Screen animations can be turned off
+- Option to open Whirlpool pages in your browser app
