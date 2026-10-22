@@ -3,7 +3,7 @@
 Settings › General has two independent choices: **Layout** (how screens draw) and **Colours** (the palette). Each is one JSON file, named after its `id`; adding one is adding a file, no code changes unless a layout needs a switch that does not exist yet.
 
 - Layouts: `core/ui/src/main/assets/layouts/` — `classic` (default, must stay), `cards` (design by Jkill).
-- Palettes: `core/ui/src/main/assets/palettes/` — `whirl` (Whirl blue, must stay), `whirlpool` (the website's colours), `silver-ember` (design by Jkill). "From your wallpaper" (Material You, Android 12+) is built in, not a file, and is the default; v1.0's "Use wallpaper colours" off becomes Whirl blue.
+- Palettes: `core/ui/src/main/assets/palettes/` — `whirl` (Whirl blue, must stay), `whirlpool` (the website's colours), `whirldroid` (Whirldroid 2.14.12's colours, from its `colors.xml`, with two shades adjusted for 4.5:1), `silver-ember` (design by Jkill). "From your wallpaper" (Material You, Android 12+) is built in, not a file, and is the default; v1.0's "Use wallpaper colours" off becomes Whirl blue.
 
 ## Palette
 
