@@ -40,6 +40,7 @@ import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.UpdatedAgo
 import au.howesthat.whirl.core.ui.errorMessage
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
+import au.howesthat.whirl.core.ui.whirlTopBarColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -113,6 +114,7 @@ fun NewsScreen(navIcon: NavIcon, viewModel: NewsViewModel = hiltViewModel()) {
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = whirlTopBarColors(),
                 title = { Text(stringResource(R.string.news_title)) },
                 navigationIcon = { NavIconButton(navIcon) },
                 actions = { IconButton(onClick = { viewModel.refresh() }) { Icon(Icons.Default.Refresh, stringResource(R.string.refresh)) } },

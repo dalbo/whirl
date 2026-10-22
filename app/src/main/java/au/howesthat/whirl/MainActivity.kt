@@ -17,15 +17,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.luminance
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.ThemeMode
-import au.howesthat.whirl.core.ui.AppStyles
 import au.howesthat.whirl.core.ui.LocalBrowserApp
+import au.howesthat.whirl.core.ui.Styles
 import au.howesthat.whirl.core.ui.WhirlTheme
 import au.howesthat.whirl.core.notifications.WatchedNotifier
+import au.howesthat.whirl.core.ui.usesWallpaper
 import au.howesthat.whirl.feature.setup.SetupScreen
 import au.howesthat.whirl.navigation.WatchedRoute
 import au.howesthat.whirl.navigation.WatchSnackbars
@@ -53,14 +55,18 @@ class MainActivity : ComponentActivity() {
             val state by viewModel.state.collectAsStateWithLifecycle()
             val loaded = state ?: return@setContent
             val dark = isDark(loaded.settings)
-            // The bars follow the app's theme, not the system's (Dark in the app with a light phone kept dark icons).
-            DisposableEffect(dark) {
-                val style = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark }
-                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+            val palette = remember(loaded.settings.palette) { Styles.palette(this, loaded.settings.palette) }
+            val layout = remember(loaded.settings.layout) { Styles.layout(this, loaded.settings.layout).layout }
+            // The bars follow the app's theme, not the system's (Dark in the app with a light phone kept dark icons);
+            // the status bar sits over the top app bar, so a palette's dark top bar wants light icons.
+            val darkTopBar = palette.takeUnless { usesWallpaper(it) }?.extra("topBar", dark)?.let { it.luminance() < 0.5f } ?: dark
+            DisposableEffect(dark, darkTopBar) {
+                val status = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTopBar }
+                val navigation = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark }
+                enableEdgeToEdge(statusBarStyle = status, navigationBarStyle = navigation)
                 onDispose {}
             }
-            val style = remember(loaded.settings.style) { AppStyles.find(this, loaded.settings.style) }
-            WhirlTheme(darkTheme = dark, dynamicColor = loaded.settings.dynamicColor, textScale = loaded.settings.textScale.factor, style = style) {
+            WhirlTheme(darkTheme = dark, palette = palette, layout = layout, textScale = loaded.settings.textScale.factor) {
                 val account by viewModel.account.collectAsStateWithLifecycle()
                 val alert by viewModel.alert.collectAsStateWithLifecycle()
                 if (!loaded.setupDone) {

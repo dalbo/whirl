@@ -43,6 +43,7 @@ import au.howesthat.whirl.core.data.ScrapedListRepository
 import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
+import au.howesthat.whirl.core.ui.whirlTopBarColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -153,6 +154,7 @@ fun SearchScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: SearchViewMode
         topBar = {
             Column {
                 TopAppBar(
+                    colors = whirlTopBarColors(),
                     title = {
                         TextField(
                             value = text,

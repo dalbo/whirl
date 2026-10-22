@@ -1,6 +1,8 @@
 package au.howesthat.whirl.core.data
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import au.howesthat.whirl.core.database.FetchLogEntity
@@ -54,9 +56,8 @@ class RepositoryTest {
     private val clock = MutableClock()
     // DataStore needs a scope that actually runs; a TestScope that nobody advances would hang every read.
     private val dataStoreScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val settings by lazy {
-        SettingsRepository(PreferenceDataStoreFactory.create(scope = dataStoreScope) { tmp.newFile("s.preferences_pb").also { it.delete() } })
-    }
+    private val store by lazy { PreferenceDataStoreFactory.create(scope = dataStoreScope) { tmp.newFile("s.preferences_pb").also { it.delete() } } }
+    private val settings by lazy { SettingsRepository(store) }
     private val api by lazy {
         WhirlpoolApi(WhirlpoolHttp.client("Whirl/test"), settings::apiKey, server.url("/api/"), RetryPolicy.NONE)
     }
@@ -104,10 +105,12 @@ class RepositoryTest {
     }
 
     @Test
-    fun `wallpaper colours default on and can be turned off`() = runTest {
-        assertTrue(settings.settings.first().dynamicColor)
-        settings.update { it.copy(dynamicColor = false) }
-        assertFalse(settings.settings.first().dynamicColor)
+    fun `colours default to the wallpaper, and v1_0's wallpaper switch carries over`() = runTest {
+        assertEquals("wallpaper", settings.settings.first().palette)
+        store.edit { it[booleanPreferencesKey("dynamic_color")] = false }
+        assertEquals("whirl", settings.settings.first().palette)
+        settings.update { it.copy(palette = "whirlpool") }
+        assertEquals("whirlpool", settings.settings.first().palette)
     }
 
     @Test
@@ -122,10 +125,10 @@ class RepositoryTest {
     }
 
     @Test
-    fun `the app style defaults to Classic and is stored by id`() = runTest {
-        assertEquals("classic", settings.settings.first().style)
-        settings.update { it.copy(style = "silver-ember") }
-        assertEquals("silver-ember", settings.settings.first().style)
+    fun `the layout defaults to Classic and is stored by id`() = runTest {
+        assertEquals("classic", settings.settings.first().layout)
+        settings.update { it.copy(layout = "cards") }
+        assertEquals("cards", settings.settings.first().layout)
     }
 
     @Test

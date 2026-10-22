@@ -1,6 +1,5 @@
 package au.howesthat.whirl.feature.settings
 
-import android.os.Build
 import android.text.format.DateFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -53,11 +52,12 @@ import au.howesthat.whirl.core.data.PostFontSize
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.TextScale
 import au.howesthat.whirl.core.data.ThemeMode
-import au.howesthat.whirl.core.ui.AppStyle
-import au.howesthat.whirl.core.ui.AppStyles
 import au.howesthat.whirl.core.ui.LocalAppStyle
+import au.howesthat.whirl.core.ui.Palette
 import au.howesthat.whirl.core.ui.SectionHeading
+import au.howesthat.whirl.core.ui.Styles
 import au.howesthat.whirl.core.ui.Surfaces
+import au.howesthat.whirl.core.ui.whirlTopBarColors
 import au.howesthat.whirl.feature.setup.NotificationOptions
 import au.howesthat.whirl.feature.setup.themeLabel
 import java.time.LocalTime
@@ -68,13 +68,15 @@ import java.time.format.DateTimeFormatter
 fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val styles = remember(context) { AppStyles.all(context) }
+    val layouts = remember(context) { Styles.layouts(context) }
+    val palettes = remember(context) { Styles.palettes(context) }
     val account by viewModel.account.collectAsStateWithLifecycle()
     val update = viewModel::update
 
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = whirlTopBarColors(),
                 title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
@@ -91,13 +93,12 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, viewModel: Setti
             Group(stringResource(R.string.settings_general)) {
                 Choice(stringResource(R.string.settings_homepage), Homepage.entries, settings.homepage, { homepageLabel(it) }) { v -> update { it.copy(homepage = v) } }
                 Choice(stringResource(R.string.settings_theme), ThemeMode.entries, settings.theme, { themeLabel(it) }) { v -> update { it.copy(theme = v) } }
-                // A style with its own palette turns wallpaper colours off, or choosing it would seem to do nothing.
-                Choice(stringResource(R.string.settings_style), styles, AppStyles.find(context, settings.style), { styleLabel(it) }) { v ->
-                    update { it.copy(style = v.id, dynamicColor = it.dynamicColor && !v.ownColours) }
+                Choice(stringResource(R.string.settings_layout), layouts, Styles.layout(context, settings.layout), { styleLabel(it.name, it.credit) }) { v ->
+                    update { it.copy(layout = v.id) }
                 }
-                // Material You needs Android 12; older phones always get Whirl's own colours.
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    Toggle(stringResource(R.string.settings_dynamic_color), settings.dynamicColor) { v -> update { it.copy(dynamicColor = v) } }
+                // Wallpaper (Material You) is offered from Android 12; older phones list only the palettes.
+                Choice(stringResource(R.string.settings_palette), palettes, Styles.palette(context, settings.palette), { paletteLabel(it) }) { v ->
+                    update { it.copy(palette = v.id) }
                 }
                 if (settings.theme == ThemeMode.DARK_AT_NIGHT) {
                     TimeSetting(stringResource(R.string.settings_night_start), settings.nightStart) { v -> update { it.copy(nightStart = v) } }
@@ -143,7 +144,11 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, viewModel: Setti
 
 /** A section of settings: a heading and its rows, as one card in styles with [Surfaces.CARDS]. */
 @Composable
-private fun styleLabel(style: AppStyle): String = style.credit?.let { stringResource(R.string.settings_style_credit, style.name, it) } ?: style.name
+private fun styleLabel(name: String, credit: String?): String = credit?.let { stringResource(R.string.settings_style_credit, name, it) } ?: name
+
+@Composable
+private fun paletteLabel(palette: Palette): String =
+    if (palette.isWallpaper) stringResource(R.string.settings_palette_wallpaper) else styleLabel(palette.name, palette.credit)
 
 @Composable
 private fun Group(title: String, content: @Composable ColumnScope.() -> Unit) {

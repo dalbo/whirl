@@ -2,7 +2,6 @@
   "id": "silver-ember",
   "name": "Silver & ember",
   "credit": "design by Jkill",
-  "ownColours": true,
   "light": {
     "primary": "#A63D0B",
     "onPrimary": "#F8F0EA",
@@ -71,16 +70,5 @@
     "surfaceContainerHighest": "#343E49",
     "unread": "#2E2B29",
     "quoteRepliedUser": "#8C98D0"
-  },
-  "layout": {
-    "corner": 18,
-    "gutter": 16,
-    "lists": "cards",
-    "posts": "cards",
-    "quotes": "boxed",
-    "headings": "marker",
-    "tabs": "pills",
-    "unread": "accent",
-    "boldTitles": true
   }
 }

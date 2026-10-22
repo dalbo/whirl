@@ -48,6 +48,7 @@ import au.howesthat.whirl.core.ui.UpdatedAgo
 import au.howesthat.whirl.core.ui.errorMessage
 import au.howesthat.whirl.core.ui.menuClickable
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
+import au.howesthat.whirl.core.ui.whirlTopBarColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -124,6 +125,7 @@ fun ForumsScreen(navIcon: NavIcon, onOpenForum: (ForumRef) -> Unit, onSearch: ()
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = whirlTopBarColors(),
                 title = { Text(stringResource(R.string.forums_title)) },
                 navigationIcon = { NavIconButton(navIcon) },
                 actions = {

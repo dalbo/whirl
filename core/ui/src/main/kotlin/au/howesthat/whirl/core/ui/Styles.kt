@@ -1,6 +1,7 @@
 package au.howesthat.whirl.core.ui
 
 import android.content.Context
+import android.os.Build
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -14,43 +15,55 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * An app style (Settings → App style), read from `assets/styles/<id>.json`. Colours fill Material's colour scheme by
- * role name, plus Whirl's own roles ([EXTRA_ROLES]); roles left out keep Material's baseline. The layout switches pick
- * between the ways each screen can draw itself. Adding a style is adding a JSON file; see `docs/styles.md`.
+ * A colour palette (Settings › Colours), read from `assets/palettes/<id>.json`. Colours fill Material's colour scheme by
+ * role name, plus Whirl's own roles ([EXTRA_ROLES]); roles left out keep Material's baseline. "Wallpaper" is not a
+ * file: it is Material You's scheme from the wallpaper (Android 12+). See `docs/styles.md`.
  */
 @Serializable
-data class AppStyle(
+data class Palette(
     val id: String,
     val name: String,
-    /** Who designed it, shown under the choice in Settings. */
+    /** Who designed it, shown after the name in Settings. */
     val credit: String? = null,
-    /** The style has a full palette of its own, so choosing it turns off wallpaper colours (they can go back on). */
-    val ownColours: Boolean = false,
     val light: Map<String, String> = emptyMap(),
     val dark: Map<String, String> = emptyMap(),
-    val layout: StyleLayout = StyleLayout(),
 ) {
+    val isWallpaper: Boolean get() = id == WALLPAPER
+
     /** [light] or [dark] applied to Material's baseline scheme. */
     fun colorScheme(dark: Boolean): ColorScheme =
         (if (dark) this.dark else light).entries.fold(if (dark) darkColorScheme() else lightColorScheme()) { scheme, (role, hex) ->
             if (role in EXTRA_ROLES) scheme else scheme.withRole(role, parseColour(hex))
         }
 
-    /** One of Whirl's own roles ([EXTRA_ROLES]), or null when the style leaves it to the default. */
+    /** One of Whirl's own roles ([EXTRA_ROLES]), or null when the palette leaves it to the default. */
     fun extra(role: String, dark: Boolean): Color? = (if (dark) this.dark else light)[role]?.let(::parseColour)
 
     companion object {
-        const val CLASSIC = "classic"
-
-        /** Classic as in `classic.json`, for when the assets cannot be read. */
-        val Fallback = AppStyle(CLASSIC, "Classic", light = mapOf("primary" to "#3A5A8C"), dark = mapOf("primary" to "#A9C2EE"))
+        const val WALLPAPER = "wallpaper"
+        const val WHIRL = "whirl"
 
         /** Colour roles that are Whirl's, not Material's. */
-        val EXTRA_ROLES = setOf("unread", "quoteRepliedUser", "quoteOther")
+        val EXTRA_ROLES = setOf("unread", "quoteRepliedUser", "quoteOther", "topBar", "onTopBar")
 
-        private val json = Json { ignoreUnknownKeys = false }
+        val Wallpaper = Palette(WALLPAPER, "Wallpaper")
 
-        fun parse(text: String): AppStyle = json.decodeFromString(serializer(), text)
+        /** Whirl blue as in `whirl.json`, for when the assets cannot be read. */
+        val Fallback = Palette(WHIRL, "Whirl blue", light = mapOf("primary" to "#3A5A8C"), dark = mapOf("primary" to "#A9C2EE"))
+    }
+}
+
+/** A display layout (Settings › Layout), read from `assets/layouts/<id>.json`: how screens draw, not their colours. */
+@Serializable
+data class LayoutStyle(
+    val id: String,
+    val name: String,
+    val credit: String? = null,
+    val layout: StyleLayout = StyleLayout(),
+) {
+    companion object {
+        const val CLASSIC = "classic"
+        val Fallback = LayoutStyle(CLASSIC, "Classic")
     }
 }
 
@@ -85,14 +98,17 @@ data class StyleLayout(
 @Serializable enum class Tabs { @SerialName("underline") UNDERLINE, @SerialName("pills") PILLS }
 @Serializable enum class Unread { @SerialName("badge") BADGE, @SerialName("accent") ACCENT }
 
-/** The style in use with its colours resolved for light or dark (and wallpaper colours, when on). */
+/** The layout and palette in use, with colours resolved for light or dark. */
 @Immutable
 data class ResolvedStyle(
     val layout: StyleLayout,
-    /** Background of unread rows; null leaves them untinted. */
+    /** Background of unread rows ([Unread.ACCENT]); null leaves them untinted. */
     val unreadContainer: Color?,
     val quoteRepliedUser: Color,
     val quoteOther: Color,
+    /** Top app bars; null keeps Material's (the surface colour). */
+    val topBar: Color?,
+    val onTopBar: Color?,
 )
 
 /**
@@ -108,25 +124,45 @@ internal object QuoteColors {
 }
 
 val LocalAppStyle = staticCompositionLocalOf {
-    ResolvedStyle(StyleLayout(), null, QuoteColors.repliedUserLight, QuoteColors.otherLight)
+    ResolvedStyle(StyleLayout(), null, QuoteColors.repliedUserLight, QuoteColors.otherLight, null, null)
 }
 
-/** The bundled styles, Classic first. Read once per process. */
-object AppStyles {
-    @Volatile private var cached: List<AppStyle>? = null
+/** The bundled palettes and layouts, read once per process. */
+object Styles {
+    private val json = Json { ignoreUnknownKeys = false }
+    @Volatile private var palettes: List<Palette>? = null
+    @Volatile private var layouts: List<LayoutStyle>? = null
 
-    fun all(context: Context): List<AppStyle> = cached ?: load(context).also { cached = it }
+    fun parsePalette(text: String): Palette = json.decodeFromString(Palette.serializer(), text)
+    fun parseLayout(text: String): LayoutStyle = json.decodeFromString(LayoutStyle.serializer(), text)
 
-    fun find(context: Context, id: String): AppStyle = all(context).let { styles -> styles.firstOrNull { it.id == id } ?: styles.first() }
+    /** Wallpaper first where Android has it (12+), then Whirl blue, then the rest by name. */
+    fun palettes(context: Context): List<Palette> = palettes ?: run {
+        val files = load(context, "palettes", ::parsePalette)
+        val whirl = files.firstOrNull { it.id == Palette.WHIRL } ?: Palette.Fallback
+        val wallpaper = listOf(Palette.Wallpaper).filter { Build.VERSION.SDK_INT >= Build.VERSION_CODES.S }
+        (wallpaper + whirl + files.filter { it.id != Palette.WHIRL }.sortedBy { it.name }).also { palettes = it }
+    }
 
-    private fun load(context: Context): List<AppStyle> {
+    /** Classic first, then the rest by name. */
+    fun layouts(context: Context): List<LayoutStyle> = layouts ?: run {
+        val files = load(context, "layouts", ::parseLayout)
+        val classic = files.firstOrNull { it.id == LayoutStyle.CLASSIC } ?: LayoutStyle.Fallback
+        (listOf(classic) + files.filter { it.id != LayoutStyle.CLASSIC }.sortedBy { it.name }).also { layouts = it }
+    }
+
+    /** The palette with [id]; an unknown id (or Wallpaper before Android 12) gives Whirl blue. */
+    fun palette(context: Context, id: String): Palette =
+        palettes(context).let { all -> all.firstOrNull { it.id == id } ?: all.first { it.id == Palette.WHIRL } }
+
+    fun layout(context: Context, id: String): LayoutStyle = layouts(context).let { all -> all.firstOrNull { it.id == id } ?: all.first() }
+
+    private fun <T> load(context: Context, folder: String, parse: (String) -> T): List<T> {
         val assets = context.assets
-        val styles = assets.list("styles").orEmpty().filter { it.endsWith(".json") }.mapNotNull { file ->
+        return assets.list(folder).orEmpty().filter { it.endsWith(".json") }.mapNotNull { file ->
             // A broken file must not stop the app: it is left out (the unit tests parse every bundled file).
-            runCatching { AppStyle.parse(assets.open("styles/$file").bufferedReader().use { it.readText() }) }.getOrNull()
+            runCatching { parse(assets.open("$folder/$file").bufferedReader().use { it.readText() }) }.getOrNull()
         }
-        val classic = styles.firstOrNull { it.id == AppStyle.CLASSIC } ?: AppStyle.Fallback
-        return listOf(classic) + styles.filter { it.id != AppStyle.CLASSIC }.sortedBy { it.name }
     }
 }
 
