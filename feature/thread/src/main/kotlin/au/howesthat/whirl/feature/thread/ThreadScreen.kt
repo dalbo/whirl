@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
@@ -22,10 +25,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -275,6 +280,9 @@ private fun PostList(
     viewModel: ThreadViewModel,
 ) {
     val browser = rememberOpenInBrowser()
+    val isWatched by viewModel.isWatched.collectAsStateWithLifecycle()
+    val pageCount by viewModel.pageCount.collectAsStateWithLifecycle()
+    val filter by viewModel.filter.collectAsStateWithLifecycle()
     val now = Instant.now()
     LazyColumn(Modifier.fillMaxSize(), state = list) {
         item(key = "updated") {
@@ -337,6 +345,19 @@ private fun PostList(
                     onOpenInBrowser = { browser(viewModel.postUrl(post.post, page)) },
                 )
                 HorizontalDivider()
+            }
+        }
+        // As on Whirlpool and in Whirldroid: mark a watched thread read at the end of its last page, for those who
+        // leave auto mark as read off so a half-read thread stays unread.
+        if (isWatched && page == pageCount && filter == PostFilter.All) {
+            item(key = "mark_read") {
+                Box(Modifier.readableWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                    FilledTonalButton(onClick = { viewModel.perform(WatchAction.MARK_READ) }) {
+                        Icon(Icons.Default.Check, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                        Text(stringResource(R.string.mark_read))
+                    }
+                }
             }
         }
     }
