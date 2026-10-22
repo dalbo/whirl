@@ -88,6 +88,8 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, viewModel: Setti
             }
             Choice(stringResource(R.string.settings_text_scale), TextScale.entries, settings.textScale, { scaleLabel(it) }) { v -> update { it.copy(textScale = v) } }
             Choice(stringResource(R.string.settings_font_size), PostFontSize.entries, settings.postFontSize, { fontLabel(it) }) { v -> update { it.copy(postFontSize = v) } }
+            Toggle(stringResource(R.string.settings_screen_animations), settings.screenAnimations) { v -> update { it.copy(screenAnimations = v) } }
+            Toggle(stringResource(R.string.settings_browser_app), settings.browserApp) { v -> update { it.copy(browserApp = v) } }
 
             Section(stringResource(R.string.settings_notifications))
             Column(Modifier.padding(horizontal = 16.dp)) {

@@ -9,6 +9,8 @@
     <string name="settings_homepage">Start screen</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_dynamic_color">Use wallpaper colours</string>
+    <string name="settings_screen_animations">Screen animations</string>
+    <string name="settings_browser_app">Open Whirlpool pages in the browser app</string>
     <string name="settings_night_start">Night starts</string>
     <string name="settings_night_end">Night ends</string>
     <string name="settings_text_scale">Text size</string>

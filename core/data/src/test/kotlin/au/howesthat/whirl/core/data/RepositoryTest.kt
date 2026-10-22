@@ -111,6 +111,17 @@ class RepositoryTest {
     }
 
     @Test
+    fun `screen animations default on, the browser app off`() = runTest {
+        val d = settings.settings.first()
+        assertTrue(d.screenAnimations)
+        assertFalse(d.browserApp)
+        settings.update { it.copy(screenAnimations = false, browserApp = true) }
+        val s = settings.settings.first()
+        assertFalse(s.screenAnimations)
+        assertTrue(s.browserApp)
+    }
+
+    @Test
     fun `text sizes default to Whirldroid's 17 sp posts and the system size elsewhere`() = runTest {
         val d = settings.settings.first()
         assertEquals(17f, d.postFontSize.sp)
