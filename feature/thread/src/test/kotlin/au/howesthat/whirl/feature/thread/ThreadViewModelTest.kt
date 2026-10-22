@@ -11,6 +11,7 @@ import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.database.WhirlDatabase
 import au.howesthat.whirl.core.model.ForumRef
+import au.howesthat.whirl.core.model.PostFilter
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.network.RetryPolicy
 import au.howesthat.whirl.core.network.WhirlpoolApi
@@ -190,5 +191,20 @@ class ThreadViewModelTest {
             fromWatched.perform(WatchAction.MARK_READ)
             assertEquals(ThreadEvent.Back, awaitItem())
         }
+    }
+
+    @Test
+    fun `posts by OP reads the thread starter from page 1`() = runTest {
+        enqueueHtml("thread_97r5wzn3_last.html")
+        val vm = viewModel("threadId" to "97r5wzn3", "page" to -1)
+        await { vm.startPage.filterNotNull().first() }
+        server.takeRequest()
+        enqueueHtml("thread_97r5wzn3_p1.html")
+        enqueueHtml("thread_97r5wzn3_p1.html")
+        vm.showOpPosts()
+        val op = await { vm.opUserId.filterNotNull().first() }
+        assertEquals(PostFilter.ByUser(op), await { vm.filter.first { it != PostFilter.All } })
+        assertEquals("/thread/97r5wzn3", server.takeRequest().target)
+        assertEquals(op, repo.page(ThreadId("97r5wzn3"), 1).first()!!.value.posts.first().author.id)
     }
 }

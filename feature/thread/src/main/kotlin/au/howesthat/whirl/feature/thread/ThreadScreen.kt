@@ -162,6 +162,7 @@ private fun ThreadPager(
 ) {
     val pager = rememberPagerState(initialPage = (start - 1).coerceAtLeast(0)) { pageCount }
     val jumpTo by viewModel.jumpTo.collectAsStateWithLifecycle()
+    val opUserId by viewModel.opUserId.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val browser = rememberOpenInBrowser()
     var picking by remember { mutableStateOf(false) }
@@ -182,7 +183,11 @@ private fun ThreadPager(
                     Text(title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     val sub = listOfNotNull(
                         stringResource(au.howesthat.whirl.core.ui.R.string.page_of, pager.currentPage + 1, pageCount),
-                        filterLabel(filter).takeIf { filter != PostFilter.All },
+                        when (filter) {
+                            PostFilter.All -> null
+                            PostFilter.ByUser(opUserId ?: -1) -> stringResource(R.string.filter_op)
+                            else -> filterLabel(filter)
+                        },
                     ).joinToString(" · ")
                     // Announced when a swipe changes the page.
                     Text(
@@ -201,7 +206,9 @@ private fun ThreadPager(
                     onWatchAction = viewModel::perform,
                     filter = filter,
                     myUserId = viewModel.myUserId.collectAsStateWithLifecycle().value,
+                    opUserId = opUserId,
                     onFilter = viewModel::setFilter,
+                    onOpPosts = viewModel::showOpPosts,
                     onFirst = { scope.launch { pager.scrollToPage(0) } },
                     onLast = viewModel::lastPage,
                     onGoTo = { picking = true },
@@ -468,7 +475,9 @@ private fun ThreadMenu(
     onWatchAction: (WatchAction) -> Unit,
     filter: PostFilter,
     myUserId: Long?,
+    opUserId: Long?,
     onFilter: (PostFilter) -> Unit,
+    onOpPosts: () -> Unit,
     onFirst: () -> Unit,
     onLast: () -> Unit,
     onGoTo: () -> Unit,
@@ -489,23 +498,22 @@ private fun ThreadMenu(
         DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.last_page)) }, onClick = { open = false; onLast() })
         DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.go_to_page)) }, onClick = { open = false; onGoTo() })
         HorizontalDivider()
-        val filters = listOfNotNull(
-            PostFilter.All,
-            myUserId?.let { PostFilter.ByUser(it) },
-            PostFilter.Moderators,
-            PostFilter.Reps,
+        @Composable
+        fun FilterItem(label: String, checked: Boolean, onClick: () -> Unit) = DropdownMenuItem(
+            text = { Text(label) },
+            leadingIcon = if (checked) {
+                { Icon(Icons.Default.Check, contentDescription = null) }
+            } else {
+                null
+            },
+            onClick = { open = false; onClick() },
         )
-        filters.forEach { f ->
-            DropdownMenuItem(
-                text = { Text(if (f is PostFilter.ByUser) stringResource(R.string.filter_mine) else filterLabel(f)) },
-                leadingIcon = if (f == filter) {
-                    { Icon(Icons.Default.Check, contentDescription = null) }
-                } else {
-                    null
-                },
-                onClick = { open = false; onFilter(f) },
-            )
-        }
+        FilterItem(filterLabel(PostFilter.All), filter == PostFilter.All) { onFilter(PostFilter.All) }
+        myUserId?.let { me -> FilterItem(stringResource(R.string.filter_mine), filter == PostFilter.ByUser(me)) { onFilter(PostFilter.ByUser(me)) } }
+        // The thread starter's id is known only once page 1 has been read, so this item finds it first.
+        FilterItem(stringResource(R.string.filter_op), opUserId != null && filter == PostFilter.ByUser(opUserId), onOpPosts)
+        FilterItem(filterLabel(PostFilter.Moderators), filter == PostFilter.Moderators) { onFilter(PostFilter.Moderators) }
+        FilterItem(filterLabel(PostFilter.Reps), filter == PostFilter.Reps) { onFilter(PostFilter.Reps) }
         HorizontalDivider()
         DropdownMenuItem(text = { Text(stringResource(R.string.reply_to_thread)) }, onClick = { open = false; onReply() })
         DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser)) }, onClick = { open = false; onOpenInBrowser() })

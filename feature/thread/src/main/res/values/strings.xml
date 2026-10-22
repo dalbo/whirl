@@ -26,6 +26,7 @@
     <string name="reply_to_thread">Reply in browser</string>
     <string name="filter_all">All posts</string>
     <string name="filter_mine">Posts by me</string>
+    <string name="filter_op">Posts by OP</string>
     <string name="filter_mods">Posts by moderators</string>
     <string name="filter_reps">Posts by reps</string>
     <string name="filter_user">One user\'s posts</string>
