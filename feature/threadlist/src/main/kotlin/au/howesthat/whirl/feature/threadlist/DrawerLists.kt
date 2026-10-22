@@ -21,6 +21,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import au.howesthat.whirl.core.data.AppVisits
 import au.howesthat.whirl.core.data.Cached
 import au.howesthat.whirl.core.data.LatestThreadsRepository
 import au.howesthat.whirl.core.data.OpenedFrom
@@ -184,7 +185,7 @@ internal fun RefreshButton(onClick: () -> Unit) {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class WatchedViewModel @Inject constructor(deps: ListDeps, private val repo: WatchedRepository) :
+class WatchedViewModel @Inject constructor(deps: ListDeps, private val repo: WatchedRepository, private val visits: AppVisits) :
     ListViewModel(deps, OpenedFrom.WATCHED) {
 
     private val _unreadOnly = MutableStateFlow(true)
@@ -198,11 +199,18 @@ class WatchedViewModel @Inject constructor(deps: ListDeps, private val repo: Wat
         .map { cached -> cached.value.count { it.unreadCount > 0 } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
+    private var refreshedVisit: Int? = null
+
     /**
-     * Watched is checked every time it comes on screen: opening the app, returning to it, or coming back from a
-     * thread. One API call, at most every 10 s (the manual refresh throttle); the list shows from the cache meanwhile.
+     * Watched is checked the first time it comes on screen in each visit to the app (opening it or returning to it
+     * from the background), in the background while the cached list shows. Coming back from a thread uses the cache
+     * unless it is older than the usual 10 minutes: a refresh after every thread was slow on older phones.
      */
-    fun onShown() = refresh(force = true)
+    fun onShown() {
+        val visit = visits.current
+        refresh(force = visit != refreshedVisit)
+        refreshedVisit = visit
+    }
 
     fun showUnreadOnly(unread: Boolean) {
         _unreadOnly.value = unread
