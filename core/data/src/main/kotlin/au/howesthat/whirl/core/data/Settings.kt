@@ -13,6 +13,10 @@ data class Settings(
     val postFontSize: PostFontSize = PostFontSize.NORMAL,
     /** Scales all text in the app on top of Android's font size. */
     val textScale: TextScale = TextScale.DEFAULT,
+    /** Slide and fade between screens; off switches screens at once. */
+    val screenAnimations: Boolean = true,
+    /** Whirlpool pages (replies, private forums, "Open in browser") open in the browser app, not a Custom Tab. */
+    val browserApp: Boolean = false,
     // Notifications
     val watchedNotify: Boolean = false,
     val notifyIntervalMinutes: Int = 60,

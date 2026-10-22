@@ -41,6 +41,8 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
         val nightEnd = stringPreferencesKey("night_end")
         val postFontSize = stringPreferencesKey("post_font_size")
         val textScale = stringPreferencesKey("text_scale")
+        val screenAnimations = booleanPreferencesKey("screen_animations")
+        val browserApp = booleanPreferencesKey("browser_app")
         val watchedNotify = booleanPreferencesKey("watched_notify")
         val notifyInterval = intPreferencesKey("notify_interval")
         val openThreadsInBrowser = booleanPreferencesKey("open_threads_in_browser")
@@ -61,6 +63,8 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
             homepage = p[Keys.homepage].toEnum(d.homepage),
             theme = p[Keys.theme].toEnum(d.theme),
             dynamicColor = p[Keys.dynamicColor] ?: d.dynamicColor,
+            screenAnimations = p[Keys.screenAnimations] ?: d.screenAnimations,
+            browserApp = p[Keys.browserApp] ?: d.browserApp,
             nightStart = p[Keys.nightStart]?.let(LocalTime::parse) ?: d.nightStart,
             nightEnd = p[Keys.nightEnd]?.let(LocalTime::parse) ?: d.nightEnd,
             postFontSize = p[Keys.postFontSize].toEnum(d.postFontSize),
@@ -119,6 +123,8 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
             p[Keys.homepage] = s.homepage.name
             p[Keys.theme] = s.theme.name
             p[Keys.dynamicColor] = s.dynamicColor
+            p[Keys.screenAnimations] = s.screenAnimations
+            p[Keys.browserApp] = s.browserApp
             p[Keys.nightStart] = s.nightStart.toString()
             p[Keys.nightEnd] = s.nightEnd.toString()
             p[Keys.postFontSize] = s.postFontSize.name

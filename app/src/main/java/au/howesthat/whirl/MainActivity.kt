@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,6 +22,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.ThemeMode
+import au.howesthat.whirl.core.ui.LocalBrowserApp
 import au.howesthat.whirl.core.ui.WhirlTheme
 import au.howesthat.whirl.core.notifications.WatchedNotifier
 import au.howesthat.whirl.feature.setup.SetupScreen
@@ -66,8 +68,17 @@ class MainActivity : ComponentActivity() {
                     // Fixed while this tree lives: a changed homepage setting must not re-route an open NavHost.
                     val startRoute = remember { loaded.settings.homepage.route() }
                     val link by viewModel.link.collectAsStateWithLifecycle()
-                    WhirlApp(startRoute = startRoute, account = account, alert = alert, link = link, onLinkHandled = viewModel::linkHandled) { host ->
-                        WatchSnackbars(host, viewModel.watchEvents, viewModel::undo, viewModel::commit)
+                    CompositionLocalProvider(LocalBrowserApp provides loaded.settings.browserApp) {
+                        WhirlApp(
+                            startRoute = startRoute,
+                            account = account,
+                            alert = alert,
+                            link = link,
+                            onLinkHandled = viewModel::linkHandled,
+                            animations = loaded.settings.screenAnimations,
+                        ) { host ->
+                            WatchSnackbars(host, viewModel.watchEvents, viewModel::undo, viewModel::commit)
+                        }
                     }
                 }
             }

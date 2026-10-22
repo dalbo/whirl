@@ -1,5 +1,7 @@
 package au.howesthat.whirl.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -19,6 +21,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -57,6 +60,8 @@ fun WhirlApp(
     account: Account?,
     alert: String,
     link: Any? = null,
+    /** The "Screen animations" setting: off switches screens without Navigation's cross-fade. */
+    animations: Boolean = true,
     onLinkHandled: () -> Unit = {},
     /** App-wide snackbars (watch actions), shown above every screen. */
     snackbars: @Composable (SnackbarHostState) -> Unit = {},
@@ -116,7 +121,7 @@ fun WhirlApp(
                 )
             },
         ) {
-            NavHost(nav, startDestination = startRoute) {
+            val graph: NavGraphBuilder.() -> Unit = {
                 composable<NewsRoute> { NewsScreen(drawerIcon) }
                 composable<RecentRoute> { RecentScreen(drawerIcon, listNav) }
                 composable<LatestRoute> { LatestScreen(drawerIcon, listNav) }
@@ -135,6 +140,19 @@ fun WhirlApp(
                     )
                 }
                 composable<AboutRoute> { AboutScreen(backIcon) }
+            }
+            if (animations) {
+                NavHost(nav, startDestination = startRoute, builder = graph)
+            } else {
+                NavHost(
+                    nav,
+                    startDestination = startRoute,
+                    enterTransition = { EnterTransition.None },
+                    exitTransition = { ExitTransition.None },
+                    popEnterTransition = { EnterTransition.None },
+                    popExitTransition = { ExitTransition.None },
+                    builder = graph,
+                )
             }
         }
         SnackbarHost(snackbarHost, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
