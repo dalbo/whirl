@@ -2,6 +2,16 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.1.0
+Tester feedback from the Whirlpool thread, and a choice of looks.
+- Settings › Layout and Colours: the Classic layout or Cards (rounded cards, boxed quotes, tinted unread rows; design by Jkill), with colours from your wallpaper (the default), Whirl blue, Whirlpool (the website's indigo and greys), Whirldroid, or Silver & ember (design by Jkill). These replace "Use wallpaper colours"; if you had it off, you get Whirl blue.
+- A "Mark as read" button at the end of the last page of a watched thread, for when auto mark as read is off.
+- "Posts by OP" in the post filter, for catching up on long threads.
+- Watched refreshes once each time you open the app or come back to it, no longer after every thread (slow on older phones and connections).
+- "Screen animations" setting: turn off the fade between screens.
+- "Open Whirlpool pages in the browser app": replies, private forums and "Open in browser" open in your browser instead of a tab inside Whirl.
+- Layouts and colours are JSON files in the app (`docs/styles.md`), each checked for 4.5:1 text contrast in light and dark.
+
 ## v1.0.1
 - Report a post to Whirlpool's moderators from its long-press menu (opens Whirlpool's report form in your browser), and report a concern to the developer from About. Whirl's child safety standards are published at https://dalbo.github.io/whirl/child-safety/.
 
