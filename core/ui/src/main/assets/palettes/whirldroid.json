@@ -29,7 +29,6 @@
     "surfaceContainer": "#F2F2F2",
     "surfaceContainerHigh": "#F6F1EB",
     "surfaceContainerHighest": "#E3E3E3",
-    "unread": "#D4ED8E",
     "quoteRepliedUser": "#4455AA",
     "topBar": "#3A437B",
     "onTopBar": "#FFFFFF"
@@ -62,7 +61,6 @@
     "surfaceContainer": "#1B1E23",
     "surfaceContainerHigh": "#333840",
     "surfaceContainerHighest": "#3B414A",
-    "unread": "#2C325E",
     "quoteRepliedUser": "#8C98D0",
     "topBar": "#3A437B",
     "onTopBar": "#FFFFFF"
