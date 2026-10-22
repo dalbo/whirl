@@ -15,6 +15,7 @@ Read in this order: this file → `PLAN.md` → `fixtures/README.md` → `tools/
 | `fastlane/metadata/android/en-AU/`, `en-US/` | Store listing (en-AU for Play, an identical en-US copy for F-Droid; CI diffs them): text, icon, feature graphic, screenshots, per-versionCode changelogs | yes |
 | `tools/store-graphics/` | `make_icon.py` (the icon's single source: launcher, themed, status bar, listing images) and the render script | yes |
 | `app/version.properties` | The app's version; bumped in each release PR, checked against the tag, read by F-Droid | yes |
+| `docs/styles.md`, `core/ui/src/main/assets/styles/` | App styles (Settings › App style): one JSON file per style (colours by Material role, layout switches); `AppStyleTest` checks every file and its contrast | yes |
 | `docs/fdroid/`, `docs/community.md` | fdroiddata metadata and Dallin's merge-request steps; drafts of the Whirlpool posts | yes |
 | `reference/legacy-whirldroid/` | Whirldroid 1.8.12 source from Bitbucket (Java, 2016). Behavioural reference only, unknown licence. | no (git-ignored) |
 | `reference/whirldroid-2.14.12-decompiled/` | jadx output of the last Play Store build (versionCode 92), app package and resources only. The authoritative spec for features; see PLAN.md §1. | no (git-ignored) |

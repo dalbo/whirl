@@ -2,13 +2,17 @@ package au.howesthat.whirl.feature.settings
 
 import android.os.Build
 import android.text.format.DateFormat
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -33,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
@@ -48,6 +53,11 @@ import au.howesthat.whirl.core.data.PostFontSize
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.TextScale
 import au.howesthat.whirl.core.data.ThemeMode
+import au.howesthat.whirl.core.ui.AppStyle
+import au.howesthat.whirl.core.ui.AppStyles
+import au.howesthat.whirl.core.ui.LocalAppStyle
+import au.howesthat.whirl.core.ui.SectionHeading
+import au.howesthat.whirl.core.ui.Surfaces
 import au.howesthat.whirl.feature.setup.NotificationOptions
 import au.howesthat.whirl.feature.setup.themeLabel
 import java.time.LocalTime
@@ -57,6 +67,8 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val styles = remember(context) { AppStyles.all(context) }
     val account by viewModel.account.collectAsStateWithLifecycle()
     val update = viewModel::update
 
@@ -71,52 +83,83 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, viewModel: Setti
         },
     ) { padding ->
         Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {
-            Section(stringResource(R.string.settings_account))
-            account?.let { SettingRow(stringResource(R.string.settings_logged_in_as, it.userName, it.userId)) }
-            SettingRow(stringResource(R.string.settings_sign_out), stringResource(R.string.settings_sign_out_summary)) { viewModel.signOut(onSignedOut) }
-
-            Section(stringResource(R.string.settings_general))
-            Choice(stringResource(R.string.settings_homepage), Homepage.entries, settings.homepage, { homepageLabel(it) }) { v -> update { it.copy(homepage = v) } }
-            Choice(stringResource(R.string.settings_theme), ThemeMode.entries, settings.theme, { themeLabel(it) }) { v -> update { it.copy(theme = v) } }
-            // Material You needs Android 12; older phones always get Whirl's own colours.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                Toggle(stringResource(R.string.settings_dynamic_color), settings.dynamicColor) { v -> update { it.copy(dynamicColor = v) } }
-            }
-            if (settings.theme == ThemeMode.DARK_AT_NIGHT) {
-                TimeSetting(stringResource(R.string.settings_night_start), settings.nightStart) { v -> update { it.copy(nightStart = v) } }
-                TimeSetting(stringResource(R.string.settings_night_end), settings.nightEnd) { v -> update { it.copy(nightEnd = v) } }
-            }
-            Choice(stringResource(R.string.settings_text_scale), TextScale.entries, settings.textScale, { scaleLabel(it) }) { v -> update { it.copy(textScale = v) } }
-            Choice(stringResource(R.string.settings_font_size), PostFontSize.entries, settings.postFontSize, { fontLabel(it) }) { v -> update { it.copy(postFontSize = v) } }
-            Toggle(stringResource(R.string.settings_screen_animations), settings.screenAnimations) { v -> update { it.copy(screenAnimations = v) } }
-            Toggle(stringResource(R.string.settings_browser_app), settings.browserApp) { v -> update { it.copy(browserApp = v) } }
-
-            Section(stringResource(R.string.settings_notifications))
-            Column(Modifier.padding(horizontal = 16.dp)) {
-                NotificationOptions(
-                    settings,
-                    onWatchedNotify = { v -> update { it.copy(watchedNotify = v) } },
-                    onInterval = { v -> update { it.copy(notifyIntervalMinutes = v) } },
-                )
+            Group(stringResource(R.string.settings_account)) {
+                account?.let { SettingRow(stringResource(R.string.settings_logged_in_as, it.userName, it.userId)) }
+                SettingRow(stringResource(R.string.settings_sign_out), stringResource(R.string.settings_sign_out_summary)) { viewModel.signOut(onSignedOut) }
             }
 
-            Section(stringResource(R.string.settings_threads))
-            Toggle(stringResource(R.string.settings_open_in_browser), settings.openThreadsInBrowser) { v -> update { it.copy(openThreadsInBrowser = v) } }
-            Toggle(stringResource(R.string.settings_public_at_bottom), settings.loadPublicAtBottom) { v -> update { it.copy(loadPublicAtBottom = v) } }
-            Toggle(stringResource(R.string.settings_private_at_bottom), settings.loadPrivateAtBottom) { v -> update { it.copy(loadPrivateAtBottom = v) } }
+            Group(stringResource(R.string.settings_general)) {
+                Choice(stringResource(R.string.settings_homepage), Homepage.entries, settings.homepage, { homepageLabel(it) }) { v -> update { it.copy(homepage = v) } }
+                Choice(stringResource(R.string.settings_theme), ThemeMode.entries, settings.theme, { themeLabel(it) }) { v -> update { it.copy(theme = v) } }
+                // A style with its own palette turns wallpaper colours off, or choosing it would seem to do nothing.
+                Choice(stringResource(R.string.settings_style), styles, AppStyles.find(context, settings.style), { styleLabel(it) }) { v ->
+                    update { it.copy(style = v.id, dynamicColor = it.dynamicColor && !v.ownColours) }
+                }
+                // Material You needs Android 12; older phones always get Whirl's own colours.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    Toggle(stringResource(R.string.settings_dynamic_color), settings.dynamicColor) { v -> update { it.copy(dynamicColor = v) } }
+                }
+                if (settings.theme == ThemeMode.DARK_AT_NIGHT) {
+                    TimeSetting(stringResource(R.string.settings_night_start), settings.nightStart) { v -> update { it.copy(nightStart = v) } }
+                    TimeSetting(stringResource(R.string.settings_night_end), settings.nightEnd) { v -> update { it.copy(nightEnd = v) } }
+                }
+                Choice(stringResource(R.string.settings_text_scale), TextScale.entries, settings.textScale, { scaleLabel(it) }) { v -> update { it.copy(textScale = v) } }
+                Choice(stringResource(R.string.settings_font_size), PostFontSize.entries, settings.postFontSize, { fontLabel(it) }) { v -> update { it.copy(postFontSize = v) } }
+                Toggle(stringResource(R.string.settings_screen_animations), settings.screenAnimations) { v -> update { it.copy(screenAnimations = v) } }
+                Toggle(stringResource(R.string.settings_browser_app), settings.browserApp) { v -> update { it.copy(browserApp = v) } }
+            }
 
-            Section(stringResource(R.string.settings_recent))
-            Choice(stringResource(R.string.settings_recent_days), Settings.RECENT_DAYS, settings.recentHistoryDays, { daysLabel(it) }) { v -> update { it.copy(recentHistoryDays = v) } }
-            Toggle(stringResource(R.string.settings_recent_at_top), settings.loadRecentAtTop) { v -> update { it.copy(loadRecentAtTop = v) } }
-            Toggle(stringResource(R.string.settings_ignore_own_recent), settings.ignoreOwnRepliesRecent) { v -> update { it.copy(ignoreOwnRepliesRecent = v) } }
+            Group(stringResource(R.string.settings_notifications)) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    NotificationOptions(
+                        settings,
+                        onWatchedNotify = { v -> update { it.copy(watchedNotify = v) } },
+                        onInterval = { v -> update { it.copy(notifyIntervalMinutes = v) } },
+                    )
+                }
+            }
 
-            Section(stringResource(R.string.settings_watched))
-            Toggle(stringResource(R.string.settings_watched_at_top), settings.loadWatchedAtTop) { v -> update { it.copy(loadWatchedAtTop = v) } }
-            Toggle(stringResource(R.string.settings_ignore_own_watched), settings.ignoreOwnRepliesWatched) { v -> update { it.copy(ignoreOwnRepliesWatched = v) } }
-            Toggle(stringResource(R.string.settings_auto_mark_read), settings.watchedAutoMarkAsRead) { v -> update { it.copy(watchedAutoMarkAsRead = v) } }
-            Toggle(stringResource(R.string.settings_back_to_list), settings.watchedBackToList) { v -> update { it.copy(watchedBackToList = v) } }
+            Group(stringResource(R.string.settings_threads)) {
+                Toggle(stringResource(R.string.settings_open_in_browser), settings.openThreadsInBrowser) { v -> update { it.copy(openThreadsInBrowser = v) } }
+                Toggle(stringResource(R.string.settings_public_at_bottom), settings.loadPublicAtBottom) { v -> update { it.copy(loadPublicAtBottom = v) } }
+                Toggle(stringResource(R.string.settings_private_at_bottom), settings.loadPrivateAtBottom) { v -> update { it.copy(loadPrivateAtBottom = v) } }
+            }
+
+            Group(stringResource(R.string.settings_recent)) {
+                Choice(stringResource(R.string.settings_recent_days), Settings.RECENT_DAYS, settings.recentHistoryDays, { daysLabel(it) }) { v -> update { it.copy(recentHistoryDays = v) } }
+                Toggle(stringResource(R.string.settings_recent_at_top), settings.loadRecentAtTop) { v -> update { it.copy(loadRecentAtTop = v) } }
+                Toggle(stringResource(R.string.settings_ignore_own_recent), settings.ignoreOwnRepliesRecent) { v -> update { it.copy(ignoreOwnRepliesRecent = v) } }
+            }
+
+            Group(stringResource(R.string.settings_watched)) {
+                Toggle(stringResource(R.string.settings_watched_at_top), settings.loadWatchedAtTop) { v -> update { it.copy(loadWatchedAtTop = v) } }
+                Toggle(stringResource(R.string.settings_ignore_own_watched), settings.ignoreOwnRepliesWatched) { v -> update { it.copy(ignoreOwnRepliesWatched = v) } }
+                Toggle(stringResource(R.string.settings_auto_mark_read), settings.watchedAutoMarkAsRead) { v -> update { it.copy(watchedAutoMarkAsRead = v) } }
+                Toggle(stringResource(R.string.settings_back_to_list), settings.watchedBackToList) { v -> update { it.copy(watchedBackToList = v) } }
+            }
         }
     }
+}
+
+/** A section of settings: a heading and its rows, as one card in styles with [Surfaces.CARDS]. */
+@Composable
+private fun styleLabel(style: AppStyle): String = style.credit?.let { stringResource(R.string.settings_style_credit, style.name, it) } ?: style.name
+
+@Composable
+private fun Group(title: String, content: @Composable ColumnScope.() -> Unit) {
+    val layout = LocalAppStyle.current.layout
+    if (layout.lists != Surfaces.CARDS) {
+        Section(title)
+        Column(content = content)
+        return
+    }
+    val shape = RoundedCornerShape(layout.cornerDp)
+    SectionHeading(title)
+    Column(
+        Modifier.padding(horizontal = layout.gutterDp).padding(bottom = 12.dp).clip(shape)
+            .background(MaterialTheme.colorScheme.surface).border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),
+        content = content,
+    )
 }
 
 @Composable

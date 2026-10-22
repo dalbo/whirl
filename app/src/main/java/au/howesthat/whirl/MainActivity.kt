@@ -22,6 +22,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.ThemeMode
+import au.howesthat.whirl.core.ui.AppStyles
 import au.howesthat.whirl.core.ui.LocalBrowserApp
 import au.howesthat.whirl.core.ui.WhirlTheme
 import au.howesthat.whirl.core.notifications.WatchedNotifier
@@ -58,7 +59,8 @@ class MainActivity : ComponentActivity() {
                 enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
                 onDispose {}
             }
-            WhirlTheme(darkTheme = dark, dynamicColor = loaded.settings.dynamicColor, textScale = loaded.settings.textScale.factor) {
+            val style = remember(loaded.settings.style) { AppStyles.find(this, loaded.settings.style) }
+            WhirlTheme(darkTheme = dark, dynamicColor = loaded.settings.dynamicColor, textScale = loaded.settings.textScale.factor, style = style) {
                 val account by viewModel.account.collectAsStateWithLifecycle()
                 val alert by viewModel.alert.collectAsStateWithLifecycle()
                 if (!loaded.setupDone) {

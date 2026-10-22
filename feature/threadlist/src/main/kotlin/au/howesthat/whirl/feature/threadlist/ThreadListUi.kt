@@ -1,7 +1,6 @@
 package au.howesthat.whirl.feature.threadlist
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,10 +8,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -27,16 +26,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.howesthat.whirl.core.data.OpenThread
@@ -45,7 +46,12 @@ import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.RowKind
 import au.howesthat.whirl.core.ui.ActionsMenu
 import au.howesthat.whirl.core.ui.EmptyState
+import au.howesthat.whirl.core.ui.LocalAppStyle
 import au.howesthat.whirl.core.ui.MenuAction
+import au.howesthat.whirl.core.ui.RowPosition
+import au.howesthat.whirl.core.ui.SectionHeading
+import au.howesthat.whirl.core.ui.SectionRow
+import au.howesthat.whirl.core.ui.Unread
 import au.howesthat.whirl.core.ui.menuClickable
 import au.howesthat.whirl.core.ui.ErrorState
 import au.howesthat.whirl.core.ui.errorMessage
@@ -133,37 +139,26 @@ fun ThreadListBody(
                 }
                 sections.orEmpty().forEachIndexed { index, section ->
                     section.forum?.let { forum ->
-                        item(key = "section-$index") { SectionHeader(forum, onClick = { nav.openForum(forum) }) }
+                        item(key = "section-$index") { SectionHeading(forum.title, onClick = { nav.openForum(forum) }) }
                     }
-                    items(section.items, key = { "$index-${it.id.value}" }) { item ->
-                        ThreadRowItem(
-                            item = item,
-                            now = now,
-                            onOpen = { launch(viewModel.open(item)) },
-                            onLastPost = { launch(viewModel.lastPost(item)) },
-                            onOpenInBrowser = { browser(viewModel.browserUrl(item)) },
-                            onOpenForum = item.forum?.takeIf { showForum }?.let { forum -> { nav.openForum(forum.copy(groupId = null)) } },
-                            watchActions = remember(item, watchedIds) { viewModel.watchActions(item) },
-                            onWatchAction = { action -> viewModel.perform(action, item) },
-                        )
-                        HorizontalDivider()
+                    itemsIndexed(section.items, key = { _, it -> "$index-${it.id.value}" }) { i, item ->
+                        SectionRow(RowPosition.of(i, section.items.size)) {
+                            ThreadRowItem(
+                                item = item,
+                                now = now,
+                                onOpen = { launch(viewModel.open(item)) },
+                                onLastPost = { launch(viewModel.lastPost(item)) },
+                                onOpenInBrowser = { browser(viewModel.browserUrl(item)) },
+                                onOpenForum = item.forum?.takeIf { showForum }?.let { forum -> { nav.openForum(forum.copy(groupId = null)) } },
+                                watchActions = remember(item, watchedIds) { viewModel.watchActions(item) },
+                                onWatchAction = { action -> viewModel.perform(action, item) },
+                            )
+                        }
                     }
                 }
                 footer?.invoke(this)
             }
         }
-    }
-}
-
-@Composable
-private fun SectionHeader(forum: ForumRef, onClick: () -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-        Text(
-            forum.title,
-            Modifier.fillMaxWidth().semantics { heading() }.clickable(role = Role.Button, onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-        )
     }
 }
 
@@ -185,6 +180,11 @@ fun ThreadRowItem(
         MenuAction(stringResource(R.string.row_last_post), enabled = openable, onClick = onLastPost) +
         MenuAction(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser), onClick = onOpenInBrowser) +
         listOfNotNull(onOpenForum?.let { MenuAction(stringResource(R.string.row_go_to_forum, item.forum?.title.orEmpty()), onClick = it) })
+    val style = LocalAppStyle.current
+    // Unread.ACCENT: a tinted row with an accent bar at its start and "N new" instead of the badge.
+    val accent = style.layout.unread == Unread.ACCENT
+    val unreadTint = style.unreadContainer.takeIf { accent && (item.isUnread || item.unreadCount > 0) }
+    val bar = MaterialTheme.colorScheme.primary
     Box {
         ListItem(
             modifier = Modifier
@@ -195,13 +195,25 @@ fun ThreadRowItem(
                     onClick = onOpen,
                     onLongClickLabel = stringResource(au.howesthat.whirl.core.ui.R.string.show_actions),
                 )
-                .alpha(if (inactive) 0.6f else 1f),
-            colors = if (item.isSticky) ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else ListItemDefaults.colors(),
+                .alpha(if (inactive) 0.6f else 1f)
+                .then(
+                    if (unreadTint == null) Modifier else Modifier.drawWithContent {
+                        drawContent()
+                        val width = 3.dp.toPx()
+                        val x = if (layoutDirection == LayoutDirection.Ltr) 0f else size.width - width
+                        drawRoundRect(bar, Offset(x, 16.dp.toPx()), Size(width, size.height - 32.dp.toPx()), CornerRadius(width / 2))
+                    },
+                ),
+            colors = when {
+                unreadTint != null -> ListItemDefaults.colors(containerColor = unreadTint)
+                item.isSticky -> ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                else -> ListItemDefaults.colors()
+            },
             overlineContent = labels(item)?.let { { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
             headlineContent = {
                 Text(
                     item.title,
-                    fontWeight = if (item.isUnread) FontWeight.Bold else null,
+                    fontWeight = if (item.isUnread) (if (accent) FontWeight.SemiBold else FontWeight.Bold) else null,
                     fontStyle = if (inactive) FontStyle.Italic else null,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
@@ -211,7 +223,23 @@ fun ThreadRowItem(
             trailingContent = if (item.unreadCount > 0) {
                 {
                     val unread = pluralStringResource(R.plurals.row_unread, item.unreadCount, item.unreadCount)
-                    Badge(Modifier.clearAndSetSemantics { contentDescription = unread }) { Text(item.unreadCount.toString()) }
+                    if (accent) {
+                        Surface(
+                            Modifier.clearAndSetSemantics { contentDescription = unread },
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ) {
+                            Text(
+                                stringResource(R.string.row_new_count, item.unreadCount),
+                                Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    } else {
+                        Badge(Modifier.clearAndSetSemantics { contentDescription = unread }) { Text(item.unreadCount.toString()) }
+                    }
                 }
             } else {
                 null
