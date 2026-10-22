@@ -245,6 +245,27 @@ class ThreadViewModel @Inject constructor(
         load(LAST_PAGE, force = false)
     }
 
+    private val _opUserId = MutableStateFlow<Long?>(null)
+    /** The thread starter, once "Posts by OP" has found them. */
+    val opUserId: StateFlow<Long?> = _opUserId.asStateFlow()
+
+    /** "Posts by OP": the thread starter wrote the first post on page 1, which is fetched if it is not cached. */
+    fun showOpPosts() {
+        _opUserId.value?.let { setFilter(PostFilter.ByUser(it)); return }
+        viewModelScope.launch {
+            try {
+                repo.load(threadId, 1, PostFilter.All, route.forumId)
+                val op = repo.page(threadId, 1).first()?.value?.posts?.firstOrNull()?.author?.id ?: return@launch
+                _opUserId.value = op
+                setFilter(PostFilter.ByUser(op))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                events.send(ThreadEvent.Failed(e))
+            }
+        }
+    }
+
     fun setFilter(filter: PostFilter) {
         if (_filter.value == filter) return
         _filter.value = filter
