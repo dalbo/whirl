@@ -110,7 +110,7 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, viewModel: Setti
             }
 
             Group(stringResource(R.string.settings_notifications)) {
-                Column(Modifier.padding(horizontal = 16.dp)) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     NotificationOptions(
                         settings,
                         onWatchedNotify = { v -> update { it.copy(watchedNotify = v) } },
