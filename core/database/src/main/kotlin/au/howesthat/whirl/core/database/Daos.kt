@@ -46,6 +46,9 @@ interface ForumDao {
     @Query("UPDATE forums SET is_private = :isPrivate WHERE id = :id")
     suspend fun setPrivate(id: Int, isPrivate: Boolean)
 
+    @Query("UPDATE forums SET is_private = 0")
+    suspend fun clearPrivate()
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun addFavourite(favourite: FavouriteForumEntity)
 

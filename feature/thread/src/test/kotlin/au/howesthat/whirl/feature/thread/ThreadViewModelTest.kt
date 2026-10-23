@@ -197,18 +197,36 @@ class ThreadViewModelTest {
     }
 
     @Test
-    fun `posts by OP reads the thread starter from page 1`() = runTest {
+    fun `posts by OP reads the thread starter from page 1 and opens the filtered view in the browser`() = runTest {
         enqueueHtml("thread_97r5wzn3_last.html")
         val vm = viewModel("threadId" to "97r5wzn3", "page" to -1)
         await { vm.startPage.filterNotNull().first() }
         server.takeRequest()
         enqueueHtml("thread_97r5wzn3_p1.html")
-        enqueueHtml("thread_97r5wzn3_p1.html")
-        vm.showOpPosts()
-        val op = await { vm.opUserId.filterNotNull().first() }
-        assertEquals(PostFilter.ByUser(op), await { vm.filter.first { it != PostFilter.All } })
+        vm.navigation.test {
+            vm.showOpPosts()
+            val op = await { vm.opUserId.filterNotNull().first() }
+            assertEquals(ThreadEvent.Browser("https://forums.whirlpool.net.au/thread/97r5wzn3?ux=$op"), awaitItem())
+            assertEquals(op, repo.page(ThreadId("97r5wzn3"), 1).first()!!.value.posts.first().author.id)
+        }
         assertEquals("/thread/97r5wzn3", server.takeRequest().target)
-        assertEquals(op, repo.page(ThreadId("97r5wzn3"), 1).first()!!.value.posts.first().author.id)
+        assertEquals(PostFilter.All, vm.filter.value, "the app stays on all posts")
+    }
+
+    @Test
+    fun `filters need a Whirlpool login, so they open in the browser`() = runTest {
+        enqueueHtml("thread_3pxj858k_p2.html")
+        val vm = viewModel("threadId" to "3pxj858k", "page" to 2)
+        await { vm.page(2).filterNotNull().first() }
+        vm.navigation.test {
+            vm.setFilter(PostFilter.Moderators)
+            assertEquals(ThreadEvent.Browser("https://forums.whirlpool.net.au/thread/3pxj858k?um=1"), awaitItem())
+            vm.setFilter(PostFilter.Reps)
+            assertEquals(ThreadEvent.Browser("https://forums.whirlpool.net.au/thread/3pxj858k?ur=1"), awaitItem())
+            vm.setFilter(PostFilter.ByUser(30703))
+            assertEquals(ThreadEvent.Browser("https://forums.whirlpool.net.au/thread/3pxj858k?ux=30703"), awaitItem())
+        }
+        assertEquals(1, server.requestCount, "nothing filtered is fetched")
     }
 
     @Test

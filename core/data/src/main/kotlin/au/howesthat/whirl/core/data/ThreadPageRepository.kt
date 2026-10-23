@@ -110,7 +110,8 @@ class ThreadPageRepository @Inject constructor(
         return try {
             parseOrDrift { ThreadPageParser.parse(html) }
         } catch (e: WhirlpoolError.NotSignedIn) {
-            forumId?.let { forums.markPrivate(it) }
+            // Only the plain thread says the forum is private: filtered views need a login in every forum.
+            if (filter == PostFilter.All) forumId?.let { forums.markPrivate(it) }
             throw e
         }
     }

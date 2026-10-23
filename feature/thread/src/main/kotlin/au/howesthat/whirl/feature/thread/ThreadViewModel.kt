@@ -278,7 +278,16 @@ class ThreadViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Whirlpool shows filtered views (one user's posts, moderators', reps') only to signed-in users ("You must be
+     * registered and signed in", checked 2026-10-23), and Whirl has no web session, so they open in the browser, which
+     * has the user's login. All posts reloads in the app.
+     */
     fun setFilter(filter: PostFilter) {
+        if (filter != PostFilter.All) {
+            viewModelScope.launch { events.send(ThreadEvent.Browser(filterUrl(filter))) }
+            return
+        }
         if (_filter.value == filter) return
         _filter.value = filter
         _scrollTarget.value = null
@@ -363,6 +372,12 @@ class ThreadViewModel @Inject constructor(
     }
 
     fun threadUrl(page: Int? = currentPage.value): String = urls.thread(threadId, page ?: 1).toString()
+    fun filterUrl(filter: PostFilter): String = urls.thread(
+        threadId,
+        userId = (filter as? PostFilter.ByUser)?.userId,
+        moderatorsOnly = filter == PostFilter.Moderators,
+        repsOnly = filter == PostFilter.Reps,
+    ).toString()
     fun postUrl(post: Post, page: Int): String = urls.thread(threadId, page).newBuilder().fragment("r${post.number}").build().toString()
     fun replyToThreadUrl(): String = urls.replyToThread(threadId).toString()
     fun replyToPostUrl(post: Post): String = urls.replyToPost(post.replyId).toString()

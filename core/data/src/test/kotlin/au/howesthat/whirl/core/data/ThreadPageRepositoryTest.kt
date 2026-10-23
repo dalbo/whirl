@@ -26,6 +26,7 @@ import java.time.Duration
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -128,6 +129,22 @@ class ThreadPageRepositoryTest {
         enqueueHtml("thread_private_feedback_3nzn4p83.html")
         assertFailsWith<WhirlpoolError.NotSignedIn> { repo.load(ThreadId("3nzn4p83"), 1, forumId = 35) }
         assertTrue(forums.forums.first().value.single().isPrivate)
+    }
+
+    @Test
+    fun `a filtered view that needs a login leaves its forum alone, and learned private forums are forgotten once`() = runTest {
+        db.forumDao().replaceAll(listOf(ForumEntity(92, "ISPs", "ISPs", 0)))
+        // Whirlpool answers ux=/um=/ur= with "not signed in" in every forum (2026-10-23).
+        enqueueHtml("thread_private_feedback_3nzn4p83.html")
+        assertFailsWith<WhirlpoolError.NotSignedIn> { repo.load(nbn, 1, PostFilter.Moderators, forumId = 92) }
+        assertFalse(forums.forums.first().value.single().isPrivate)
+
+        forums.markPrivate(92)
+        forums.forgetLearnedPrivateOnce()
+        assertFalse(forums.forums.first().value.single().isPrivate)
+        forums.markPrivate(92)
+        forums.forgetLearnedPrivateOnce()
+        assertTrue(forums.forums.first().value.single().isPrivate, "only once: what is learned afterwards stays")
     }
 
     @Test
