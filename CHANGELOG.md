@@ -2,6 +2,9 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.1.3
+- With "Screen animations" off, swiping back no longer animates either: the back gesture's own animation (the page shrinking into a card over the previous screen) is turned off too.
+
 ## v1.1.2
 - "Posts by me", "Posts by OP", "Posts by moderators", "Posts by reps" and a post's "user's posts" open the filtered page in your browser. Whirlpool shows filtered views only to signed-in users, and Whirl does not sign in to the site, so in the app they always showed "This page needs a Whirlpool login".
 - Fixed: trying one of those filters marked the thread's forum as private, and from then on every thread in that forum opened in the browser. Forums marked this way are cleared once when you update.
