@@ -3,6 +3,7 @@ package au.howesthat.whirl.core.data
 import au.howesthat.whirl.core.database.ApiThreadColumns
 import au.howesthat.whirl.core.database.FavouriteForumEntity
 import au.howesthat.whirl.core.database.FetchLogDao
+import au.howesthat.whirl.core.database.FetchLogEntity
 import au.howesthat.whirl.core.database.ForumDao
 import au.howesthat.whirl.core.database.ForumEntity
 import au.howesthat.whirl.core.database.NewsDao
@@ -58,8 +59,20 @@ class ForumRepository @Inject constructor(
     /** Called when a forum page turns out to need a web login. */
     suspend fun markPrivate(forumId: Int) = dao.setPrivate(forumId, true)
 
+    /**
+     * Once (v1.1.2): forget the private forums learned so far. Up to v1.1.1 a filtered thread view, which needs a login
+     * everywhere, marked its forum private, after which the forum's threads always opened in the browser. Truly private
+     * forums are learned again from their pages; the known ones (KNOWN_PRIVATE) never depended on this.
+     */
+    suspend fun forgetLearnedPrivateOnce() {
+        if (log.fetchedAt(PRIVATE_RESET_KEY) != null) return
+        dao.clearPrivate()
+        log.put(FetchLogEntity(PRIVATE_RESET_KEY, clock.millis()))
+    }
+
     companion object {
         private const val KEY = "forums"
+        private const val PRIVATE_RESET_KEY = "reset:learned-private-forums-1.1.2"
 
         /** Private Messages, Feedback, In the news, Talk with a mod (PLAN.md §2.2). */
         val KNOWN_PRIVATE = setOf(1, 35, 85, 134)

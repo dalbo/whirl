@@ -551,22 +551,20 @@ private fun ThreadMenu(
         DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.last_page)) }, onClick = { open = false; onLast() })
         DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.go_to_page)) }, onClick = { open = false; onGoTo() })
         HorizontalDivider()
-        @Composable
-        fun FilterItem(label: String, checked: Boolean, onClick: () -> Unit) = DropdownMenuItem(
-            text = { Text(label) },
-            leadingIcon = if (checked) {
-                { Icon(Icons.Default.Check, contentDescription = null) }
-            } else {
-                null
-            },
-            onClick = { open = false; onClick() },
+        // Whirlpool shows these filtered views only to signed-in users, so they open in the browser (its login).
+        Text(
+            stringResource(R.string.filters_in_browser),
+            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        FilterItem(filterLabel(PostFilter.All), filter == PostFilter.All) { onFilter(PostFilter.All) }
-        myUserId?.let { me -> FilterItem(stringResource(R.string.filter_mine), filter == PostFilter.ByUser(me)) { onFilter(PostFilter.ByUser(me)) } }
+        @Composable
+        fun FilterItem(label: String, onClick: () -> Unit) = DropdownMenuItem(text = { Text(label) }, onClick = { open = false; onClick() })
+        myUserId?.let { me -> FilterItem(stringResource(R.string.filter_mine)) { onFilter(PostFilter.ByUser(me)) } }
         // The thread starter's id is known only once page 1 has been read, so this item finds it first.
-        FilterItem(stringResource(R.string.filter_op), opUserId != null && filter == PostFilter.ByUser(opUserId), onOpPosts)
-        FilterItem(filterLabel(PostFilter.Moderators), filter == PostFilter.Moderators) { onFilter(PostFilter.Moderators) }
-        FilterItem(filterLabel(PostFilter.Reps), filter == PostFilter.Reps) { onFilter(PostFilter.Reps) }
+        FilterItem(stringResource(R.string.filter_op), onOpPosts)
+        FilterItem(filterLabel(PostFilter.Moderators)) { onFilter(PostFilter.Moderators) }
+        FilterItem(filterLabel(PostFilter.Reps)) { onFilter(PostFilter.Reps) }
         HorizontalDivider()
         DropdownMenuItem(text = { Text(stringResource(R.string.reply_to_thread)) }, onClick = { open = false; onReply() })
         DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser)) }, onClick = { open = false; onOpenInBrowser() })
