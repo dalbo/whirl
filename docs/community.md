@@ -34,3 +34,27 @@ moderator, whichever they suggested:
 > and package so it can't be confused with Whirldroid, and Whirldroid's old `whirldroid-thread://` links open in it.
 > I used Whirldroid's behaviour as the reference for what the app should do but haven't used any of its code. Happy to
 > credit you however you'd like, or to change anything you're not comfortable with.
+
+## 4. v1.1 reply in the Whirldroid thread (draft, 2026-10-23; not yet posted)
+In `97q1vrm9` (Android › Apps), answering the feedback since the v1.0 post. Plain text. Drop the tester paragraph if the moderators have not answered yet. Update the release line to the newest tag.
+
+> Whirl 1.1 is out (now 1.1.3). Thanks for all the feedback, most of it is in:
+>
+> - Mark as read: a "Mark as read" button at the end of the last page of a watched thread, hidden if you use "Mark as read when opened". (BadFish)
+> - Posts by OP: added to the post filter. The filters (me, OP, mods, reps) open in your browser: Whirlpool only shows those views to signed-in users. (BadFish)
+> - Transitions: Settings > Screen animations turns them off, including the back swipe. (BadFish)
+> - Favourites were already there: long-press a forum in Forums to add it; favourites show at the top. (BadFish)
+> - Watched refresh: once when you open the app or come back to it, not every time you return from a thread. (kudabird)
+> - Mark as read when opened now works however you open a watched thread, which fixes threads staying unread on the site. (kudabird)
+> - Replying in your browser: Settings > "Open Whirlpool pages in the browser app". (Chris)
+> - Looks: Settings > Layout (Classic, or Cards: Jkill's design, thanks Jkill!) and Colours (from your wallpaper, Whirl blue, Whirlpool, Whirldroid, or Jkill's Silver & ember). (crunchynuts) Each is a small file in the app, so new ones are easy if anyone wants to design one.
+>
+> Not yet: marking read up to a particular post (BRK) needs Whirl to log in to the site, which I'm not doing without the mods' OK. iOS (FERRARIF1): sorry, not planned.
+>
+> Download: https://github.com/dalbo/whirl/releases/latest (APK). It's also in closed testing on Google Play. Google needs 12+ testers for 14 days before it can go public, so if you're in Australia and want to help, use the same Google account as your phone and:
+> 1. Join https://groups.google.com/g/whirl-testers-group
+> 2. Opt in at https://play.google.com/apps/testing/au.howesthat.whirl
+> 3. Install from https://play.google.com/store/apps/details?id=au.howesthat.whirl
+>
+> If you already installed the APK from GitHub, uninstall it first. cevad, you're first in line.
+
