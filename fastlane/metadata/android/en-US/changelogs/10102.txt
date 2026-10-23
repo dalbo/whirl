@@ -1,0 +1,2 @@
+- "Posts by me / OP / moderators / reps" open in your browser: Whirlpool now shows these only to signed-in users
+- Fixed: after trying one, threads in that forum kept opening in the browser

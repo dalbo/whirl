@@ -2,6 +2,10 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.1.2
+- "Posts by me", "Posts by OP", "Posts by moderators", "Posts by reps" and a post's "user's posts" open the filtered page in your browser. Whirlpool shows filtered views only to signed-in users, and Whirl does not sign in to the site, so in the app they always showed "This page needs a Whirlpool login".
+- Fixed: trying one of those filters marked the thread's forum as private, and from then on every thread in that forum opened in the browser. Forums marked this way are cleared once when you update.
+
 ## v1.1.1
 - "Mark as read when opened" marks a watched thread read however it is opened, not only from Watched and only when Watched's saved list showed unread posts. Since v1.1.0 that list can be minutes old, and reading in Whirl does not move your read position on Whirlpool, so threads could stay unread on the site.
 - The "Mark as read" button at the end of a watched thread is hidden when "Mark as read when opened" is on.
