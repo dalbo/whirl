@@ -1,0 +1,1 @@
+- With "Screen animations" off, the back swipe no longer animates either (the page shrinking into a card)
