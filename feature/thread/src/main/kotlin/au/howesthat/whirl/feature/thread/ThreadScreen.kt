@@ -299,6 +299,8 @@ private fun PostList(
     val isWatched by viewModel.isWatched.collectAsStateWithLifecycle()
     val pageCount by viewModel.pageCount.collectAsStateWithLifecycle()
     val filter by viewModel.filter.collectAsStateWithLifecycle()
+    // With "Mark as read when opened" the thread was marked as it opened: nothing left for the button to do.
+    val autoMarkRead = viewModel.settings.collectAsStateWithLifecycle().value.watchedAutoMarkAsRead
     val now = Instant.now()
     LazyColumn(Modifier.fillMaxSize(), state = list) {
         item(key = "updated") {
@@ -368,7 +370,7 @@ private fun PostList(
         }
         // As on Whirlpool and in Whirldroid: mark a watched thread read at the end of its last page, for those who
         // leave auto mark as read off so a half-read thread stays unread.
-        if (isWatched && page == pageCount && filter == PostFilter.All) {
+        if (isWatched && page == pageCount && filter == PostFilter.All && !autoMarkRead) {
             item(key = "mark_read") {
                 Box(Modifier.readableWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                     FilledTonalButton(onClick = { viewModel.perform(WatchAction.MARK_READ) }) {

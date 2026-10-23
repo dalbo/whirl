@@ -18,6 +18,7 @@ import au.howesthat.whirl.core.network.WhirlpoolApi
 import au.howesthat.whirl.core.network.WhirlpoolHttp
 import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.network.WhirlpoolWeb
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,7 +32,9 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
+import mockwebserver3.RecordedRequest
 import okhttp3.Dns
 import mockwebserver3.MockWebServer
 import org.junit.After
@@ -207,4 +210,31 @@ class ThreadViewModelTest {
         assertEquals("/thread/97r5wzn3", server.takeRequest().target)
         assertEquals(op, repo.page(ThreadId("97r5wzn3"), 1).first()!!.value.posts.first().author.id)
     }
+
+    @Test
+    fun `a watched thread opened outside Watched is marked read when auto mark read is on`() = runTest {
+        // Its own server, answering by URL: the thread page (missing here: marking does not wait for it), the watched
+        // list that says the thread is watched, and the mark-read command.
+        val api = MockWebServer().apply {
+            dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse = when {
+                    request.url.queryParameter("watchedread") != null -> json("api_cmd_watchedread.json")
+                    request.url.encodedPath.startsWith("/api/") -> json("api_watched_mode1.json")
+                    else -> MockResponse.Builder().code(404).build()
+                }
+            }
+            start()
+        }
+        val keyed = WatchedRepository(WhirlpoolApi(client, { "k" }, api.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), clock, appScope)
+        val pages = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(api.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock)
+        settings.update { it.copy(watchedAutoMarkAsRead = true) }
+        ThreadViewModel(SavedStateHandle(mapOf("threadId" to "9yvx1663", "page" to 1)), pages, settings, keyed)
+        val marked = await {
+            generateSequence { api.takeRequest(5, TimeUnit.SECONDS) }.first { it.url.queryParameter("watchedread") != null }
+        }
+        assertEquals("9yvx1663", marked.url.queryParameter("watchedread"))
+        api.close()
+    }
+
+    private fun json(name: String) = MockResponse.Builder().body(File(System.getProperty("whirl.fixtures"), "api/$name").readText()).build()
 }

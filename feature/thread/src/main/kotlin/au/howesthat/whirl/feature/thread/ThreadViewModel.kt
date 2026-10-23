@@ -80,7 +80,7 @@ sealed interface ThreadEvent {
 class ThreadViewModel @Inject constructor(
     savedState: SavedStateHandle,
     private val repo: ThreadPageRepository,
-    settingsRepo: SettingsRepository,
+    private val settingsRepo: SettingsRepository,
     private val watchedRepo: WatchedRepository,
 ) : ViewModel() {
     private val route = savedState.toRoute<ThreadRoute>()
@@ -136,7 +136,19 @@ class ThreadViewModel @Inject constructor(
 
     init {
         open(route.page)
-        viewModelScope.launch { watchedRepo.ensureKnown() }
+        viewModelScope.launch {
+            watchedRepo.ensureKnown()
+            autoMarkRead()
+        }
+    }
+
+    /**
+     * "Mark as read when opened" for a watched thread opened from anywhere but Watched (which marks it as the row is
+     * tapped, also covering threads that open in the browser): Recent, Popular, search, links.
+     */
+    private suspend fun autoMarkRead() {
+        if (route.fromWatched || !settingsRepo.settings.first().watchedAutoMarkAsRead) return
+        if (watchedRepo.isWatched(threadId).first()) watchedRepo.perform(WatchAction.MARK_READ, listOf(threadId), undoable = false)
     }
 
     /** Watch, mark read or unwatch (with Undo); marking read can return to the list (2.14.12 `pref_watchedbacktolist`). */
