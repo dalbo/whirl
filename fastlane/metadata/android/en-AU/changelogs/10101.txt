@@ -1,0 +1,2 @@
+- "Mark as read when opened" now marks a watched thread read however you open it (Watched, Recent, Popular, links), even if the Watched list hadn't refreshed yet
+- The "Mark as read" button at the end of a thread is hidden when that setting is on

@@ -2,6 +2,10 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.1.1
+- "Mark as read when opened" marks a watched thread read however it is opened, not only from Watched and only when Watched's saved list showed unread posts. Since v1.1.0 that list can be minutes old, and reading in Whirl does not move your read position on Whirlpool, so threads could stay unread on the site.
+- The "Mark as read" button at the end of a watched thread is hidden when "Mark as read when opened" is on.
+
 ## v1.1.0
 Tester feedback from the Whirlpool thread, and a choice of looks.
 - Settings › Layout and Colours: the Classic layout or Cards (rounded cards, boxed quotes, tinted unread rows; design by Jkill), with colours from your wallpaper (the default), Whirl blue, Whirlpool (the website's indigo and greys), Whirldroid, or Silver & ember (design by Jkill). These replace "Use wallpaper colours"; if you had it off, you get Whirl blue.
