@@ -109,7 +109,7 @@ PLAN.md §9 is the scope. One PR per task, tests for every repository, worker an
 
 ## Next phase candidates (not started; Dallin to choose)
 Nothing is required for v1. What is left, roughly by value:
-- **From the backlog** (PLAN.md §9): image loading (needs a fixture with an image first), whole-thread `/archive/` reading mode for small threads, tablet two-pane, app widget.
+- **From the backlog** (PLAN.md §9): image loading (needs a fixture with an image first), tablet two-pane, app widget; and an undecided idea: the `/archive/` whole-thread page as a one-page reader for small threads and for filtering posts by user in the app (PLAN.md §9, "Idea, undecided").
 - **Feedback from testers** once the closed test runs: treat as the next priority.
 - **Small polish**: the poster's name in a post header is a tap target under 48 dp; deleted-post markup never captured (parser tolerates it).
 - **Housekeeping on a schedule**: targetSdk 37 before August 2027; Google developer verification (2027); keep AGP/Kotlin/Compose current; re-check reproducibility when the build changes (`docs/fdroid/README.md`).

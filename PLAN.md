@@ -197,7 +197,13 @@ Accessibility (TalkBack, font scaling), landscape, Material You, store listing t
 
 **Parked until Whirlpool's moderators approve** (see Decisions, "Web session in the app"): any in-app web login, and everything it would unlock (private forums, PMs, mark-read-to-here, native posting). Ask in the API thread or of the moderators before any work on it.
 
-**Backlog** (not in v1): whole-thread `/archive/` reading mode for small threads, app widget, tablet two-pane, image loading once a fixture exists.
+**Backlog** (not in v1): app widget, tablet two-pane, image loading once a fixture exists, and the archive idea below.
+
+**Idea, undecided (Dallin, 2026-10-23): archive reader and in-app post filters.** `/archive/<id>` is the whole thread on one public page (no login; `thread_archive_numeric.html`: 48 posts, about 3.3 KB each, every post with `data-userid`, name and `.usergroup`). Two uses of one download:
+- *Archive reader*: read a small thread on one page (scroll instead of paging; offline once cached).
+- *Filters in the app*: since v1.1.2, "Posts by me / OP / moderators / reps" and "user's posts" open the browser, because Whirlpool's `ux=`, `um=`, `ur=` views need a login (checked 2026-10-23). From the archive, Whirl could filter by user id itself.
+
+Limits that decide whether it is worth it: size grows with the thread (10 pages ≈ 0.7 MB, 50 pages ≈ 3.3 MB, the 2,290-page Geforce RTX thread ≈ 150 MB), and the long threads where "Posts by OP" matters most are the ones too big to fetch; one archive pull per filter also strains "about the rate a person browses" (§5). So: a page limit (say 50), with the browser beyond it. The archive omits moderator-hidden posts (numbering gaps; harmless for filtering) and has small parser differences (§2.3: dates in `span[itemprop=datePublished]`, bodies in `span[itemprop=text]`). Moderator and rep filters need a fixture with such posts to confirm how `.usergroup` marks them. Not started.
 
 ---
 
