@@ -151,6 +151,9 @@ fun WhirlApp(
                     exitTransition = { ExitTransition.None },
                     popEnterTransition = { EnterTransition.None },
                     popExitTransition = { ExitTransition.None },
+                    // The back gesture has its own pair (the page shrinking into a card); without these it still animated.
+                    predictivePopEnterTransition = { EnterTransition.None },
+                    predictivePopExitTransition = { ExitTransition.None },
                     builder = graph,
                 )
             }
