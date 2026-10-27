@@ -122,6 +122,11 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, viewModel: Setti
                     Choice(stringResource(R.string.settings_notify_style), NotifyStyle.entries, settings.notifyStyle, { styleLabel(it) }) { v ->
                         update { it.copy(notifyStyle = v) }
                     }
+                    if (settings.notifyStyle == NotifyStyle.SUMMARY) {
+                        Toggle(stringResource(R.string.settings_notify_keep), settings.notifyKeepUntilRead) { v ->
+                            update { it.copy(notifyKeepUntilRead = v) }
+                        }
+                    }
                 }
             }
 

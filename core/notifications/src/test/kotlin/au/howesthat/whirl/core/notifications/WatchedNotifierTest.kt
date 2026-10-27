@@ -66,7 +66,7 @@ class WatchedNotifierTest {
     fun setUp() = runTest {
         shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         settings.signIn("k", Account(216903, "d@llin"))
-        settings.update { it.copy(watchedNotify = true, ignoreOwnRepliesWatched = false, notifyStyle = NotifyStyle.SUMMARY) }
+        settings.update { it.copy(watchedNotify = true, ignoreOwnRepliesWatched = false, notifyStyle = NotifyStyle.SUMMARY, notifyKeepUntilRead = false) }
     }
 
     @After
@@ -219,9 +219,12 @@ class WatchedNotifierTest {
     }
 
     @Test
-    fun `the summary stays up when tapped`() = runTest {
+    fun `a tap removes the summary, unless it is kept until read`() = runTest {
         enqueue(unreadTwo)
         notifier.check()
+        assertTrue(assertNotNull(shown()).flags and Notification.FLAG_AUTO_CANCEL != 0)
+        settings.update { it.copy(notifyKeepUntilRead = true) }
+        notifier.sync(cachedUnread())
         assertEquals(0, assertNotNull(shown()).flags and Notification.FLAG_AUTO_CANCEL)
     }
 

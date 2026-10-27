@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import au.howesthat.whirl.core.data.NotifyStyle
+import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.data.WatchedRepository
@@ -36,7 +37,7 @@ import javax.inject.Singleton
  * The watched-thread notifications (PLAN.md §1.3): one `get=watched&watchedmode=0` call per check, alerting only when
  * some thread has a reply newer than the one last notified for it. Settings › Notification style picks
  * - [NotifyStyle.SUMMARY]: one inbox-style notification listing the unread threads, with Mark read and Unwatch for
- *   all of them; tapping opens Watched and leaves it up until the threads are read;
+ *   all of them; tapping opens Watched and removes it, or with "keep until read" leaves it up until they are read;
  * - [NotifyStyle.PER_THREAD]: one notification per thread (tagged with its id, grouped under a summary), each with its
  *   own Mark read and Unwatch; tapping opens that thread and removes it. Only threads with a new reply alert.
  *
@@ -67,7 +68,7 @@ class WatchedNotifier @Inject constructor(
         val me = settings.account.first()?.userId
         val before = notified.all().associate { it.threadId to it.lastDate }
         val plan = planAlert(watched.fetchUnread(), before, me, s.ignoreOwnRepliesWatched)
-        posting.withLock { render(plan.threads, plan.newIds, s.notifyStyle) }
+        posting.withLock { render(plan.threads, plan.newIds, s) }
         notified.put(plan.threads.map { NotifiedEntity(it.id.value, it.lastDate.toInstant().toEpochMilli()) })
         notified.keepOnly(plan.threads.map { it.id.value })
     }
@@ -77,13 +78,14 @@ class WatchedNotifier @Inject constructor(
         val s = settings.settings.first()
         if (!s.watchedNotify || !canNotify()) return
         val threads = notifiable(unread, settings.account.first()?.userId, s.ignoreOwnRepliesWatched)
-        posting.withLock { render(threads, newIds = emptySet(), s.notifyStyle) }
+        posting.withLock { render(threads, newIds = emptySet(), s) }
     }
 
     /** Runs [sync] whenever the app's Unread list or the notification settings change. Called once at startup. */
     fun keepInSync(scope: CoroutineScope) {
         scope.launch {
-            val shape = settings.settings.map { Triple(it.notifyStyle, it.ignoreOwnRepliesWatched, it.watchedNotify) }.distinctUntilChanged()
+            val shape = settings.settings.map { listOf(it.notifyStyle, it.notifyKeepUntilRead, it.ignoreOwnRepliesWatched, it.watchedNotify) }
+                .distinctUntilChanged()
             combine(watched.watched(unreadOnly = true).map { it.value }.distinctUntilChanged(), shape) { unread, _ -> unread }
                 .collect { sync(it) }
         }
@@ -117,20 +119,20 @@ class WatchedNotifier @Inject constructor(
      * Shows [threads]: the ones in [newIds] with an alert, the rest only where something is already showing for them.
      * Switching style carries what was showing over to the new style.
      */
-    private fun render(threads: List<WatchedThread>, newIds: Set<ThreadId>, style: NotifyStyle) {
+    private fun render(threads: List<WatchedThread>, newIds: Set<ThreadId>, s: Settings) {
         if (threads.isEmpty()) return cancel()
         val active = context.getSystemService(NotificationManager::class.java).activeNotifications
         val summaryShowing = active.any { it.id == NOTIFICATION_ID && it.tag == null }
         val threadsShowing = active.filter { it.id == THREAD_NOTIFICATION_ID }.mapNotNull { it.tag }.toSet()
         createChannel()
-        when (style) {
+        when (s.notifyStyle) {
             NotifyStyle.SUMMARY -> {
                 val showing = summaryShowing || threadsShowing.isNotEmpty()
                 manager.cancel(GROUP_SUMMARY_ID)
                 threadsShowing.forEach { manager.cancel(it, THREAD_NOTIFICATION_ID) }
                 when {
-                    newIds.isNotEmpty() -> showSummary(threads, alert = true)
-                    showing -> showSummary(threads, alert = false)
+                    newIds.isNotEmpty() -> showSummary(threads, alert = true, s.notifyKeepUntilRead)
+                    showing -> showSummary(threads, alert = false, s.notifyKeepUntilRead)
                 }
             }
             NotifyStyle.PER_THREAD -> {
@@ -185,11 +187,10 @@ class WatchedNotifier @Inject constructor(
 
     // canNotify() checks POST_NOTIFICATIONS; lint does not follow the helper.
     @SuppressLint("MissingPermission")
-    private fun showSummary(threads: List<WatchedThread>, alert: Boolean) {
+    private fun showSummary(threads: List<WatchedThread>, alert: Boolean, keepUntilRead: Boolean) {
         val notification = builder(alert)
             .listing(threads)
-            // Stays up after a tap: Watched opens, and the notification goes once its threads are read.
-            .setAutoCancel(false)
+            .setAutoCancel(!keepUntilRead)
             .setContentIntent(openWatched())
             .actions(threads.map { it.id }, key = "")
             .build()

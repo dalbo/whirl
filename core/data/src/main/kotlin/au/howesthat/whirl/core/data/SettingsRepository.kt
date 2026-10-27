@@ -49,6 +49,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
         val watchedNotify = booleanPreferencesKey("watched_notify")
         val notifyInterval = intPreferencesKey("notify_interval")
         val notifyStyle = stringPreferencesKey("notify_style")
+        val notifyKeepUntilRead = booleanPreferencesKey("notify_keep_until_read")
         val openThreadsInBrowser = booleanPreferencesKey("open_threads_in_browser")
         val loadPublicAtBottom = booleanPreferencesKey("load_public_at_bottom")
         val loadPrivateAtBottom = booleanPreferencesKey("load_private_at_bottom")
@@ -77,6 +78,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
             watchedNotify = p[Keys.watchedNotify] ?: d.watchedNotify,
             notifyIntervalMinutes = p[Keys.notifyInterval] ?: d.notifyIntervalMinutes,
             notifyStyle = p[Keys.notifyStyle].toEnum(d.notifyStyle),
+            notifyKeepUntilRead = p[Keys.notifyKeepUntilRead] ?: d.notifyKeepUntilRead,
             openThreadsInBrowser = p[Keys.openThreadsInBrowser] ?: d.openThreadsInBrowser,
             loadPublicAtBottom = p[Keys.loadPublicAtBottom] ?: d.loadPublicAtBottom,
             loadPrivateAtBottom = p[Keys.loadPrivateAtBottom] ?: d.loadPrivateAtBottom,
@@ -139,6 +141,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
             p[Keys.watchedNotify] = s.watchedNotify
             p[Keys.notifyInterval] = s.notifyIntervalMinutes
             p[Keys.notifyStyle] = s.notifyStyle.name
+            p[Keys.notifyKeepUntilRead] = s.notifyKeepUntilRead
             p[Keys.openThreadsInBrowser] = s.openThreadsInBrowser
             p[Keys.loadPublicAtBottom] = s.loadPublicAtBottom
             p[Keys.loadPrivateAtBottom] = s.loadPrivateAtBottom

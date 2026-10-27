@@ -26,6 +26,8 @@ data class Settings(
     val watchedNotify: Boolean = false,
     val notifyIntervalMinutes: Int = 60,
     val notifyStyle: NotifyStyle = NotifyStyle.SUMMARY,
+    /** The summary notification stays up when tapped, until its threads are read; off, a tap removes it. */
+    val notifyKeepUntilRead: Boolean = false,
     // Threads
     val openThreadsInBrowser: Boolean = false,
     val loadPublicAtBottom: Boolean = false,
