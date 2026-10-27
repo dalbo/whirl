@@ -20,7 +20,8 @@
     <string name="settings_font_size">Post text size</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_threads">Threads</string>
-    <string name="settings_open_in_browser">Open threads in the browser</string>
+    <string name="settings_open_in_browser">Open public forum threads in the browser</string>
+    <string name="settings_open_in_browser_summary">Private forum threads always open in the browser, where you are signed in to Whirlpool.</string>
     <string name="settings_public_at_bottom">Open public forum threads at the last page</string>
     <string name="settings_private_at_bottom">Open private forum threads at the last page</string>
     <string name="settings_recent">Recent threads</string>

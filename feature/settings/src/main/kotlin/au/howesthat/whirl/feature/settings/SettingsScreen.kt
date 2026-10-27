@@ -120,7 +120,7 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, viewModel: Setti
             }
 
             Group(stringResource(R.string.settings_threads)) {
-                Toggle(stringResource(R.string.settings_open_in_browser), settings.openThreadsInBrowser) { v -> update { it.copy(openThreadsInBrowser = v) } }
+                Toggle(stringResource(R.string.settings_open_in_browser), settings.openThreadsInBrowser, stringResource(R.string.settings_open_in_browser_summary)) { v -> update { it.copy(openThreadsInBrowser = v) } }
                 Toggle(stringResource(R.string.settings_public_at_bottom), settings.loadPublicAtBottom) { v -> update { it.copy(loadPublicAtBottom = v) } }
                 Toggle(stringResource(R.string.settings_private_at_bottom), settings.loadPrivateAtBottom) { v -> update { it.copy(loadPrivateAtBottom = v) } }
             }
@@ -182,12 +182,15 @@ private fun SettingRow(title: String, summary: String? = null, onClick: (() -> U
 }
 
 @Composable
-private fun Toggle(title: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun Toggle(title: String, checked: Boolean, summary: String? = null, onChange: (Boolean) -> Unit) {
     Row(
         Modifier.fillMaxWidth().selectable(checked, role = Role.Switch) { onChange(!checked) }.padding(16.dp, 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, Modifier.weight(1f).padding(end = 16.dp), style = MaterialTheme.typography.bodyLarge)
+        Column(Modifier.weight(1f).padding(end = 16.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            summary?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
         Switch(checked = checked, onCheckedChange = null)
     }
 }
