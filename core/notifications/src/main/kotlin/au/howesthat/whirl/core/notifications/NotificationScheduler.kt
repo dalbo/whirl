@@ -31,6 +31,7 @@ class NotificationScheduler @Inject constructor(
     /** Called once from `Application.onCreate`. */
     fun start() {
         notifier.createChannel()
+        notifier.keepInSync(scope)
         scope.launch {
             combine(settings.settings, settings.isSetupDone) { s, done -> if (done && s.watchedNotify) s.notifyIntervalMinutes else null }
                 .distinctUntilChanged()

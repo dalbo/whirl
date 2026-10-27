@@ -19,6 +19,10 @@
     <string name="settings_text_scale">Text size</string>
     <string name="settings_font_size">Post text size</string>
     <string name="settings_notifications">Notifications</string>
+    <string name="settings_notify_style">Notification style</string>
+    <string name="notify_style_summary">One for all watched threads</string>
+    <string name="notify_style_per_thread">One per thread</string>
+    <string name="settings_notify_keep">Keep the notification up until its threads are read</string>
     <string name="settings_threads">Threads</string>
     <string name="settings_open_in_browser">Open public forum threads in the browser</string>
     <string name="settings_open_in_browser_summary">Private forum threads always open in the browser, where you are signed in to Whirlpool.</string>

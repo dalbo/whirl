@@ -23,17 +23,19 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.ThemeMode
+import au.howesthat.whirl.core.data.WatchedPosition
+import au.howesthat.whirl.core.model.ThreadId
+import au.howesthat.whirl.core.notifications.WatchedNotifier
 import au.howesthat.whirl.core.ui.LocalBrowserApp
 import au.howesthat.whirl.core.ui.Styles
 import au.howesthat.whirl.core.ui.WhirlTheme
-import au.howesthat.whirl.core.notifications.WatchedNotifier
 import au.howesthat.whirl.core.ui.usesWallpaper
 import au.howesthat.whirl.feature.setup.SetupScreen
-import au.howesthat.whirl.navigation.WatchedRoute
 import au.howesthat.whirl.navigation.WatchSnackbars
+import au.howesthat.whirl.navigation.WatchedRoute
 import au.howesthat.whirl.navigation.WhirlApp
-import au.howesthat.whirl.navigation.routeForLink
 import au.howesthat.whirl.navigation.route
+import au.howesthat.whirl.navigation.routeForLink
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import java.time.LocalTime
@@ -98,9 +100,17 @@ class MainActivity : ComponentActivity() {
         viewModel.openLink(routeFor(intent))
     }
 
-    /** A Whirlpool link, or the watched-thread notification (which opens Watched). */
+    /** A Whirlpool link, or a watched-thread notification (the summary opens Watched, a thread's opens the thread). */
     private fun routeFor(intent: Intent): Any? = when {
         intent.getBooleanExtra(WatchedNotifier.EXTRA_OPEN_WATCHED, false) -> WatchedRoute
+        intent.hasExtra(WatchedNotifier.EXTRA_THREAD_ID) -> {
+            viewModel.openWatchedThread(
+                ThreadId(intent.getStringExtra(WatchedNotifier.EXTRA_THREAD_ID)!!),
+                forumId = intent.getIntExtra(WatchedNotifier.EXTRA_FORUM_ID, 0),
+                WatchedPosition(intent.getIntExtra(WatchedNotifier.EXTRA_LAST_PAGE, 1), intent.getIntExtra(WatchedNotifier.EXTRA_LAST_READ_POST, 0)),
+            )
+            null
+        }
         else -> intent.data?.let { routeForLink(it) }
     }
 }

@@ -25,6 +25,9 @@ data class Settings(
     // Notifications
     val watchedNotify: Boolean = false,
     val notifyIntervalMinutes: Int = 60,
+    val notifyStyle: NotifyStyle = NotifyStyle.SUMMARY,
+    /** The summary notification stays up when tapped, until its threads are read; off, a tap removes it. */
+    val notifyKeepUntilRead: Boolean = false,
     // Threads
     val openThreadsInBrowser: Boolean = false,
     val loadPublicAtBottom: Boolean = false,
@@ -60,6 +63,9 @@ enum class PostFontSize(val sp: Float) { SMALLEST(14f), SMALLER(16f), NORMAL(17f
 
 /** App-wide text size, multiplied with Android's font size. */
 enum class TextScale(val factor: Float) { DEFAULT(1f), LARGE(1.15f), LARGER(1.3f), LARGEST(1.5f) }
+
+/** Watched-thread notifications: one listing every unread thread, or one per thread (grouped by Android). */
+enum class NotifyStyle { SUMMARY, PER_THREAD }
 
 /** The account the API key belongs to. */
 data class Account(val userId: Long, val userName: String)

@@ -13,6 +13,7 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import au.howesthat.whirl.core.data.Account
+import au.howesthat.whirl.core.data.NotifyStyle
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.data.WatchedRepository
@@ -65,7 +66,7 @@ class WatchedNotifierTest {
     fun setUp() = runTest {
         shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         settings.signIn("k", Account(216903, "d@llin"))
-        settings.update { it.copy(watchedNotify = true, ignoreOwnRepliesWatched = false) }
+        settings.update { it.copy(watchedNotify = true, ignoreOwnRepliesWatched = false, notifyStyle = NotifyStyle.SUMMARY, notifyKeepUntilRead = false) }
     }
 
     @After
@@ -82,6 +83,16 @@ class WatchedNotifierTest {
     private fun shown(): Notification? = shadowOf(manager).getNotification(WatchedNotifier.NOTIFICATION_ID)
 
     private val unreadTwo get() = fixture("api_watched_mode0.json")
+
+    private fun thread(id: String): Notification? = shadowOf(manager).getNotification(id, WatchedNotifier.THREAD_NOTIFICATION_ID)
+
+    private fun groupSummary(): Notification? = shadowOf(manager).getNotification(WatchedNotifier.GROUP_SUMMARY_ID)
+
+    private fun lines(n: Notification) = n.extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)!!.map { it.toString() }
+
+    private fun alerts(n: Notification) = n.flags and Notification.FLAG_ONLY_ALERT_ONCE == 0
+
+    private suspend fun cachedUnread() = watched.watched(unreadOnly = true).first().value
 
     @Test
     fun `new replies alert once, listing every unread thread`() = runTest {
@@ -205,6 +216,112 @@ class WatchedNotifierTest {
         assertFalse(notifier.act(WatchAction.UNWATCH, listOf(ThreadId("9yvx1663"))))
         assertNotNull(shown())
         assertEquals(2, watched.watched(unreadOnly = true).first().value.size, "rolled back")
+    }
+
+    @Test
+    fun `a tap removes the summary, unless it is kept until read`() = runTest {
+        enqueue(unreadTwo)
+        notifier.check()
+        assertTrue(assertNotNull(shown()).flags and Notification.FLAG_AUTO_CANCEL != 0)
+        settings.update { it.copy(notifyKeepUntilRead = true) }
+        notifier.sync(cachedUnread())
+        assertEquals(0, assertNotNull(shown()).flags and Notification.FLAG_AUTO_CANCEL)
+    }
+
+    @Test
+    fun `one per thread, each thread gets its own notification and buttons, under a silent group summary`() = runTest {
+        settings.update { it.copy(notifyStyle = NotifyStyle.PER_THREAD) }
+        enqueue(unreadTwo)
+        notifier.check()
+        assertNull(shown())
+
+        val bike = assertNotNull(thread("9yvx1663"))
+        assertEquals("Bike Riding", bike.extras.getString(NotificationCompat.EXTRA_TITLE))
+        assertEquals("683 unread posts", bike.extras.getCharSequence(NotificationCompat.EXTRA_TEXT).toString())
+        assertTrue(alerts(bike))
+        assertTrue(bike.flags and Notification.FLAG_AUTO_CANCEL != 0, "a tap opens the thread and removes it")
+        val (action, ids) = assertNotNull(NotificationActionReceiver.parse(shadowOf(bike.actions.first().actionIntent).savedIntent))
+        assertEquals(WatchAction.MARK_READ, action)
+        assertEquals(listOf(ThreadId("9yvx1663")), ids)
+        val open = shadowOf(bike.contentIntent).savedIntent
+        assertEquals("9yvx1663", open.getStringExtra(WatchedNotifier.EXTRA_THREAD_ID))
+        assertNotNull(thread("9q684xp3"))
+
+        val summary = assertNotNull(groupSummary())
+        assertEquals(listOf("Bike Riding (683)", "Electric Vehicles (17527)"), lines(summary))
+        assertFalse(alerts(summary))
+
+        // Nothing new: a dismissed thread stays dismissed, and the summary lists only what is left.
+        manager.cancel("9yvx1663", WatchedNotifier.THREAD_NOTIFICATION_ID)
+        enqueue(unreadTwo)
+        notifier.check()
+        assertNull(thread("9yvx1663"))
+        assertFalse(alerts(assertNotNull(thread("9q684xp3"))))
+        assertEquals(listOf("Electric Vehicles (17527)"), lines(assertNotNull(groupSummary())))
+    }
+
+    @Test
+    fun `one per thread, only the thread with a new reply alerts`() = runTest {
+        settings.update { it.copy(notifyStyle = NotifyStyle.PER_THREAD) }
+        db.notifiedDao().put(listOf(NotifiedEntity("9q684xp3", OffsetDateTime.parse("2026-10-20T14:28:45+10:00").toInstant().toEpochMilli())))
+        enqueue(unreadTwo)
+        notifier.check()
+        assertTrue(alerts(assertNotNull(thread("9yvx1663"))))
+        assertNull(thread("9q684xp3"), "already notified, and not showing")
+    }
+
+    @Test
+    fun `sync follows the app's unread list without alerting or coming back once dismissed`() = runTest {
+        enqueue(unreadTwo)
+        notifier.check()
+        val unread = cachedUnread()
+
+        // Read in the app: the summary drops it, silently.
+        notifier.sync(unread.filter { it.id.value == "9q684xp3" })
+        val n = assertNotNull(shown())
+        assertEquals("Electric Vehicles", n.extras.getString(NotificationCompat.EXTRA_TITLE))
+        assertFalse(alerts(n))
+
+        // Dismissed: a sync does not bring it back.
+        manager.cancelAll()
+        notifier.sync(unread)
+        assertNull(shown())
+
+        // Everything read: gone.
+        enqueue(unreadTwo)
+        notifier.check()
+        notifier.sync(emptyList())
+        assertNull(shown())
+    }
+
+    @Test
+    fun `sync drops a thread read in the app from the per-thread notifications`() = runTest {
+        settings.update { it.copy(notifyStyle = NotifyStyle.PER_THREAD) }
+        enqueue(unreadTwo)
+        notifier.check()
+        notifier.sync(cachedUnread().filter { it.id.value == "9q684xp3" })
+        assertNull(thread("9yvx1663"))
+        assertFalse(alerts(assertNotNull(thread("9q684xp3"))))
+        notifier.sync(emptyList())
+        assertNull(thread("9q684xp3"))
+        assertNull(groupSummary())
+    }
+
+    @Test
+    fun `changing the style carries a showing notification over`() = runTest {
+        enqueue(unreadTwo)
+        notifier.check()
+        settings.update { it.copy(notifyStyle = NotifyStyle.PER_THREAD) }
+        notifier.sync(cachedUnread())
+        assertNull(shown())
+        assertFalse(alerts(assertNotNull(thread("9yvx1663"))))
+        assertNotNull(thread("9q684xp3"))
+
+        settings.update { it.copy(notifyStyle = NotifyStyle.SUMMARY) }
+        notifier.sync(cachedUnread())
+        assertNull(thread("9yvx1663"))
+        assertNull(groupSummary())
+        assertEquals(2, lines(assertNotNull(shown())).size)
     }
 
     @Test

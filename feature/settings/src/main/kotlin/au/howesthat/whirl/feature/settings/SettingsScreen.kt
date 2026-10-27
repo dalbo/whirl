@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.howesthat.whirl.core.data.Homepage
+import au.howesthat.whirl.core.data.NotifyStyle
 import au.howesthat.whirl.core.data.PostFontSize
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.TextScale
@@ -116,6 +117,16 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, viewModel: Setti
                         onWatchedNotify = { v -> update { it.copy(watchedNotify = v) } },
                         onInterval = { v -> update { it.copy(notifyIntervalMinutes = v) } },
                     )
+                }
+                if (settings.watchedNotify) {
+                    Choice(stringResource(R.string.settings_notify_style), NotifyStyle.entries, settings.notifyStyle, { styleLabel(it) }) { v ->
+                        update { it.copy(notifyStyle = v) }
+                    }
+                    if (settings.notifyStyle == NotifyStyle.SUMMARY) {
+                        Toggle(stringResource(R.string.settings_notify_keep), settings.notifyKeepUntilRead) { v ->
+                            update { it.copy(notifyKeepUntilRead = v) }
+                        }
+                    }
                 }
             }
 
@@ -266,6 +277,14 @@ private fun fontLabel(f: PostFontSize) = stringResource(
         PostFontSize.LARGER -> R.string.font_large
         PostFontSize.LARGE -> R.string.font_larger
         PostFontSize.LARGEST -> R.string.font_largest
+    },
+)
+
+@Composable
+private fun styleLabel(s: NotifyStyle) = stringResource(
+    when (s) {
+        NotifyStyle.SUMMARY -> R.string.notify_style_summary
+        NotifyStyle.PER_THREAD -> R.string.notify_style_per_thread
     },
 )
 
