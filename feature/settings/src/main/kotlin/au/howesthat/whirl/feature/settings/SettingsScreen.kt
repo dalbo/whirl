@@ -39,7 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -127,7 +126,6 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, viewModel: Setti
             }
 
             Group(stringResource(R.string.settings_recent)) {
-                Choice(stringResource(R.string.settings_recent_days), Settings.RECENT_DAYS, settings.recentHistoryDays, { daysLabel(it) }) { v -> update { it.copy(recentHistoryDays = v) } }
                 Toggle(stringResource(R.string.settings_recent_at_top), settings.loadRecentAtTop) { v -> update { it.copy(loadRecentAtTop = v) } }
                 Toggle(stringResource(R.string.settings_ignore_own_recent), settings.ignoreOwnRepliesRecent) { v -> update { it.copy(ignoreOwnRepliesRecent = v) } }
             }
@@ -277,6 +275,3 @@ private fun scaleLabel(t: TextScale) = stringResource(
         TextScale.LARGEST -> R.string.font_largest
     },
 )
-
-@Composable
-private fun daysLabel(days: Int) = pluralStringResource(R.plurals.days, days, days)
