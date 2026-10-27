@@ -30,7 +30,9 @@ import androidx.navigation.compose.rememberNavController
 import au.howesthat.whirl.R
 import au.howesthat.whirl.about.AboutScreen
 import au.howesthat.whirl.core.data.Account
+import au.howesthat.whirl.core.data.OpenThread
 import au.howesthat.whirl.core.ui.NavIcon
+import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 import au.howesthat.whirl.feature.forums.ForumsScreen
 import au.howesthat.whirl.feature.news.NewsScreen
 import au.howesthat.whirl.feature.settings.SettingsScreen
@@ -96,9 +98,15 @@ fun WhirlApp(
 
     // Links open on top of the start screen, so Back returns to it. A drawer destination (Watched, from the notification)
     // opens like a drawer tap; anything else is pushed, so a second thread link opens even while a thread is showing.
+    val browser = rememberOpenInBrowser()
     LaunchedEffect(link) {
         link?.let {
-            if (isTopLevelRoute(it)) nav.navigateTopLevel(it) else nav.navigate(it)
+            when {
+                // A thread notification's thread that opens in the browser (private forum, or "open in the browser").
+                it is OpenThread.Browser -> browser(it.url)
+                isTopLevelRoute(it) -> nav.navigateTopLevel(it)
+                else -> nav.navigate(it)
+            }
             onLinkHandled()
         }
     }
