@@ -2,6 +2,15 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.2.0
+Tester feedback from the Whirl and Whirldroid threads.
+- Recent threads: pick how far back to look ("Last 7 days") at the top of the screen, now up to 365 days. The setting moved there from Settings.
+- Watched-thread notifications follow what you do in the app: a thread read, marked read or unwatched in Whirl leaves the notification straight away, and it goes once nothing is unread. A dismissed notification only comes back for a new reply.
+- Settings › Notifications › Notification style: one notification for all watched threads (as before), or one per thread, grouped, each with its own Mark read and Unwatch. Tapping a thread's notification opens that thread; only threads with a new reply make a sound.
+- Settings › Notifications › "Keep the notification up until its threads are read": tapping the notification opens Watched without removing it.
+- "Open threads in the browser" is now "Open public forum threads in the browser"; private forum threads always open in the browser.
+- The Cloudflare block message mentions that it happens more often outside Australia or on a VPN.
+
 ## v1.1.3
 - With "Screen animations" off, swiping back no longer animates either: the back gesture's own animation (the page shrinking into a card over the previous screen) is turned off too.
 

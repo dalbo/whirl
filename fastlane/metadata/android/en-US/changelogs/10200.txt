@@ -1,0 +1,6 @@
+Whirl 1.2
+- Recent threads: choose how far back on the screen, up to 365 days
+- Notifications update when you read threads in the app
+- New option: one notification per watched thread
+- Option to keep the notification until its threads are read
+- Clearer wording for the browser setting and the Cloudflare block message
