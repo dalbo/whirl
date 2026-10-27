@@ -9,6 +9,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
+import au.howesthat.whirl.core.data.Settings
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -121,6 +132,14 @@ class RecentViewModel @Inject constructor(private val deps: ListDeps, private va
         viewModelScope.launch { deps.settings.settings.map { it.recentHistoryDays }.distinctUntilChanged().drop(1).collect { refresh(force = false) } }
     }
 
+    /** How far back the list goes; the picker on the screen changes the saved setting. */
+    val days: StateFlow<Int> = deps.settings.settings.map { it.recentHistoryDays }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, Settings().recentHistoryDays)
+
+    fun selectDays(days: Int) {
+        viewModelScope.launch { deps.settings.update { it.copy(recentHistoryDays = days) } }
+    }
+
     override suspend fun fetch(force: Boolean) {
         repo.refresh(deps.settings.settings.first().recentHistoryDays, force)
     }
@@ -128,7 +147,30 @@ class RecentViewModel @Inject constructor(private val deps: ListDeps, private va
 
 @Composable
 fun RecentScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: RecentViewModel = hiltViewModel()) {
-    SimpleList(stringResource(R.string.recent_title), navIcon, nav, viewModel, viewModel.state, stringResource(R.string.empty_recent))
+    val days by viewModel.days.collectAsStateWithLifecycle()
+    SimpleList(
+        stringResource(R.string.recent_title), navIcon, nav, viewModel, viewModel.state, stringResource(R.string.empty_recent),
+        subBar = { DaysPicker(days, viewModel::selectDays) },
+    )
+}
+
+@Composable
+private fun DaysPicker(selected: Int, onSelect: (Int) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Surface(tonalElevation = 2.dp) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+            val choose = stringResource(R.string.choose_recent_days)
+            TextButton(onClick = { open = true }, Modifier.semantics { onClick(label = choose, action = null) }) {
+                Text(pluralStringResource(R.plurals.recent_days, selected, selected))
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                Settings.RECENT_DAYS.forEach { d ->
+                    DropdownMenuItem(text = { Text(pluralStringResource(R.plurals.recent_days, d, d)) }, onClick = { open = false; onSelect(d) })
+                }
+            }
+        }
+    }
 }
 
 // --- Popular -----------------------------------------------------------------------------------------------------
@@ -165,18 +207,23 @@ private fun SimpleList(
     stateFlow: StateFlow<ListState>,
     emptyText: String,
     browserUrl: String? = null,
+    /** Shown under the top bar, like the forum screen's group and page pickers. */
+    subBar: (@Composable () -> Unit)? = null,
 ) {
     val state by stateFlow.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     Scaffold(
         topBar = {
-            TopAppBar(
-                colors = whirlTopBarColors(),
-                title = { ListTitle(title, state.updatedAt) },
-                navigationIcon = { NavIconButton(navIcon) },
-                actions = { RefreshButton { viewModel.refresh() } },
-            )
+            Column {
+                TopAppBar(
+                    colors = whirlTopBarColors(),
+                    title = { ListTitle(title, state.updatedAt) },
+                    navigationIcon = { NavIconButton(navIcon) },
+                    actions = { RefreshButton { viewModel.refresh() } },
+                )
+                subBar?.invoke()
+            }
         },
     ) { padding ->
         ThreadListBody(

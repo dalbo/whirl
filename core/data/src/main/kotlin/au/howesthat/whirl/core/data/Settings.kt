@@ -41,7 +41,8 @@ data class Settings(
 ) {
     companion object {
         val NOTIFY_INTERVALS = listOf(15, 30, 60, 240, 720, 1440)
-        val RECENT_DAYS = listOf(1, 3, 7, 14, 30, 60, 120)
+        /** The API refuses `recentdays` above 366. */
+        val RECENT_DAYS = listOf(1, 3, 7, 14, 30, 60, 120, 180, 365)
     }
 }
 
