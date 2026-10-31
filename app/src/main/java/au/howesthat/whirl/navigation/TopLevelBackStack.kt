@@ -62,6 +62,29 @@ class TopLevelBackStack(val start: NavKey, tops: List<NavKey>, saved: Saved? = n
         }
     }
 
+    /**
+     * Two panes: a thread chosen in a list replaces the threads beside it (everything above the topmost [isList]
+     * entry), so the back stack does not grow with each tap. With the list on top, as on a phone, this is a push.
+     */
+    fun openFromList(key: NavKey, isList: (NavKey) -> Boolean) {
+        val stack = stack(current)
+        val list = stack.indexOfLast(isList)
+        if (list >= 0) while (stack.lastIndex > list) stack.removeAt(stack.lastIndex)
+        stack.add(key)
+    }
+
+    /** The list a screen sits above in its stack (what a thread is shown beside), or null. */
+    fun listBelow(key: NavKey, isList: (NavKey) -> Boolean): NavKey? {
+        val stack = stacks.values.firstOrNull { key in it } ?: return null
+        return stack.subList(0, stack.lastIndexOf(key)).lastOrNull(isList)
+    }
+
+    /** The screen directly above [key] in its stack (the thread beside a list), or null. */
+    fun above(key: NavKey): NavKey? {
+        val stack = stacks.values.firstOrNull { key in it } ?: return null
+        return stack.getOrNull(stack.lastIndexOf(key) + 1)
+    }
+
     fun save(): Saved = Saved(current, stacks.values.map { it.toList() })
 
     @Serializable

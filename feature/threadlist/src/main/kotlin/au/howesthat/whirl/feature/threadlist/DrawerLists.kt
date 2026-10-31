@@ -33,6 +33,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +57,7 @@ import au.howesthat.whirl.core.data.ScrapedListRepository
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.model.TextQuery
+import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.ui.FindBar
 import au.howesthat.whirl.core.ui.FindButton
 import au.howesthat.whirl.core.ui.OnFindShortcut
@@ -281,6 +283,7 @@ internal fun ListTopBar(
             label = stringResource(au.howesthat.whirl.core.ui.R.string.find_in, title),
             matches = sections?.sumOf { it.items.size },
             onSearchWhirlpool = searchRoute?.let { route -> { words -> nav.openSearch(route(words)) } },
+            closeOnBack = LocalSelectedThread.current == null,
         )
     }
 }
@@ -301,7 +304,29 @@ class WatchedViewModel @Inject constructor(deps: ListDeps, private val repo: Wat
     /** The Unread/All tab (2.14.12 replaced 1.8's "hide read" setting with these tabs). */
     val unreadOnly: StateFlow<Boolean> = _unreadOnly.asStateFlow()
 
-    val state = stateOf(_unreadOnly.flatMapLatest { unread -> repo.watched(unread).toListState { list -> groupByForum(list.map { it.toItem() }) } }.filtered())
+    /** The thread open beside the list (two panes): kept on the Unread tab after it is marked read. */
+    private val kept = MutableStateFlow<ThreadId?>(null)
+
+    fun keep(id: ThreadId?) {
+        kept.value = id
+    }
+
+    val state = stateOf(
+        _unreadOnly.flatMapLatest { unread ->
+            val sections = repo.watched(unread).toListState { list -> groupByForum(list.map { it.toItem() }) }
+            if (!unread) {
+                sections
+            } else {
+                // Opening a thread marks it read, which takes it off Unread while it is open beside the list.
+                var previous: List<Section>? = null
+                combine(sections, kept) { state, id ->
+                    val shown = state.sections?.let { keepRow(it, previous, id) }
+                    previous = shown
+                    state.copy(sections = shown)
+                }
+            }
+        }.filtered(),
+    )
 
     /**
      * Finding in Unread: how many threads in All match too, offered when Unread has none. The count is null when All
@@ -349,6 +374,8 @@ class WatchedViewModel @Inject constructor(deps: ListDeps, private val repo: Wat
 fun WatchedScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: WatchedViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val unreadOnly by viewModel.unreadOnly.collectAsStateWithLifecycle()
+    val selected = LocalSelectedThread.current
+    LaunchedEffect(selected) { viewModel.keep(selected) }
     val unread by viewModel.unreadThreads.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()

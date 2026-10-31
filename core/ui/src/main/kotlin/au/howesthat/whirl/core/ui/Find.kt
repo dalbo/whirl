@@ -37,11 +37,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -98,6 +100,8 @@ fun FindBar(
     matches: Int?,
     modifier: Modifier = Modifier,
     onSearchWhirlpool: ((String) -> Unit)? = null,
+    /** Back closes the bar; false (a thread open beside the list) leaves Back to the thread unless the field has focus. */
+    closeOnBack: Boolean = true,
 ) {
     val state = rememberTextFieldState(query)
     val change by rememberUpdatedState(onQueryChange)
@@ -112,7 +116,11 @@ fun FindBar(
         }
     }
     val keyboard = LocalSoftwareKeyboardController.current
-    BackHandler(onBack = onClose)
+    var fieldFocused by remember { mutableStateOf(false) }
+    BackHandler(enabled = closeOnBack || fieldFocused, onBack = onClose)
+    // Choosing a thread beside the list leaves the field focused (only the keyboard went); let Back reach the thread.
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(closeOnBack) { if (!closeOnBack) focusManager.clearFocus() }
     // A shortcut with the bar already open goes back to the field.
     OnFindShortcut { focus.requestFocus() }
 
@@ -127,7 +135,7 @@ fun FindBar(
                     onSearch = { keyboard?.hide() },
                     expanded = false,
                     onExpandedChange = {},
-                    modifier = Modifier.weight(1f).focusRequester(focus).onPreviewKeyEvent { event ->
+                    modifier = Modifier.weight(1f).focusRequester(focus).onFocusChanged { fieldFocused = it.isFocused }.onPreviewKeyEvent { event ->
                         (event.key == Key.Escape && event.type == KeyEventType.KeyDown).also { escape -> if (escape) onClose() }
                     },
                     placeholder = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },

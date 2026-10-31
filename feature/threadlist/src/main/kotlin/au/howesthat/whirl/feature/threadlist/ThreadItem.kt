@@ -99,6 +99,28 @@ fun filterSections(sections: List<Section>, query: TextQuery, matchForum: Boolea
         section.copy(items = section.items.filter { query.matches(it.title, it.group, it.forum?.title?.takeIf { matchForum }) })
     }.filter { it.items.isNotEmpty() }
 
+/**
+ * Two panes: [sections] with the row for [id] put back where it was in [previous] if it has gone (Watched's Unread tab
+ * drops a thread once it is read, while it is still open beside the list). Unchanged without [id] or [previous].
+ */
+fun keepRow(sections: List<Section>, previous: List<Section>?, id: ThreadId?): List<Section> {
+    if (id == null || previous == null || sections.any { s -> s.items.any { it.openId == id } }) return sections
+    val sectionIndex = previous.indexOfFirst { s -> s.items.any { it.openId == id } }
+    if (sectionIndex < 0) return sections
+    val old = previous[sectionIndex]
+    val itemIndex = old.items.indexOfFirst { it.openId == id }
+    val row = old.items[itemIndex]
+    val at = sections.indexOfFirst { it.forum?.id == old.forum?.id }
+    return if (at >= 0) {
+        sections.toMutableList().also { list ->
+            val items = list[at].items.toMutableList().apply { add(itemIndex.coerceAtMost(size), row) }
+            list[at] = list[at].copy(items = items)
+        }
+    } else {
+        sections.toMutableList().apply { add(sectionIndex.coerceAtMost(size), Section(old.forum, listOf(row))) }
+    }
+}
+
 /** Keeps a scraped page's own section headers (Popular, search), or one unheaded section for a forum page. */
 fun sectionsOf(items: List<ThreadItem>, sectioned: Boolean): List<Section> =
     if (!sectioned) listOf(Section(null, items))

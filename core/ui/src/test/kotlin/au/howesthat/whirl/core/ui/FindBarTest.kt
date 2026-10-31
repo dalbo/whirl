@@ -1,6 +1,9 @@
 package au.howesthat.whirl.core.ui
 
 import android.view.KeyEvent
+import androidx.activity.OnBackPressedDispatcher
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -139,5 +142,28 @@ class FindBarTest {
         requests.tryEmit(Unit)
         compose.waitForIdle()
         assertEquals(1, opened)
+    }
+
+    @Test
+    fun `with a thread open beside the list, Back is left to the thread`() {
+        var closeOnBack by mutableStateOf(true)
+        var closedBy = 0
+        var reachedThread = 0
+        var dispatcher: OnBackPressedDispatcher? = null
+        compose.setContent {
+            dispatcher = LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
+            // Stands in for the thread pane's Back, registered before the bar.
+            BackHandler { reachedThread++ }
+            WhirlTheme(darkTheme = false) {
+                FindBar(query = "nbn", onQueryChange = {}, onClose = { closedBy++ }, label = "Find", matches = 1, closeOnBack = closeOnBack)
+            }
+        }
+        field.assertIsFocused()
+        closeOnBack = false
+        compose.waitForIdle()
+        compose.runOnUiThread { dispatcher!!.onBackPressed() }
+        compose.waitForIdle()
+        assertEquals(0, closedBy, "the bar stays open")
+        assertEquals(1, reachedThread)
     }
 }

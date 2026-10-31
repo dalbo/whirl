@@ -45,6 +45,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
         val postFontSize = stringPreferencesKey("post_font_size")
         val textScale = stringPreferencesKey("text_scale")
         val screenAnimations = booleanPreferencesKey("screen_animations")
+        val twoPane = booleanPreferencesKey("two_pane")
         val browserApp = booleanPreferencesKey("browser_app")
         val watchedNotify = booleanPreferencesKey("watched_notify")
         val notifyInterval = intPreferencesKey("notify_interval")
@@ -70,6 +71,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
             palette = p[Keys.palette] ?: if (p[Keys.dynamicColor] == false) "whirl" else d.palette,
             layout = p[Keys.layout] ?: d.layout,
             screenAnimations = p[Keys.screenAnimations] ?: d.screenAnimations,
+            twoPane = p[Keys.twoPane] ?: d.twoPane,
             browserApp = p[Keys.browserApp] ?: d.browserApp,
             nightStart = p[Keys.nightStart]?.let(LocalTime::parse) ?: d.nightStart,
             nightEnd = p[Keys.nightEnd]?.let(LocalTime::parse) ?: d.nightEnd,
@@ -133,6 +135,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
             p[Keys.palette] = s.palette
             p[Keys.layout] = s.layout
             p[Keys.screenAnimations] = s.screenAnimations
+            p[Keys.twoPane] = s.twoPane
             p[Keys.browserApp] = s.browserApp
             p[Keys.nightStart] = s.nightStart.toString()
             p[Keys.nightEnd] = s.nightEnd.toString()

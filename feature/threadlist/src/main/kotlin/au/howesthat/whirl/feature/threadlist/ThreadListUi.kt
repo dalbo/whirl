@@ -21,6 +21,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +36,8 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,6 +48,7 @@ import au.howesthat.whirl.core.data.OpenThread
 import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.RowKind
+import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.ui.ActionsMenu
 import au.howesthat.whirl.core.ui.EmptyState
 import au.howesthat.whirl.core.ui.LocalAppStyle
@@ -67,6 +71,12 @@ class ThreadListNav(
     val openForum: (ForumRef) -> Unit,
     val openSearch: (SearchRoute) -> Unit,
 )
+
+/**
+ * The thread open beside this list in a two-pane layout (null on a phone, or with no thread chosen): its row is
+ * highlighted, Watched keeps it while it is unread no longer, and Back goes to the thread before the find bar.
+ */
+val LocalSelectedThread = compositionLocalOf<ThreadId?> { null }
 
 /** Turns an [OpenThread] decision into navigation or a Custom Tab. */
 @Composable
@@ -116,6 +126,7 @@ fun ThreadListBody(
     val now = Instant.now()
     // Read so rows recompose when a watch action changes what they offer.
     val watchedIds by viewModel.watchedIds.collectAsStateWithLifecycle()
+    val selected = LocalSelectedThread.current
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = onRefresh, modifier = modifier.fillMaxSize()) {
         when {
             sections == null && error != null -> ErrorState(
@@ -164,6 +175,7 @@ fun ThreadListBody(
                                 onOpenForum = item.forum?.takeIf { showForum }?.let { forum -> { nav.openForum(forum.copy(groupId = null)) } },
                                 watchActions = remember(item, watchedIds) { viewModel.watchActions(item) },
                                 onWatchAction = { action -> viewModel.perform(action, item) },
+                                selected = selected != null && item.openId == selected,
                             )
                         }
                     }
@@ -184,6 +196,8 @@ fun ThreadRowItem(
     onOpenForum: (() -> Unit)?,
     watchActions: List<WatchAction> = emptyList(),
     onWatchAction: (WatchAction) -> Unit = {},
+    /** The thread open beside the list (two panes). */
+    selected: Boolean = false,
 ) {
     var menu by remember { mutableStateOf(false) }
     val openable = item.openId != null
@@ -200,6 +214,7 @@ fun ThreadRowItem(
     Box {
         ListItem(
             modifier = Modifier
+                .semantics { this.selected = selected }
                 .menuClickable(
                     actions,
                     enabled = openable,
@@ -209,7 +224,8 @@ fun ThreadRowItem(
                 )
                 .alpha(if (inactive) 0.6f else 1f)
                 .then(
-                    if (unreadTint == null) Modifier else Modifier.drawWithContent {
+                    // The accent bar marks unread rows (Cards) and the thread open beside the list.
+                    if (unreadTint == null && !selected) Modifier else Modifier.drawWithContent {
                         drawContent()
                         val width = 3.dp.toPx()
                         val x = if (layoutDirection == LayoutDirection.Ltr) 0f else size.width - width
@@ -217,6 +233,7 @@ fun ThreadRowItem(
                     },
                 ),
             colors = when {
+                selected -> ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)
                 unreadTint != null -> ListItemDefaults.colors(containerColor = unreadTint)
                 item.isSticky -> ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
                 else -> ListItemDefaults.colors()
