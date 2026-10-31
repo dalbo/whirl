@@ -61,4 +61,9 @@
     <string name="page_n">Page %1$d</string>
     <!-- Unread count on a row in styles with an accent for unread rows (TalkBack still reads "N unread posts"). -->
     <string name="row_new_count">%1$d new</string>
+    <plurals name="find_show_in_all">
+        <item quantity="one">Show %1$d in All</item>
+        <item quantity="other">Show %1$d in All</item>
+    </plurals>
+    <string name="find_look_in_all">Look in All</string>
 </resources>

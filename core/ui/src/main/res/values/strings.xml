@@ -29,4 +29,14 @@
     <string name="ago_minutes">%1$d min ago</string>
     <string name="ago_hours">%1$d h ago</string>
     <string name="ago_days">%1$d d ago</string>
+    <string name="find_in_list">Find in list</string>
+    <string name="find_in">Find in %1$s</string>
+    <string name="find_close">Close find</string>
+    <string name="find_clear">Clear</string>
+    <string name="find_none">Nothing here matches “%1$s”.</string>
+    <string name="search_whirlpool_for">Search Whirlpool for “%1$s”</string>
+    <plurals name="find_matches">
+        <item quantity="one">%1$d match</item>
+        <item quantity="other">%1$d matches</item>
+    </plurals>
 </resources>

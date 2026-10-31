@@ -1,5 +1,6 @@
 package au.howesthat.whirl.feature.threadlist
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import au.howesthat.whirl.core.data.ForumRepository
@@ -10,19 +11,30 @@ import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadOpener
 import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.data.WatchedRepository
+import au.howesthat.whirl.core.model.TextQuery
 import au.howesthat.whirl.core.model.ThreadId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** What every thread list needs to decide how a tap opens a thread and which watch actions a row offers. */
-class ListDeps @Inject constructor(val settings: SettingsRepository, val forums: ForumRepository, val watched: WatchedRepository)
+/**
+ * What every thread list needs to decide how a tap opens a thread and which watch actions a row offers, plus the
+ * list's saved state (the find query).
+ */
+class ListDeps @Inject constructor(
+    val settings: SettingsRepository,
+    val forums: ForumRepository,
+    val watched: WatchedRepository,
+    val savedState: SavedStateHandle,
+)
 
 /** Refresh state, errors and thread opening shared by every thread list screen. */
 abstract class ListViewModel(private val deps: ListDeps, private val from: OpenedFrom) : ViewModel() {
@@ -39,6 +51,17 @@ abstract class ListViewModel(private val deps: ListDeps, private val from: Opene
     private val _error = MutableStateFlow<Throwable?>(null)
     /** The last refresh's failure; the cached list (if any) stays on screen. */
     val error: StateFlow<Throwable?> = _error.asStateFlow()
+
+    /** Find in list: null while the bar is closed, else what is typed. Saved, so it survives process death. */
+    val query: StateFlow<String?> = deps.savedState.getStateFlow(QUERY_KEY, null)
+
+    fun setQuery(query: String?) {
+        deps.savedState[QUERY_KEY] = query
+    }
+
+    /** This list with only the rows that match [query]. */
+    protected fun Flow<ListState>.filtered(matchForum: Boolean = true): Flow<ListState> =
+        combine(query) { state, query -> state.copy(sections = state.sections?.let { filterSections(it, TextQuery(query), matchForum) }) }
 
     protected abstract suspend fun fetch(force: Boolean)
 
@@ -107,4 +130,8 @@ abstract class ListViewModel(private val deps: ListDeps, private val from: Opene
     }
 
     fun browserUrl(item: ThreadItem): String = opener.browserUrl(item.openId ?: item.id)
+
+    private companion object {
+        const val QUERY_KEY = "findQuery"
+    }
 }

@@ -1,5 +1,6 @@
 package au.howesthat.whirl.feature.threadlist
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import au.howesthat.whirl.core.data.ForumRepository
@@ -20,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -53,10 +55,13 @@ class ListViewModelTest {
         SettingsRepository(ApplicationProvider.getApplicationContext()),
         ForumRepository(api, db.forumDao(), db.fetchLogDao(), Clock.systemUTC()),
         watched,
+        SavedStateHandle(),
     )
 
     /** A list whose fetches wait until the test completes them. */
     private class Blocking(deps: ListDeps) : ListViewModel(deps, OpenedFrom.LIST) {
+        fun filter(state: ListState) = flowOf(state).filtered()
+
         val calls = mutableListOf<CompletableDeferred<Unit>>()
         var cancelled = 0
         override suspend fun fetch(force: Boolean) {
@@ -109,5 +114,25 @@ class ListViewModelTest {
         watched.perform(WatchAction.WATCH, listOf(row.id))
         vm.watchedIds.first { row.id in it }
         assertEquals(listOf(WatchAction.UNWATCH), vm.watchActions(row))
+    }
+
+    @Test
+    fun `the find query filters the list and is saved`() = TestScope(dispatcher).runTest {
+        val vm = Blocking(deps)
+        val isp = ForumRef(92, "Choosing an ISP")
+        val list = ListState(
+            listOf(Section(isp, listOf(ThreadItem(ThreadId("a"), ThreadId("a"), "NBN plans", forum = isp), ThreadItem(ThreadId("b"), ThreadId("b"), "Optus", forum = isp)))),
+            updatedAt = null,
+        )
+        assertNull(vm.query.value, "the bar starts closed")
+        assertEquals(2, vm.filter(list).first().sections!!.single().items.size)
+
+        vm.setQuery("nbn")
+        assertEquals(listOf("NBN plans"), vm.filter(list).first().sections!!.single().items.map { it.title })
+        assertEquals("nbn", deps.savedState.get<String>("findQuery"), "kept in the saved state, for process death")
+        assertEquals("nbn", Blocking(deps).query.value, "a new ViewModel over the same saved state")
+
+        vm.setQuery(null)
+        assertEquals(2, vm.filter(list).first().sections!!.single().items.size)
     }
 }

@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Surface
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +55,9 @@ import au.howesthat.whirl.core.data.ScrapedList
 import au.howesthat.whirl.core.data.ScrapedListRepository
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.network.WhirlpoolUrls
+import au.howesthat.whirl.core.model.TextQuery
+import au.howesthat.whirl.core.ui.FindBar
+import au.howesthat.whirl.core.ui.FindButton
 import au.howesthat.whirl.core.ui.LocalAppStyle
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
@@ -77,6 +81,9 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import javax.inject.Inject
 
+/** Watched threads in All that match the find query; [count] is null when All has not been fetched. */
+data class AllMatches(val count: Int?)
+
 /** Sections plus when they were fetched (null = never). */
 data class ListState(val sections: List<Section>?, val updatedAt: Instant?)
 
@@ -91,7 +98,7 @@ private fun ListViewModel.stateOf(flow: Flow<ListState>): StateFlow<ListState> =
 @HiltViewModel
 class LatestViewModel @Inject constructor(deps: ListDeps, private val repo: LatestThreadsRepository) :
     ListViewModel(deps, OpenedFrom.LIST) {
-    val state = stateOf(repo.threads.toListState { list -> groupByForum(list.map { it.toItem() }) })
+    val state = stateOf(repo.threads.toListState { list -> groupByForum(list.map { it.toItem() }) }.filtered())
 
     init {
         refresh(force = false)
@@ -123,7 +130,8 @@ class RecentViewModel @Inject constructor(private val deps: ListDeps, private va
                     // 2.14.12: "ignore my own replies" hides threads whose last post is mine.
                     groupByForum(list.filterNot { ignoreOwn && it.lastPoster.id == me }.map { it.toItem() })
                 }
-            },
+            }
+            .filtered(),
     )
 
     init {
@@ -178,7 +186,7 @@ private fun DaysPicker(selected: Int, onSelect: (Int) -> Unit) {
 @HiltViewModel
 class PopularViewModel @Inject constructor(deps: ListDeps, private val repo: ScrapedListRepository) :
     ListViewModel(deps, OpenedFrom.LIST) {
-    val state = stateOf(repo.observe(ScrapedList.Popular).toListState { page -> sectionsOf(page.rows.map { it.toItem(null) }, sectioned = true) })
+    val state = stateOf(repo.observe(ScrapedList.Popular).toListState { page -> sectionsOf(page.rows.map { it.toItem(null) }, sectioned = true) }.filtered())
 
     init {
         refresh(force = false)
@@ -213,15 +221,21 @@ private fun SimpleList(
     val state by stateFlow.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    val query by viewModel.query.collectAsStateWithLifecycle()
     Scaffold(
         topBar = {
             Column {
-                TopAppBar(
-                    colors = whirlTopBarColors(),
-                    title = { ListTitle(title, state.updatedAt) },
-                    navigationIcon = { NavIconButton(navIcon) },
-                    actions = { RefreshButton { viewModel.refresh() } },
-                )
+                ListTopBar(title, viewModel, nav, query, state.sections) {
+                    TopAppBar(
+                        colors = whirlTopBarColors(),
+                        title = { ListTitle(title, state.updatedAt) },
+                        navigationIcon = { NavIconButton(navIcon) },
+                        actions = {
+                            FindButton { viewModel.setQuery("") }
+                            RefreshButton { viewModel.refresh() }
+                        },
+                    )
+                }
                 subBar?.invoke()
             }
         },
@@ -236,6 +250,35 @@ private fun SimpleList(
             emptyText = emptyText,
             browserUrl = browserUrl,
             modifier = Modifier.padding(padding),
+            findQuery = query,
+        )
+    }
+}
+
+/**
+ * [titleBar], or Find in list's bar while [query] is not null. Cross-forum lists search all of Whirlpool from its chip;
+ * a forum page passes its own scope.
+ */
+@Composable
+internal fun ListTopBar(
+    title: String,
+    viewModel: ListViewModel,
+    nav: ThreadListNav,
+    query: String?,
+    sections: List<Section>?,
+    searchRoute: ((String) -> SearchRoute)? = { SearchRoute(query = it) },
+    titleBar: @Composable () -> Unit,
+) {
+    if (query == null) {
+        titleBar()
+    } else {
+        FindBar(
+            query = query,
+            onQueryChange = viewModel::setQuery,
+            onClose = { viewModel.setQuery(null) },
+            label = stringResource(au.howesthat.whirl.core.ui.R.string.find_in, title),
+            matches = sections?.sumOf { it.items.size },
+            onSearchWhirlpool = searchRoute?.let { route -> { words -> nav.openSearch(route(words)) } },
         )
     }
 }
@@ -256,7 +299,20 @@ class WatchedViewModel @Inject constructor(deps: ListDeps, private val repo: Wat
     /** The Unread/All tab (2.14.12 replaced 1.8's "hide read" setting with these tabs). */
     val unreadOnly: StateFlow<Boolean> = _unreadOnly.asStateFlow()
 
-    val state = stateOf(_unreadOnly.flatMapLatest { unread -> repo.watched(unread).toListState { list -> groupByForum(list.map { it.toItem() }) } })
+    val state = stateOf(_unreadOnly.flatMapLatest { unread -> repo.watched(unread).toListState { list -> groupByForum(list.map { it.toItem() }) } }.filtered())
+
+    /**
+     * Finding in Unread: how many threads in All match too, offered when Unread has none. The count is null when All
+     * was never fetched (Watched opens on Unread), so the hint only says to look there.
+     */
+    val allMatches: StateFlow<AllMatches?> = combine(_unreadOnly, query, repo.watched(unreadOnly = false)) { unread, query, all ->
+        val words = TextQuery(query)
+        when {
+            !unread || words.isBlank -> null
+            all.updatedAt == null -> AllMatches(null)
+            else -> filterSections(groupByForum(all.value.map { it.toItem() }), words).sumOf { it.items.size }.takeIf { it > 0 }?.let(::AllMatches)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Threads with unread posts, for "N unread" in the title. */
     val unreadThreads: StateFlow<Int> = repo.watched(unreadOnly = true)
@@ -294,6 +350,8 @@ fun WatchedScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: WatchedViewMo
     val unread by viewModel.unreadThreads.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    val query by viewModel.query.collectAsStateWithLifecycle()
+    val allMatches by viewModel.allMatches.collectAsStateWithLifecycle()
     LifecycleResumeEffect(viewModel) {
         viewModel.onShown()
         onPauseOrDispose {}
@@ -301,18 +359,23 @@ fun WatchedScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: WatchedViewMo
     Scaffold(
         topBar = {
             Column {
-                TopAppBar(
-                    colors = whirlTopBarColors(),
-                    title = {
-                        ListTitle(
-                            stringResource(R.string.watched_title),
-                            state.updatedAt,
-                            subtitle = unread.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.watched_unread, it, it) },
-                        )
-                    },
-                    navigationIcon = { NavIconButton(navIcon) },
-                    actions = { RefreshButton { viewModel.refresh() } },
-                )
+                ListTopBar(stringResource(R.string.watched_title), viewModel, nav, query, state.sections) {
+                    TopAppBar(
+                        colors = whirlTopBarColors(),
+                        title = {
+                            ListTitle(
+                                stringResource(R.string.watched_title),
+                                state.updatedAt,
+                                subtitle = unread.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.watched_unread, it, it) },
+                            )
+                        },
+                        navigationIcon = { NavIconButton(navIcon) },
+                        actions = {
+                            FindButton { viewModel.setQuery("") }
+                            RefreshButton { viewModel.refresh() }
+                        },
+                    )
+                }
                 WatchedTabs(unreadOnly, unread, viewModel::showUnreadOnly)
             }
         },
@@ -326,6 +389,14 @@ fun WatchedScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: WatchedViewMo
             nav = nav,
             emptyText = stringResource(if (unreadOnly) R.string.empty_watched_unread else R.string.empty_watched),
             modifier = Modifier.padding(padding),
+            findQuery = query,
+            findEmptyAction = allMatches?.let { all ->
+                {
+                    OutlinedButton(onClick = { viewModel.showUnreadOnly(false) }) {
+                        Text(all.count?.let { pluralStringResource(R.plurals.find_show_in_all, it, it) } ?: stringResource(R.string.find_look_in_all))
+                    }
+                }
+            },
         )
     }
 }
