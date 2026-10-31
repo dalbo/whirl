@@ -44,7 +44,8 @@ import java.time.Instant
 
 /**
  * A thread, opened at [page] (1-based, or -1 for the last page). [scrollToPost] is a post number, [scrollToReply] a
- * reply id; [userId] opens it filtered to one user's posts (`ux=`); [fromWatched] when opened from Watched.
+ * reply id; [userId] opens it filtered to one user's posts (`ux=`); [fromWatched] when opened from Watched;
+ * [lastReadPost] the last post read when it was opened, for the "New posts" marker.
  */
 @Serializable
 data class ThreadRoute(
@@ -55,6 +56,7 @@ data class ThreadRoute(
     val forumId: Int? = null,
     val userId: Long? = null,
     val fromWatched: Boolean = false,
+    val lastReadPost: Int? = null,
 ) : NavKey
 
 /** A post ready to draw: its body parsed into blocks. */
@@ -139,12 +141,33 @@ class ThreadViewModel @AssistedInject constructor(
     val isWatched: StateFlow<Boolean> = watchedRepo.isWatched(threadId)
         .stateIn(viewModelScope, SharingStarted.Eagerly, route.fromWatched)
 
+    /**
+     * The first unread post (a post number), fixed as the thread opened so marking it read leaves the marker where
+     * it was, as reloading the page would on Whirlpool. Null when nothing is unread or the thread is not watched.
+     */
+    private val _firstUnread = MutableStateFlow(route.lastReadPost?.let { it + 1 })
+    val firstUnread: StateFlow<Int?> = _firstUnread.asStateFlow()
+
     init {
         open(route.page)
         viewModelScope.launch {
             watchedRepo.ensureKnown()
+            // Opened from elsewhere (Recent, a link): the cached watched lists know the position, until marked read below.
+            if (_firstUnread.value == null) _firstUnread.value = watchedRepo.lastReadPost(threadId)?.let { it + 1 }
             autoMarkRead()
         }
+    }
+
+    /** The page holding the first unread post, in the unfiltered thread. */
+    fun firstUnreadPage(): Int? = _firstUnread.value?.let { pageOfPost(it) }
+
+    /** Shows the first unread post; only offered without a filter, where pages follow post numbers. */
+    fun goToFirstUnread() {
+        val post = _firstUnread.value ?: return
+        if (_filter.value != PostFilter.All) return
+        val page = pageOfPost(post)
+        _scrollTarget.value = ScrollTarget(page, postNumber = post)
+        _jumpTo.value = page.coerceAtMost(_pageCount.value)
     }
 
     /**
@@ -390,8 +413,10 @@ class ThreadViewModel @AssistedInject constructor(
 
     /** Whirlpool's "alert moderators" form; its page is the post's page in the unfiltered thread. */
     fun reportPostUrl(post: Post): String =
-        urls.reportPost(post.replyId, threadId, (post.number - 1) / POSTS_PER_PAGE + 1, post.number).toString()
+        urls.reportPost(post.replyId, threadId, pageOfPost(post.number), post.number).toString()
 }
 
 /** Whirlpool shows 20 posts per thread page. */
 private const val POSTS_PER_PAGE = 20
+
+private fun pageOfPost(number: Int) = (number - 1) / POSTS_PER_PAGE + 1

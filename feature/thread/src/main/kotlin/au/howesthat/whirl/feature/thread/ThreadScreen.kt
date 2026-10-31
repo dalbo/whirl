@@ -243,7 +243,16 @@ private fun ThreadPager(
     }
 
     if (picking && pageCount > 1) {
-        PagePickerDialog(pageCount, pager.currentPage + 1, onDismiss = { picking = false }) { page ->
+        PagePickerDialog(
+            pageCount,
+            pager.currentPage + 1,
+            onDismiss = { picking = false },
+            firstUnreadPage = viewModel.firstUnreadPage().takeIf { filter == PostFilter.All },
+            onFirstUnread = {
+                picking = false
+                viewModel.goToFirstUnread()
+            },
+        ) { page ->
             picking = false
             scope.launch { pager.scrollToPage(page - 1) }
         }
@@ -257,6 +266,8 @@ private fun PageContent(page: Int, viewModel: ThreadViewModel, error: Throwable?
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val target by viewModel.scrollTarget.collectAsStateWithLifecycle()
     val myUserId by viewModel.myUserId.collectAsStateWithLifecycle()
+    val firstUnread by viewModel.firstUnread.collectAsStateWithLifecycle()
+    val filter by viewModel.filter.collectAsStateWithLifecycle()
     val browser = rememberOpenInBrowser()
     val list = rememberLazyListState()
     val base = MaterialTheme.typography.bodyMedium
@@ -266,13 +277,17 @@ private fun PageContent(page: Int, viewModel: ThreadViewModel, error: Throwable?
     val loaded = ui
     // Header rows before the posts: updated line, moderator note, parts.
     val headerCount = 1 + (if (loaded?.note != null) 1 else 0) + (if (loaded?.page?.parts?.isNotEmpty() == true) 1 else 0)
+    // The "New posts" marker sits above the first unread post; post numbers only line up without a filter.
+    val newFrom = firstUnread.takeIf { filter == PostFilter.All }
+    val markerAt = loaded?.posts?.indexOfFirst { it.post.number == newFrom } ?: -1
     LaunchedEffect(loaded, target) {
         val t = target ?: return@LaunchedEffect
         if (loaded == null || t.page != page) return@LaunchedEffect
         val index = loaded.posts.indexOfFirst { p ->
             (t.replyId != null && p.post.replyId == t.replyId) || (t.postNumber != null && p.post.number == t.postNumber)
         }
-        if (index >= 0) list.scrollToItem(headerCount + index)
+        // Past the marker, a post is one row further down; the first unread post itself scrolls to the marker.
+        if (index >= 0) list.scrollToItem(headerCount + index + if (markerAt in 0 until index) 1 else 0)
         viewModel.scrollHandled()
     }
 
@@ -285,7 +300,7 @@ private fun PageContent(page: Int, viewModel: ThreadViewModel, error: Throwable?
                 onOpenInBrowser = { browser(viewModel.threadUrl(page)) },
             )
             loaded == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            else -> PostList(loaded, page, list, error, textStyle, myUserId, viewModel)
+            else -> PostList(loaded, page, list, error, textStyle, myUserId, newFrom, viewModel)
         }
     }
 }
@@ -298,6 +313,7 @@ private fun PostList(
     error: Throwable?,
     textStyle: TextStyle,
     myUserId: Long?,
+    newFrom: Int?,
     viewModel: ThreadViewModel,
 ) {
     val browser = rememberOpenInBrowser()
@@ -355,22 +371,25 @@ private fun PostList(
                 )
             }
         }
-        items(ui.posts, key = { it.post.replyId }) { post ->
-            // Posts stay a readable width in landscape and on large screens.
-            PostFrame {
-                PostItem(
-                    post = post,
-                    textStyle = textStyle,
-                    isMine = myUserId != null && post.post.author.id == myUserId,
-                    onLink = viewModel::openLink,
-                    onQuote = { viewModel.openQuote(it, ui) },
-                    onUser = { viewModel.openLink("https://forums.whirlpool.net.au/user/${post.post.author.id}") },
-                    onUsersPosts = { viewModel.setFilter(PostFilter.ByUser(post.post.author.id)) },
-                    onReply = { browser(viewModel.replyToPostUrl(post.post)) },
-                    onEdit = { browser(viewModel.editPostUrl(post.post)) },
-                    onReport = { browser(viewModel.reportPostUrl(post.post)) },
-                    onOpenInBrowser = { browser(viewModel.postUrl(post.post, page)) },
-                )
+        ui.posts.forEach { post ->
+            if (post.post.number == newFrom) item(key = "new_posts") { NewPostsMarker() }
+            item(key = post.post.replyId) {
+                // Posts stay a readable width in landscape and on large screens.
+                PostFrame {
+                    PostItem(
+                        post = post,
+                        textStyle = textStyle,
+                        isMine = myUserId != null && post.post.author.id == myUserId,
+                        onLink = viewModel::openLink,
+                        onQuote = { viewModel.openQuote(it, ui) },
+                        onUser = { viewModel.openLink("https://forums.whirlpool.net.au/user/${post.post.author.id}") },
+                        onUsersPosts = { viewModel.setFilter(PostFilter.ByUser(post.post.author.id)) },
+                        onReply = { browser(viewModel.replyToPostUrl(post.post)) },
+                        onEdit = { browser(viewModel.editPostUrl(post.post)) },
+                        onReport = { browser(viewModel.reportPostUrl(post.post)) },
+                        onOpenInBrowser = { browser(viewModel.postUrl(post.post, page)) },
+                    )
+                }
             }
         }
         // As on Whirlpool and in Whirldroid: mark a watched thread read at the end of its last page, for those who
@@ -386,6 +405,22 @@ private fun PostList(
                 }
             }
         }
+    }
+}
+
+/** Where the unread posts start, like the orange line on Whirlpool. */
+@Composable
+private fun NewPostsMarker() {
+    val color = MaterialTheme.colorScheme.tertiary
+    Row(Modifier.readableWidth().padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        HorizontalDivider(Modifier.weight(1f), thickness = 2.dp, color = color)
+        Text(
+            stringResource(R.string.new_posts),
+            Modifier.padding(horizontal = 12.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = color,
+        )
+        HorizontalDivider(Modifier.weight(1f), thickness = 2.dp, color = color)
     }
 }
 
