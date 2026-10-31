@@ -125,6 +125,13 @@ class RepositoryTest {
     }
 
     @Test
+    fun `two panes are off until turned on`() = runTest {
+        assertFalse(settings.settings.first().twoPane)
+        settings.update { it.copy(twoPane = true) }
+        assertTrue(settings.settings.first().twoPane)
+    }
+
+    @Test
     fun `the layout defaults to Classic and is stored by id`() = runTest {
         assertEquals("classic", settings.settings.first().layout)
         settings.update { it.copy(layout = "cards") }

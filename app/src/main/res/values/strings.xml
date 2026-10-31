@@ -27,4 +27,5 @@
     <string name="watch_failed">Could not watch the thread: %1$s</string>
     <string name="mark_read_failed">Could not mark the thread read: %1$s</string>
     <string name="unwatch_failed">Could not unwatch the thread: %1$s</string>
+    <string name="choose_thread">Choose a thread</string>
 </resources>

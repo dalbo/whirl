@@ -87,4 +87,35 @@ class TopLevelBackStackTest {
         val s = TopLevelBackStack(WatchedRoute, tops, TopLevelBackStack.decode("not json"))
         assertEquals(listOf(WatchedRoute), s.visible)
     }
+
+    private val isList: (androidx.navigation3.runtime.NavKey) -> Boolean = { it == WatchedRoute || it is ForumRoute || it is UserRoute }
+
+    @Test
+    fun `a thread chosen in a list replaces the threads beside it`() {
+        val s = stack()
+        s.select(WatchedRoute)
+        s.openFromList(ThreadRoute("a"), isList)
+        assertEquals(listOf(ForumsRoute, WatchedRoute, ThreadRoute("a")), s.visible, "with the list on top it is a push")
+        s.push(ThreadRoute("b"))
+        s.openFromList(ThreadRoute("c"), isList)
+        assertEquals(listOf(ForumsRoute, WatchedRoute, ThreadRoute("c")), s.visible, "a and the thread it linked to go")
+
+        s.push(ForumRoute(7, "Desktops"))
+        s.openFromList(ThreadRoute("d"), isList)
+        assertEquals(listOf(ForumsRoute, WatchedRoute, ThreadRoute("c"), ForumRoute(7, "Desktops"), ThreadRoute("d")), s.visible)
+    }
+
+    @Test
+    fun `threads know their list and lists know the thread beside them`() {
+        val s = stack()
+        s.select(WatchedRoute)
+        s.openFromList(ThreadRoute("a"), isList)
+        s.push(ThreadRoute("b"))
+        s.push(UserRoute(1))
+        assertEquals(WatchedRoute, s.listBelow(ThreadRoute("b"), isList))
+        assertEquals(WatchedRoute, s.listBelow(UserRoute(1), isList))
+        assertEquals(ThreadRoute("a"), s.above(WatchedRoute))
+        assertEquals(null, s.above(UserRoute(1)))
+        assertEquals(null, s.listBelow(ForumsRoute, isList))
+    }
 }

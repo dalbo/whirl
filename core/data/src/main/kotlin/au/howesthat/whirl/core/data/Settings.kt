@@ -20,6 +20,8 @@ data class Settings(
     val textScale: TextScale = TextScale.DEFAULT,
     /** Slide and fade between screens; off switches screens at once. */
     val screenAnimations: Boolean = true,
+    /** On wide windows, a thread opens beside the list it came from. Experimental: off until tried on a real tablet. */
+    val twoPane: Boolean = false,
     /** Whirlpool pages (replies, private forums, "Open in browser") open in the browser app, not a Custom Tab. */
     val browserApp: Boolean = false,
     // Notifications

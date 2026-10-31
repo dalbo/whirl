@@ -96,6 +96,7 @@ class MainActivity : ComponentActivity() {
                             link = link,
                             onLinkHandled = viewModel::linkHandled,
                             animations = loaded.settings.screenAnimations,
+                            twoPane = loaded.settings.twoPane,
                         ) { host ->
                             WatchSnackbars(host, viewModel.watchEvents, viewModel::undo, viewModel::commit)
                         }

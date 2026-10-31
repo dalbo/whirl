@@ -50,3 +50,33 @@ class FilterSectionsTest {
         assertSame(sections, filterSections(sections, TextQuery("  ")))
     }
 }
+
+class KeepRowTest {
+    private val isp = ForumRef(92, "Choosing an ISP")
+    private val desktops = ForumRef(7, "Desktops")
+    private fun item(id: String, forum: ForumRef) = ThreadItem(ThreadId(id), ThreadId(id), id, forum = forum)
+
+    private val before = listOf(Section(isp, listOf(item("a", isp), item("b", isp))), Section(desktops, listOf(item("c", desktops))))
+
+    private fun ids(sections: List<Section>) = sections.map { s -> s.forum?.id to s.items.map { it.id.value } }
+
+    @Test
+    fun `the open thread stays where it was after it leaves the list`() {
+        val after = listOf(Section(isp, listOf(item("b", isp))), Section(desktops, listOf(item("c", desktops))))
+        assertEquals(listOf(92 to listOf("a", "b"), 7 to listOf("c")), ids(keepRow(after, before, ThreadId("a"))))
+    }
+
+    @Test
+    fun `its section comes back if it was the only row`() {
+        val after = listOf(Section(isp, listOf(item("a", isp), item("b", isp))))
+        assertEquals(listOf(92 to listOf("a", "b"), 7 to listOf("c")), ids(keepRow(after, before, ThreadId("c"))))
+    }
+
+    @Test
+    fun `nothing changes without a thread open or while it is still listed`() {
+        val after = listOf(Section(isp, listOf(item("b", isp))))
+        assertSame(after, keepRow(after, before, null))
+        assertSame(after, keepRow(after, null, ThreadId("a")))
+        assertSame(before, keepRow(before, before, ThreadId("a")))
+    }
+}
