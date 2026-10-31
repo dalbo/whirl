@@ -1,6 +1,7 @@
 package au.howesthat.whirl.feature.news
 
 import au.howesthat.whirl.core.model.NewsItem
+import au.howesthat.whirl.core.model.TextQuery
 import org.junit.Test
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -29,5 +30,15 @@ class NewsTest {
     @Test
     fun `articles open through Whirlpool's redirect`() {
         assertEquals("https://whirlpool.net.au/news/go.cfm?article=123", newsUrl(item(123, "2026-10-19T08:00:00+10:00")))
+    }
+
+    @Test
+    fun `find matches title, source or blurb and drops empty days`() {
+        val day1 = NewsDay(LocalDate.of(2026, 10, 20), listOf(NewsItem(1, "Telstra outage", "iTnews", "", OffsetDateTime.parse("2026-10-20T09:00:00+10:00"))))
+        val day2 = NewsDay(LocalDate.of(2026, 10, 19), listOf(NewsItem(2, "Prices rise", "ABC", "Optus and Telstra", OffsetDateTime.parse("2026-10-19T09:00:00+10:00"))))
+        val days = listOf(day1, day2)
+        assertEquals(listOf(1L, 2L), filterNews(days, TextQuery("telstra")).flatMap { d -> d.items.map { it.id } })
+        assertEquals(listOf(2L), filterNews(days, TextQuery("abc optus")).flatMap { d -> d.items.map { it.id } }, "source and blurb")
+        assertEquals(listOf(LocalDate.of(2026, 10, 20)), filterNews(days, TextQuery("itnews")).map { it.date })
     }
 }

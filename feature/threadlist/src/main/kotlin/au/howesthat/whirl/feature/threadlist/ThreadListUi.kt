@@ -1,5 +1,6 @@
 package au.howesthat.whirl.feature.threadlist
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -107,6 +108,8 @@ fun ThreadListBody(
     findQuery: String? = null,
     /** Offered under "Nothing here matches" (Watched's "Show N in All"). */
     findEmptyAction: (@Composable () -> Unit)? = null,
+    /** "Nothing here matches “%1\$s”", or a forum page's "on this page". */
+    @StringRes findNoneText: Int = au.howesthat.whirl.core.ui.R.string.find_none,
 ) {
     val launch = rememberThreadLauncher(nav)
     val browser = rememberOpenInBrowser()
@@ -135,7 +138,7 @@ fun ThreadListBody(
                 }
                 if (sections != null && sections.all { it.items.isEmpty() } && !findQuery.isNullOrBlank()) {
                     item(key = "empty") {
-                        EmptyState(stringResource(au.howesthat.whirl.core.ui.R.string.find_none, findQuery.trim()), Modifier.fillMaxWidth(), action = findEmptyAction)
+                        EmptyState(stringResource(findNoneText, findQuery.trim()), Modifier.fillMaxWidth(), action = findEmptyAction)
                     }
                 } else if (sections != null && sections.all { it.items.isEmpty() }) {
                     item(key = "empty") {

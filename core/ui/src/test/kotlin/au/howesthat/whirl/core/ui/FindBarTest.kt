@@ -1,5 +1,6 @@
 package au.howesthat.whirl.core.ui
 
+import android.view.KeyEvent
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,9 +16,14 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
+import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,6 +33,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class FindBarTest {
@@ -103,5 +110,34 @@ class FindBarTest {
         val bar = compose.onNodeWithTag("bar").getUnclippedBoundsInRoot()
         val input = field.getUnclippedBoundsInRoot()
         assertTrue(input.bottom <= bar.bottom, "field ${input.bottom} inside bar ${bar.bottom}")
+    }
+
+    @Test
+    fun `Escape closes the bar`() {
+        bar()
+        field.performKeyInput { pressKey(Key.Escape) }
+        assertTrue(closed)
+    }
+
+    @Test
+    fun `Ctrl+F and a lone slash are find shortcuts, other keys are not`() {
+        assertTrue(isFindShortcut(KeyEvent.KEYCODE_F, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON))
+        assertTrue(isFindShortcut(KeyEvent.KEYCODE_SLASH, 0))
+        assertTrue(!isFindShortcut(KeyEvent.KEYCODE_F, 0), "plain f is typing")
+        assertTrue(!isFindShortcut(KeyEvent.KEYCODE_F, KeyEvent.META_CTRL_ON or KeyEvent.META_SHIFT_ON))
+        assertTrue(!isFindShortcut(KeyEvent.KEYCODE_SLASH, KeyEvent.META_SHIFT_ON), "? is not /")
+    }
+
+    @Test
+    fun `a shortcut reaches the screen on top`() {
+        val requests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        var opened = 0
+        compose.setContent {
+            CompositionLocalProvider(LocalFindRequests provides requests) { OnFindShortcut { opened++ } }
+        }
+        compose.waitForIdle()
+        requests.tryEmit(Unit)
+        compose.waitForIdle()
+        assertEquals(1, opened)
     }
 }

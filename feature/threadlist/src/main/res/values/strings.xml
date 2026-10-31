@@ -65,5 +65,6 @@
         <item quantity="one">Show %1$d in All</item>
         <item quantity="other">Show %1$d in All</item>
     </plurals>
+    <string name="find_none_on_page">Nothing on this page matches “%1$s”.</string>
     <string name="find_look_in_all">Look in All</string>
 </resources>

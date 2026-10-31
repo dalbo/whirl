@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -37,6 +38,11 @@ import au.howesthat.whirl.core.model.NewsItem
 import au.howesthat.whirl.core.ui.ErrorState
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
+import au.howesthat.whirl.core.model.TextQuery
+import au.howesthat.whirl.core.ui.EmptyState
+import au.howesthat.whirl.core.ui.FindBar
+import au.howesthat.whirl.core.ui.FindButton
+import au.howesthat.whirl.core.ui.OnFindShortcut
 import au.howesthat.whirl.core.ui.UpdatedAgo
 import au.howesthat.whirl.core.ui.errorMessage
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
@@ -47,6 +53,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -68,12 +75,25 @@ fun groupByDay(items: List<NewsItem>, zone: ZoneId): List<NewsDay> =
         .groupBy { it.date.atZoneSameInstant(zone).toLocalDate() }
         .map { (date, list) -> NewsDay(date, list) }
 
+/** Find in list: articles whose title, source or blurb match [query]; days left empty drop. */
+fun filterNews(days: List<NewsDay>, query: TextQuery): List<NewsDay> =
+    if (query.isBlank) days
+    else days.map { day -> day.copy(items = day.items.filter { query.matches(it.title, it.source, it.blurb) }) }.filter { it.items.isNotEmpty() }
+
 data class NewsState(val days: List<NewsDay>?, val updatedAt: Instant?)
 
 @HiltViewModel
-class NewsViewModel @Inject constructor(private val repo: NewsRepository) : ViewModel() {
-    val state: StateFlow<NewsState> = repo.news
-        .map { NewsState(it.updatedAt?.let { _ -> groupByDay(it.value, ZoneId.systemDefault()) }, it.updatedAt) }
+class NewsViewModel @Inject constructor(private val repo: NewsRepository, private val savedState: SavedStateHandle) : ViewModel() {
+    /** Find in list: null while the bar is closed. Saved, so it survives process death. */
+    val query: StateFlow<String?> = savedState.getStateFlow(QUERY_KEY, null)
+
+    fun setQuery(query: String?) {
+        savedState[QUERY_KEY] = query
+    }
+
+    val state: StateFlow<NewsState> = combine(repo.news, query) { news, query ->
+        NewsState(news.updatedAt?.let { _ -> filterNews(groupByDay(news.value, ZoneId.systemDefault()), TextQuery(query)) }, news.updatedAt)
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NewsState(null, null))
 
     private val _refreshing = MutableStateFlow(false)
@@ -102,6 +122,10 @@ class NewsViewModel @Inject constructor(private val repo: NewsRepository) : View
             }
         }
     }
+
+    private companion object {
+        const val QUERY_KEY = "findQuery"
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -110,15 +134,32 @@ fun NewsScreen(navIcon: NavIcon, viewModel: NewsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    val query by viewModel.query.collectAsStateWithLifecycle()
     val browser = rememberOpenInBrowser()
+    OnFindShortcut { if (query == null) viewModel.setQuery("") }
     Scaffold(
         topBar = {
-            TopAppBar(
-                colors = whirlTopBarColors(),
-                title = { Text(stringResource(R.string.news_title)) },
-                navigationIcon = { NavIconButton(navIcon) },
-                actions = { IconButton(onClick = { viewModel.refresh() }) { Icon(Icons.Default.Refresh, stringResource(R.string.refresh)) } },
-            )
+            val find = query
+            if (find == null) {
+                TopAppBar(
+                    colors = whirlTopBarColors(),
+                    title = { Text(stringResource(R.string.news_title)) },
+                    navigationIcon = { NavIconButton(navIcon) },
+                    actions = {
+                        FindButton { viewModel.setQuery("") }
+                        IconButton(onClick = { viewModel.refresh() }) { Icon(Icons.Default.Refresh, stringResource(R.string.refresh)) }
+                    },
+                )
+            } else {
+                // Whirlpool's search finds threads, not news: no chip here.
+                FindBar(
+                    query = find,
+                    onQueryChange = viewModel::setQuery,
+                    onClose = { viewModel.setQuery(null) },
+                    label = stringResource(au.howesthat.whirl.core.ui.R.string.find_in, stringResource(R.string.news_title)),
+                    matches = state.days?.sumOf { it.items.size },
+                )
+            }
         },
     ) { padding ->
         PullToRefreshBox(isRefreshing = refreshing, onRefresh = { viewModel.refresh() }, modifier = Modifier.padding(padding).fillMaxSize()) {
@@ -132,6 +173,11 @@ fun NewsScreen(navIcon: NavIcon, viewModel: NewsViewModel = hiltViewModel()) {
                     item(key = "updated") {
                         UpdatedAgo(state.updatedAt, Instant.now(), Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
                         failed?.let { Text(errorMessage(it), Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error) }
+                    }
+                    if (days != null && days.isEmpty() && !query.isNullOrBlank()) {
+                        item(key = "empty") {
+                            EmptyState(stringResource(au.howesthat.whirl.core.ui.R.string.find_none, query.orEmpty().trim()), Modifier.fillMaxWidth())
+                        }
                     }
                     days.orEmpty().forEach { day ->
                         item(key = "d-${day.date}") { DayHeader(dayLabel(day.date, today)) }
