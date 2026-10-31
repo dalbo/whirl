@@ -11,6 +11,10 @@
     <string name="nav_about">About</string>
     <string name="about_version">Version %1$s</string>
     <string name="about_summary">An unofficial Android client for the Whirlpool forums, rewritten from Whirldroid. Free software under the MIT licence.</string>
+    <string name="about_thread">Whirl on Whirlpool</string>
+    <string name="about_thread_summary">News, questions and feedback in the Whirl thread</string>
+    <string name="about_play">Google Play</string>
+    <string name="about_play_summary">Whirl\'s page on the Play Store, to rate it or share it</string>
     <string name="about_source">Source code</string>
     <string name="about_issues">Report a problem or suggest a feature</string>
     <string name="about_concern">Report a concern</string>

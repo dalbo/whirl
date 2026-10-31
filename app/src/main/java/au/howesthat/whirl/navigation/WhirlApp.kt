@@ -194,7 +194,7 @@ fun WhirlApp(
                 onSignedOut = {},
             )
         }
-        entry<AboutRoute> { AboutScreen(backIcon) }
+        entry<AboutRoute> { AboutScreen(backIcon, onOpenThread = { id -> backStack.push(ThreadRoute(id)) }) }
     }
     // One set of entries per drawer stack, each with its own saved state and ViewModels, so a stack that is not on
     // screen keeps them (Navigation 2's saveState/restoreState).
