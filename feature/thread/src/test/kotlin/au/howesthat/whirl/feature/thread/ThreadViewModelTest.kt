@@ -112,20 +112,20 @@ class ThreadViewModelTest {
     }
 
     @Test
-    fun `a watched thread opened elsewhere keeps its new-posts marker after auto mark as read`() = runTest {
+    fun `a watched thread opened elsewhere keeps its new-posts marker once marked read`() = runTest {
         val row = WatchedThreadColumns(
             "3pxj858k", "NBN", 92, "Choosing an ISP", replies = 60, firstUserId = 1, firstUserName = "a", firstDate = 0,
             lastUserId = 2, lastUserName = "b", lastDate = 0, unreadCount = 9, lastReadPost = 52, lastPage = 3,
         )
         db.threadDao().replaceWatchedList("all", listOf(row))
-        settings.update { it.copy(watchedAutoMarkAsRead = true) }
         enqueueHtml("thread_3pxj858k_p2.html")
         val vm = viewModel(ThreadRoute("3pxj858k", 2))
         assertEquals(53, await { vm.firstUnread.filterNotNull().first() })
-        // Marked read as it opened: the cache moves on, the marker does not.
-        await { watched.watched(unreadOnly = false).first { it.value.single().unreadCount == 0 } }
+        // Marked read (as auto mark as read does, after the position is read): the cache moves on, the marker does not.
+        // Done on the cache directly: this test client has no key, so a real mark-read send fails and rolls back.
+        db.threadDao().markRead(listOf("3pxj858k"))
+        assertEquals(null, watched.lastReadPost(ThreadId("3pxj858k")))
         assertEquals(53, vm.firstUnread.value)
-        settings.update { it.copy(watchedAutoMarkAsRead = false) }
     }
 
     @Test
