@@ -197,7 +197,9 @@ Accessibility (TalkBack, font scaling), landscape, Material You, store listing t
 
 **Parked until Whirlpool's moderators approve** (see Decisions, "Web session in the app"): any in-app web login, and everything it would unlock (private forums, PMs, mark-read-to-here, native posting). Ask in the API thread or of the moderators before any work on it.
 
-**Backlog** (not in v1): app widget, tablet two-pane, image loading once a fixture exists, and the archive idea below.
+**Next (agreed 2026-10-31, `docs/plan-v1.3.md`)**: v1.3 find in list (filter the rows a list shows, with a "Search Whirlpool" chip); v1.4 tablet two-pane on Navigation 3, experimental and off by default until tried on a real tablet.
+
+**Backlog**: app widget, loading linked images (Whirlpool has no inline images; a later idea), and the archive idea below.
 
 **Idea, undecided (Dallin, 2026-10-23): archive reader and in-app post filters.** `/archive/<id>` is the thread 800 posts at a time (`/archive/<id>-N` for later pages), public (no login), every post with `data-userid`, name and `.usergroup`. Two uses of one download:
 - *Archive reader*: read a thread a few hundred posts at a time by scrolling instead of paging; offline once cached.

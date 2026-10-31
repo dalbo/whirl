@@ -115,9 +115,11 @@ PLAN.md §9 is the scope. One PR per task, tests for every repository, worker an
 - **Whirlpool posts not yet made**: drafts for the v1.1 reply in the Whirldroid thread are in `docs/community.md` §4; Dallin posts them himself. The tester call there is still subject to the moderators' answer (see "Waiting on others").
 - **Device checks this session** used the debug build (`au.howesthat.whirl.debug`, left on Whirldroid colours, Classic, Light, Screen animations off). Animations were checked with `adb shell screenrecord` and an ffmpeg contact sheet (`ffmpeg -i x.mp4 -vf "fps=8,scale=220:-1,tile=8x2" -frames:v 1 sheet.png`). The phone locks often; ask Dallin to unlock rather than changing its settings.
 
-## Next phase candidates (not started; Dallin to choose)
-Nothing is required for v1. What is left, roughly by value:
-- **From the backlog** (PLAN.md §9): image loading (needs a fixture with an image first), tablet two-pane, app widget; and an undecided idea: the `/archive/` whole-thread page as a one-page reader for small threads and for filtering posts by user in the app (PLAN.md §9, "Idea, undecided").
+## Next phase (agreed 2026-10-31)
+**`docs/plan-v1.3.md`** is the plan: v1.3.0 find in list (a tester asked to search Watched), then a Navigation 3 spike, PR A (Nav3, no visible change) and PR B (two-pane, experimental, setting off by default) as v1.4.0. Dallin has no tablet: two-pane is checked on emulators; the phone is the release gate.
+
+Other candidates, roughly by value:
+- **From the backlog** (PLAN.md §9): loading linked images (later), app widget; and an undecided idea: the `/archive/` whole-thread page as a one-page reader for small threads and for filtering posts by user in the app (PLAN.md §9, "Idea, undecided").
 - **Feedback from testers** once the closed test runs: treat as the next priority.
 - **Small polish**: the poster's name in a post header is a tap target under 48 dp; deleted-post markup never captured (parser tolerates it).
 - **Housekeeping on a schedule**: targetSdk 37 before August 2027; Google developer verification (2027); keep AGP/Kotlin/Compose current; re-check reproducibility when the build changes (`docs/fdroid/README.md`).
