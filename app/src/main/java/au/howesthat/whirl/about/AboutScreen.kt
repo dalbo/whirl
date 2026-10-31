@@ -30,13 +30,18 @@ import au.howesthat.whirl.core.ui.whirlTopBarColors
 const val REPO_URL = "https://github.com/dalbo/whirl"
 const val ISSUES_URL = "$REPO_URL/issues"
 private const val WHIRLDROID_THREAD_URL = "https://forums.whirlpool.net.au/thread/97q1vrm9"
+/** Whirl's own thread on Whirlpool (Android › Apps), opened in the app. */
+const val WHIRL_THREAD_ID = "9244p8v1"
+/** The listing's address never changes; until Whirl leaves closed testing only testers can see it. */
+private const val PLAY_PACKAGE = "au.howesthat.whirl"
+private const val PLAY_URL = "https://play.google.com/store/apps/details?id=$PLAY_PACKAGE"
 private const val CONTACT_EMAIL = "whirl@howesthat.net.au"
 /** Google Play's Child Safety Standards (Social apps): published standards and an in-app way to report. */
 private const val CHILD_SAFETY_URL = "https://dalbo.github.io/whirl/child-safety/"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AboutScreen(navIcon: NavIcon) {
+fun AboutScreen(navIcon: NavIcon, onOpenThread: (String) -> Unit) {
     val open = rememberOpenInBrowser()
     val context = LocalContext.current
     val subject = stringResource(R.string.about_concern_subject)
@@ -48,6 +53,16 @@ fun AboutScreen(navIcon: NavIcon) {
                 Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall)
                 Text(stringResource(R.string.about_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyMedium)
                 Text(stringResource(R.string.about_summary), style = MaterialTheme.typography.bodyMedium)
+            }
+            Link(stringResource(R.string.about_thread), stringResource(R.string.about_thread_summary)) { onOpenThread(WHIRL_THREAD_ID) }
+            Link(stringResource(R.string.about_play), stringResource(R.string.about_play_summary)) {
+                // The Play Store app if there is one, else its web page.
+                val market = Intent(Intent.ACTION_VIEW, "market://details?id=$PLAY_PACKAGE".toUri()).setPackage("com.android.vending")
+                try {
+                    context.startActivity(market)
+                } catch (_: ActivityNotFoundException) {
+                    open(PLAY_URL)
+                }
             }
             Link(stringResource(R.string.about_source), REPO_URL) { open(REPO_URL) }
             Link(stringResource(R.string.about_issues), ISSUES_URL) { open(ISSUES_URL) }
