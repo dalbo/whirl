@@ -37,10 +37,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
+import androidx.navigation3.runtime.NavKey
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import au.howesthat.whirl.core.data.ForumThreadsRepository
 import au.howesthat.whirl.core.data.OpenedFrom
 import au.howesthat.whirl.core.data.ScrapedList
@@ -70,21 +72,24 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import javax.inject.Inject
 
 /** A forum's thread list, optionally narrowed to a group. */
 @Serializable
-data class ForumRoute(val forumId: Int, val title: String, val groupId: Int? = null)
+data class ForumRoute(val forumId: Int, val title: String, val groupId: Int? = null) : NavKey
 
 @OptIn(ExperimentalCoroutinesApi::class)
-@HiltViewModel
-class ForumViewModel @Inject constructor(
-    savedState: SavedStateHandle,
+@HiltViewModel(assistedFactory = ForumViewModel.Factory::class)
+class ForumViewModel @AssistedInject constructor(
+    @Assisted val route: ForumRoute,
     deps: ListDeps,
     private val scraped: ScrapedListRepository,
     private val apiThreads: ForumThreadsRepository,
 ) : ListViewModel(deps, OpenedFrom.LIST) {
-    val route = savedState.toRoute<ForumRoute>()
+    @AssistedFactory
+    interface Factory {
+        fun create(route: ForumRoute): ForumViewModel
+    }
+
     private val forumId = route.forumId
 
     /** The route's title, or (for links, which carry none) the forum's name from the forum list or the page. */
@@ -171,7 +176,12 @@ class ForumViewModel @Inject constructor(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ForumScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: ForumViewModel = hiltViewModel()) {
+fun ForumScreen(
+    route: ForumRoute,
+    navIcon: NavIcon,
+    nav: ThreadListNav,
+    viewModel: ForumViewModel = hiltViewModel<ForumViewModel, ForumViewModel.Factory> { it.create(route) },
+) {
     val isPrivate by viewModel.isPrivate.collectAsStateWithLifecycle()
     val group by viewModel.group.collectAsStateWithLifecycle()
     val groups by viewModel.groups.collectAsStateWithLifecycle()

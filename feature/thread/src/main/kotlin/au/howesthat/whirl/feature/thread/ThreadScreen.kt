@@ -107,7 +107,12 @@ class ThreadNav(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ThreadScreen(navIcon: NavIcon, nav: ThreadNav, viewModel: ThreadViewModel = hiltViewModel()) {
+fun ThreadScreen(
+    route: ThreadRoute,
+    navIcon: NavIcon,
+    nav: ThreadNav,
+    viewModel: ThreadViewModel = hiltViewModel<ThreadViewModel, ThreadViewModel.Factory> { it.create(route) },
+) {
     val startPage by viewModel.startPage.collectAsStateWithLifecycle()
     val pageCount by viewModel.pageCount.collectAsStateWithLifecycle()
     val title by viewModel.title.collectAsStateWithLifecycle()

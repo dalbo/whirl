@@ -1,9 +1,11 @@
 package au.howesthat.whirl.feature.thread
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
+import androidx.navigation3.runtime.NavKey
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository
@@ -39,7 +41,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import java.time.Instant
-import javax.inject.Inject
 
 /**
  * A thread, opened at [page] (1-based, or -1 for the last page). [scrollToPost] is a post number, [scrollToReply] a
@@ -54,7 +55,7 @@ data class ThreadRoute(
     val forumId: Int? = null,
     val userId: Long? = null,
     val fromWatched: Boolean = false,
-)
+) : NavKey
 
 /** A post ready to draw: its body parsed into blocks. */
 data class UiPost(val post: Post, val body: PostBody)
@@ -76,14 +77,18 @@ sealed interface ThreadEvent {
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
-@HiltViewModel
-class ThreadViewModel @Inject constructor(
-    savedState: SavedStateHandle,
+@HiltViewModel(assistedFactory = ThreadViewModel.Factory::class)
+class ThreadViewModel @AssistedInject constructor(
+    @Assisted private val route: ThreadRoute,
     private val repo: ThreadPageRepository,
     private val settingsRepo: SettingsRepository,
     private val watchedRepo: WatchedRepository,
 ) : ViewModel() {
-    private val route = savedState.toRoute<ThreadRoute>()
+    @AssistedFactory
+    interface Factory {
+        fun create(route: ThreadRoute): ThreadViewModel
+    }
+
     val threadId = ThreadId(route.threadId)
     private val urls = WhirlpoolUrls()
 

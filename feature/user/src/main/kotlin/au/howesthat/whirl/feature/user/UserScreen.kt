@@ -26,10 +26,12 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
+import androidx.navigation3.runtime.NavKey
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import au.howesthat.whirl.core.data.OpenedFrom
 import au.howesthat.whirl.core.data.UserRepository
 import au.howesthat.whirl.core.model.UserProfile
@@ -52,18 +54,22 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.serialization.Serializable
-import javax.inject.Inject
 
 @Serializable
-data class UserRoute(val userId: Long)
+data class UserRoute(val userId: Long) : NavKey
 
-@HiltViewModel
-class UserViewModel @Inject constructor(
-    savedState: SavedStateHandle,
+@HiltViewModel(assistedFactory = UserViewModel.Factory::class)
+class UserViewModel @AssistedInject constructor(
+    @Assisted route: UserRoute,
     deps: ListDeps,
     private val repo: UserRepository,
 ) : ListViewModel(deps, OpenedFrom.LIST) {
-    val userId = savedState.toRoute<UserRoute>().userId
+    @AssistedFactory
+    interface Factory {
+        fun create(route: UserRoute): UserViewModel
+    }
+
+    val userId = route.userId
 
     val profile: StateFlow<UserProfile?> = repo.profile(userId).map { it?.value }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -86,7 +92,12 @@ class UserViewModel @Inject constructor(
 /** A user's profile: the "About this user" lines, then their recent activity as a thread list. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UserScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: UserViewModel = hiltViewModel()) {
+fun UserScreen(
+    route: UserRoute,
+    navIcon: NavIcon,
+    nav: ThreadListNav,
+    viewModel: UserViewModel = hiltViewModel<UserViewModel, UserViewModel.Factory> { it.create(route) },
+) {
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()

@@ -1,6 +1,5 @@
 package au.howesthat.whirl.feature.thread
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
@@ -83,7 +82,7 @@ class ThreadViewModelTest {
     private fun enqueueHtml(name: String) =
         server.enqueue(MockResponse.Builder().body(File(System.getProperty("whirl.fixtures"), "html/$name").readText()).build())
 
-    private fun viewModel(vararg args: Pair<String, Any?>) = ThreadViewModel(SavedStateHandle(mapOf(*args)), repo, settings, watched)
+    private fun viewModel(route: ThreadRoute) = ThreadViewModel(route, repo, settings, watched)
 
     // Room and MockWebServer do real I/O, so wait in wall-clock time, not runTest's virtual time.
     private suspend fun <T> await(block: suspend () -> T): T =
@@ -92,7 +91,7 @@ class ThreadViewModelTest {
     @Test
     fun `the last page resolves through the server`() = runTest {
         enqueueHtml("thread_97r5wzn3_last.html")
-        val vm = viewModel("threadId" to "97r5wzn3", "page" to -1)
+        val vm = viewModel(ThreadRoute("97r5wzn3", -1))
         assertEquals(2290, await { vm.startPage.filterNotNull().first() })
         assertEquals("/thread/97r5wzn3?p=-1", server.takeRequest().target)
         assertEquals(2290, vm.pageCount.value)
@@ -102,7 +101,7 @@ class ThreadViewModelTest {
     @Test
     fun `a quote on the same page scrolls without fetching`() = runTest {
         enqueueHtml("thread_3pxj858k_p2.html")
-        val vm = viewModel("threadId" to "3pxj858k", "page" to 2)
+        val vm = viewModel(ThreadRoute("3pxj858k", 2))
         val page = await { vm.page(2).filterNotNull().first() }
         val quoted = page.posts[3].post
         vm.openQuote(quoted.replyId, page)
@@ -113,7 +112,7 @@ class ThreadViewModelTest {
     @Test
     fun `links route in the app or to the browser`() = runTest {
         enqueueHtml("thread_3pxj858k_p2.html")
-        val vm = viewModel("threadId" to "3pxj858k", "page" to 2)
+        val vm = viewModel(ThreadRoute("3pxj858k", 2))
         await { vm.startPage.filterNotNull().first() }
         vm.navigation.test {
             vm.openLink("https://forums.whirlpool.net.au/thread/97r5wzn3?p=4#r61")
@@ -132,7 +131,7 @@ class ThreadViewModelTest {
     @Test
     fun `a link into the same thread moves the pager`() = runTest {
         enqueueHtml("thread_3pxj858k_p2.html")
-        val vm = viewModel("threadId" to "3pxj858k", "page" to 2)
+        val vm = viewModel(ThreadRoute("3pxj858k", 2))
         await { vm.startPage.filterNotNull().first() }
         vm.openLink("https://forums.whirlpool.net.au/thread/3pxj858k?p=7#r130")
         assertEquals(7, await { vm.jumpTo.filterNotNull().first() })
@@ -142,7 +141,7 @@ class ThreadViewModelTest {
     @Test
     fun `a quote on another page is located through the site`() = runTest {
         enqueueHtml("thread_3pxj858k_p2.html")
-        val vm = viewModel("threadId" to "3pxj858k", "page" to 1)
+        val vm = viewModel(ThreadRoute("3pxj858k", 1))
         await { vm.startPage.filterNotNull().first() }
         server.takeRequest()
         enqueueHtml("thread_3pxj858k_p2.html")
@@ -155,7 +154,7 @@ class ThreadViewModelTest {
     @Test
     fun `a short link that cannot be followed opens in the browser`() = runTest {
         enqueueHtml("thread_3pxj858k_p2.html")
-        val vm = viewModel("threadId" to "3pxj858k", "page" to 2)
+        val vm = viewModel(ThreadRoute("3pxj858k", 2))
         await { vm.startPage.filterNotNull().first() }
         vm.navigation.test {
             // The test client cannot resolve whrl.pl, so following the link fails.
@@ -172,7 +171,7 @@ class ThreadViewModelTest {
         // Two minutes later the cached page is stale, so the view model fetches, and the fetch fails.
         val later = Clock.offset(clock, Duration.ofMinutes(2))
         val staleRepo = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, later)
-        val vm = ThreadViewModel(SavedStateHandle(mapOf("threadId" to "3pxj858k", "page" to 2)), staleRepo, settings, watched)
+        val vm = ThreadViewModel(ThreadRoute("3pxj858k", 2), staleRepo, settings, watched)
         assertEquals(2, await { vm.startPage.filterNotNull().first() })
         assertEquals("Simple, ad-free NBN plan comparison tool I built", await { vm.title.filterNotNull().first() })
         await { vm.error.filterNotNull().first() }
@@ -181,14 +180,14 @@ class ThreadViewModelTest {
     @Test
     fun `watch flips the menu at once, and marking read from Watched can go back to the list`() = runTest {
         enqueueHtml("thread_3pxj858k_p2.html")
-        val vm = viewModel("threadId" to "3pxj858k", "page" to 2)
+        val vm = viewModel(ThreadRoute("3pxj858k", 2))
         assertEquals(false, vm.isWatched.value)
         vm.perform(WatchAction.WATCH)
         await { vm.isWatched.first { it } }
 
         settings.update { it.copy(watchedBackToList = true) }
         enqueueHtml("thread_3pxj858k_p2.html")
-        val fromWatched = viewModel("threadId" to "3pxj858k", "page" to 2, "fromWatched" to true)
+        val fromWatched = viewModel(ThreadRoute("3pxj858k", 2, fromWatched = true))
         await { fromWatched.settings.first { it.watchedBackToList } }
         fromWatched.navigation.test {
             fromWatched.perform(WatchAction.MARK_READ)
@@ -199,7 +198,7 @@ class ThreadViewModelTest {
     @Test
     fun `posts by OP reads the thread starter from page 1 and opens the filtered view in the browser`() = runTest {
         enqueueHtml("thread_97r5wzn3_last.html")
-        val vm = viewModel("threadId" to "97r5wzn3", "page" to -1)
+        val vm = viewModel(ThreadRoute("97r5wzn3", -1))
         await { vm.startPage.filterNotNull().first() }
         server.takeRequest()
         enqueueHtml("thread_97r5wzn3_p1.html")
@@ -216,7 +215,7 @@ class ThreadViewModelTest {
     @Test
     fun `filters need a Whirlpool login, so they open in the browser`() = runTest {
         enqueueHtml("thread_3pxj858k_p2.html")
-        val vm = viewModel("threadId" to "3pxj858k", "page" to 2)
+        val vm = viewModel(ThreadRoute("3pxj858k", 2))
         await { vm.page(2).filterNotNull().first() }
         vm.navigation.test {
             vm.setFilter(PostFilter.Moderators)
@@ -246,7 +245,7 @@ class ThreadViewModelTest {
         val keyed = WatchedRepository(WhirlpoolApi(client, { "k" }, api.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), clock, appScope)
         val pages = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(api.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock)
         settings.update { it.copy(watchedAutoMarkAsRead = true) }
-        ThreadViewModel(SavedStateHandle(mapOf("threadId" to "9yvx1663", "page" to 1)), pages, settings, keyed)
+        ThreadViewModel(ThreadRoute("9yvx1663", 1), pages, settings, keyed)
         val marked = await {
             generateSequence { api.takeRequest(5, TimeUnit.SECONDS) }.first { it.url.queryParameter("watchedread") != null }
         }

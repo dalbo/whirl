@@ -181,6 +181,27 @@ lifecycle-viewmodel-navigation3 2.11.0 (lifecycle is already 2.11.0), material3 
    drawer-stack saver (polymorphic serialization is enforced).
 5. Whether Robolectric `@Config(qualifiers = …)` drives `currentWindowAdaptiveInfoV2`; if not, `WhirlApp` takes the
    pane directive as a parameter so tests can set it.
+**Spike results (2026-10-31, from the sources of navigation3 1.2.0, lifecycle-viewmodel-navigation3 2.11.0,
+adaptive-navigation3 1.3.0):**
+1. Drawer stacks: one `rememberDecoratedNavEntries(stack, decorators, provider)` per drawer destination, each with
+   its own `SaveableStateHolder` and `ViewModelStoreProvider`, called on every composition; `NavDisplay(entries = …)`
+   shows the start stack's entries plus the selected one's. A stack not shown keeps its ViewModels and saved state
+   (the decorators clear an entry only when it leaves its own stack).
+2. `ListDetailSceneStrategy` walks back from the last entry while entries have pane metadata, keeps those with the
+   last entry's `sceneKey` (others are skipped, not a stop) and draws the **last** list and the **last** detail among
+   them. A detail entry with no list in its scene gives one pane, so the strategy returns null and the entry shows
+   full width. Consequences: (a) give each list entry its own `sceneKey` and each thread its list's key (computed in
+   the entry provider from the stack), or [Watched, A, User] would show User beside A; (b) use
+   `BackNavigationBehavior.PopLatest`: the default `PopUntilScaffoldValueChange` would pop A and B together from
+   [List, A, B], since both look the same to the scaffold.
+3. Pane motion is per entry: `ListDetailSceneStrategy.paneAnimation(EnterTransition.None, ExitTransition.None,
+   snap())` in each entry's metadata when "Screen animations" is off; `preferredPaneSize(width = 400.dp)` on lists.
+4. `rememberNavBackStack` needs a `SavedStateConfiguration` with a `SerializersModule` listing every route (built in
+   `:app`, which sees them all); the drawer stacks are saved with the same module.
+5. Robolectric window size: not tried; `WhirlApp` takes the directive as a parameter so tests set it.
+Identical keys share a `contentKey` (so a thread opened twice in one stack, unchanged, shares its ViewModel); rare,
+accepted.
+
 If the spike goes badly, the fallback is Nav2 with the thread hosted inside the list destination on wide windows only,
 turned into a pushed `ThreadRoute` on a wide → narrow resize.
 
