@@ -2,6 +2,14 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.3.0
+Find in list, asked for by a tester.
+- A search icon on Watched, Recent, Latest activity, Popular, a forum's threads, Forums and Industry news filters what the list shows as you type: every word must appear in the thread title or the forum or group name (case and accents ignored). Forums also matches section names; Industry news matches titles, sources and summaries. On a forum it filters the page you are on.
+- "Search Whirlpool for …" under the box searches the site for the same words: within the forum on a forum page, site-wide elsewhere. On Forums and a forum page this replaces the old search icon.
+- On Watched's Unread tab, when nothing unread matches, "Show N in All" switches to All with the same filter.
+- The filter stays while you open a thread and come back; the back arrow or Back clears it.
+- With a keyboard: Ctrl+F or / opens it, Esc closes it.
+
 ## v1.2.0
 Tester feedback from the Whirl and Whirldroid threads.
 - Recent threads: pick how far back to look ("Last 7 days") at the top of the screen, now up to 365 days. The setting moved there from Settings.

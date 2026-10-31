@@ -117,6 +117,8 @@ PLAN.md §9 is the scope. One PR per task, tests for every repository, worker an
 
 ## Next phase (agreed 2026-10-31)
 **`docs/plan-v1.3.md`** is the plan: v1.3.0 find in list (a tester asked to search Watched), then a Navigation 3 spike, PR A (Nav3, no visible change) and PR B (two-pane, experimental, setting off by default) as v1.4.0. Dallin has no tablet: two-pane is checked on emulators; the phone is the release gate.
+- **v1.3.0 find in list** (#78, #79, released 2026-10-31): `TextQuery` (`:core:model`), `FindBar`/`FindButton`/`OnFindShortcut` (`:core:ui`), the query in each list ViewModel's `SavedStateHandle` (`ListDeps.savedState` for thread lists). Checked on the emulator only, not yet on the phone.
+- **Emulator** (Windows side): AVD `Medium_Phone_API_36.1` (`emulator.exe -avd …`; WHPX works). Unlike this machine's curl/OkHttp, **the emulator reaches Whirlpool** (API and scraped pages) with Dallin's key entered at setup. If adb shows it `offline`, kill `qemu-system-x86_64.exe` and start it with `-no-snapshot`.
 
 Other candidates, roughly by value:
 - **From the backlog** (PLAN.md §9): loading linked images (later), app widget; and an undecided idea: the `/archive/` whole-thread page as a one-page reader for small threads and for filtering posts by user in the app (PLAN.md §9, "Idea, undecided").

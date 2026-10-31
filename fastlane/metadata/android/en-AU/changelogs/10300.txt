@@ -1,0 +1,5 @@
+Whirl 1.3
+- Find in list: filter Watched, Recent, Latest, Popular, a forum page, Forums and news by typing
+- "Search Whirlpool for …" under the box searches the site for the same words
+- Watched: "Show N in All" when nothing unread matches
+- Keyboard: Ctrl+F or / to find, Esc to close
