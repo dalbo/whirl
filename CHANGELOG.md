@@ -2,6 +2,10 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## Unreleased
+- Settings › Notifications › "Check history": the last 20 background checks for watched-thread replies (when each ran, how long after the one before, what it found, and whether it notified), with what can delay them: battery use, app standby, Battery Saver, Data Saver, and whether notifications are allowed. The share button sends it as text, to paste into the Whirl thread when notifications seem late. It contains no thread titles or account details.
+- Checks now run in the last few minutes of each interval instead of anywhere in it, so on a phone that is awake they are about one interval apart.
+
 ## v1.4.1
 - About: "Whirl on Whirlpool" opens Whirl's thread in the app, and "Google Play" opens Whirl's Play Store page, to rate or share it.
 

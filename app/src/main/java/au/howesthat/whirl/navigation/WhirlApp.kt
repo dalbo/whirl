@@ -63,6 +63,7 @@ import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 import au.howesthat.whirl.feature.forums.ForumsScreen
 import au.howesthat.whirl.feature.news.NewsScreen
+import au.howesthat.whirl.feature.settings.CheckHistoryScreen
 import au.howesthat.whirl.feature.settings.SettingsScreen
 import au.howesthat.whirl.feature.thread.ThreadNav
 import au.howesthat.whirl.feature.thread.ThreadRoute
@@ -192,8 +193,10 @@ fun WhirlApp(
                 onBack = { backStack.pop() },
                 // Signing out clears setupDone, and MainActivity swaps this whole tree for the setup wizard.
                 onSignedOut = {},
+                onCheckHistory = { backStack.push(CheckHistoryRoute) },
             )
         }
+        entry<CheckHistoryRoute> { CheckHistoryScreen(onBack = { backStack.pop() }) }
         entry<AboutRoute> { AboutScreen(backIcon, onOpenThread = { id -> backStack.push(ThreadRoute(id)) }) }
     }
     // One set of entries per drawer stack, each with its own saved state and ViewModels, so a stack that is not on

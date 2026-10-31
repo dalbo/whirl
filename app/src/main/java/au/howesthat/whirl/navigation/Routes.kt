@@ -13,6 +13,7 @@ import kotlinx.serialization.modules.subclass
 
 @Serializable object SettingsRoute : NavKey
 @Serializable object AboutRoute : NavKey
+@Serializable object CheckHistoryRoute : NavKey
 
 // Drawer destinations.
 @Serializable object NewsRoute : NavKey
@@ -36,6 +37,7 @@ val RouteSerializers = SerializersModule {
     polymorphic(NavKey::class) {
         subclass(SettingsRoute::class)
         subclass(AboutRoute::class)
+        subclass(CheckHistoryRoute::class)
         subclass(NewsRoute::class)
         subclass(RecentRoute::class)
         subclass(LatestRoute::class)

@@ -23,12 +23,15 @@ import javax.inject.Singleton
         FetchLogEntity::class,
         ThreadPageEntity::class,
         PostEntity::class,
+        CheckLogEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
     autoMigrations = [
         // v2: thread page cache (thread_pages, posts).
         AutoMigration(from = 1, to = 2),
+        // v3: background check history (check_log).
+        AutoMigration(from = 2, to = 3),
     ],
 )
 abstract class WhirlDatabase : RoomDatabase() {
@@ -38,6 +41,7 @@ abstract class WhirlDatabase : RoomDatabase() {
     abstract fun fetchLogDao(): FetchLogDao
     abstract fun notifiedDao(): NotifiedDao
     abstract fun threadPageDao(): ThreadPageDao
+    abstract fun checkLogDao(): CheckLogDao
 
     /** Clears everything tied to the signed-in account (on log out or key change). Favourites are kept. */
     suspend fun clearAccountData() {
@@ -64,4 +68,5 @@ object DatabaseModule {
     @Provides fun fetchLogDao(db: WhirlDatabase) = db.fetchLogDao()
     @Provides fun notifiedDao(db: WhirlDatabase) = db.notifiedDao()
     @Provides fun threadPageDao(db: WhirlDatabase) = db.threadPageDao()
+    @Provides fun checkLogDao(db: WhirlDatabase) = db.checkLogDao()
 }
