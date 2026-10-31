@@ -139,7 +139,7 @@ fun WhirlApp(
                 composable<ThreadRoute> { ThreadScreen(backIcon, threadNav) }
                 composable<UserRoute> { UserScreen(backIcon, listNav) }
                 composable<SearchRoute> { SearchScreen(backIcon, listNav) }
-                composable<ForumsRoute> { ForumsScreen(drawerIcon, onOpenForum = listNav.openForum, onSearch = { listNav.openSearch(SearchRoute()) }) }
+                composable<ForumsRoute> { ForumsScreen(drawerIcon, onOpenForum = listNav.openForum, onSearch = { words -> listNav.openSearch(SearchRoute(query = words)) }) }
                 composable<SettingsRoute> {
                     SettingsScreen(
                         onBack = { nav.popBackStack() },

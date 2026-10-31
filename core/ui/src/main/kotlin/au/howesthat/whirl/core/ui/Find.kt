@@ -1,5 +1,6 @@
 package au.howesthat.whirl.core.ui
 
+import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,10 +32,16 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -44,7 +51,31 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+
+/** Find shortcuts from a hardware keyboard, sent by MainActivity (no screen has focus to receive keys itself). */
+val LocalFindRequests = staticCompositionLocalOf<Flow<Unit>> { emptyFlow() }
+
+/** Ctrl+F, or "/" on its own: a key press nothing on screen used, such as a text field. */
+fun isFindShortcut(keyCode: Int, metaState: Int): Boolean {
+    val modifiers = metaState and (KeyEvent.META_CTRL_MASK or KeyEvent.META_ALT_MASK or KeyEvent.META_META_MASK or KeyEvent.META_SHIFT_MASK)
+    return (keyCode == KeyEvent.KEYCODE_F && modifiers and KeyEvent.META_CTRL_MASK != 0 && modifiers and KeyEvent.META_CTRL_MASK.inv() == 0) ||
+        (keyCode == KeyEvent.KEYCODE_SLASH && modifiers == 0)
+}
+
+/** Runs [onFind] for each find shortcut while this screen is resumed, so only the screen on top answers. */
+@Composable
+fun OnFindShortcut(onFind: () -> Unit) {
+    val requests = LocalFindRequests.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val action by rememberUpdatedState(onFind)
+    LaunchedEffect(requests, lifecycle) { lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { requests.collect { action() } } }
+}
 
 /** The top bar action that opens Find in list. */
 @Composable
@@ -82,6 +113,8 @@ fun FindBar(
     }
     val keyboard = LocalSoftwareKeyboardController.current
     BackHandler(onBack = onClose)
+    // A shortcut with the bar already open goes back to the field.
+    OnFindShortcut { focus.requestFocus() }
 
     val colors = whirlTopBarColors()
     Surface(modifier, color = colors.containerColor, contentColor = colors.titleContentColor) {
@@ -94,7 +127,9 @@ fun FindBar(
                     onSearch = { keyboard?.hide() },
                     expanded = false,
                     onExpandedChange = {},
-                    modifier = Modifier.weight(1f).focusRequester(focus),
+                    modifier = Modifier.weight(1f).focusRequester(focus).onPreviewKeyEvent { event ->
+                        (event.key == Key.Escape && event.type == KeyEventType.KeyDown).also { escape -> if (escape) onClose() }
+                    },
                     placeholder = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     trailingIcon = if (query.isEmpty()) null else {
                         {

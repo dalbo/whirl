@@ -10,7 +10,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,6 +48,7 @@ import au.howesthat.whirl.core.data.ScrapedListRepository
 import au.howesthat.whirl.core.model.ForumGroup
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.network.WhirlpoolUrls
+import au.howesthat.whirl.core.ui.FindButton
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.PagePickerDialog
@@ -119,13 +119,14 @@ class ForumViewModel @Inject constructor(
 
     val privateState: StateFlow<ListState> = apiList
         .map { cached -> ListState(cached.updatedAt?.let { listOf(Section(null, cached.value.map { it.toItem() })) }, cached.updatedAt) }
+        .filtered(matchForum = false)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ListState(null, null))
 
     fun page(page: Int): Flow<ListState> = _group.flatMapLatest { group ->
         combine(scraped.observe(ScrapedList.ForumPage(forumId, page, group)), unreadIds) { cached, unread ->
             ListState(cached?.value?.rows?.map { it.toItem(cached.value.forum, unread) }?.let { listOf(Section(null, it)) }, cached?.updatedAt)
         }
-    }
+    }.filtered(matchForum = false)
 
     init {
         refresh(force = false)
@@ -187,24 +188,32 @@ fun ForumScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: ForumViewModel 
 
     val groupName = groups.firstOrNull { it.id == group }?.name
     val title by viewModel.title.collectAsStateWithLifecycle()
+    val query by viewModel.query.collectAsStateWithLifecycle()
+    // The page on screen, for the find bar's match count.
+    val shown by remember(isPrivate, pager.settledPage, viewModel) {
+        if (isPrivate) viewModel.privateState else viewModel.page(pager.settledPage + 1)
+    }.collectAsStateWithLifecycle(ListState(null, null))
     Scaffold(
         topBar = {
             Column {
-                TopAppBar(
-                    colors = whirlTopBarColors(),
-                    title = { ListTitle(title, updatedAt = null, subtitle = groupName) },
-                    navigationIcon = { NavIconButton(navIcon) },
-                    actions = {
-                        // Private forums search in the browser, where the user is logged in; offer the browser instead.
-                        if (!isPrivate) {
-                            IconButton(onClick = {
-                                nav.openSearch(SearchRoute(forumId = viewModel.route.forumId, groupId = group, scopeTitle = groupName ?: title))
-                            }) { Icon(Icons.Default.Search, stringResource(R.string.search)) }
-                        }
-                        RefreshButton { viewModel.refresh() }
-                        Overflow(onNewThread = { browser(viewModel.newThreadUrl()) }, onOpenInBrowser = { browser(viewModel.browserUrl()) })
+                ListTopBar(
+                    title, viewModel, nav, query, shown.sections,
+                    // Private forums search in the browser, where the user is logged in: no chip there.
+                    searchRoute = if (isPrivate) null else { words ->
+                        SearchRoute(query = words, forumId = viewModel.route.forumId, groupId = group, scopeTitle = groupName ?: title)
                     },
-                )
+                ) {
+                    TopAppBar(
+                        colors = whirlTopBarColors(),
+                        title = { ListTitle(title, updatedAt = null, subtitle = groupName) },
+                        navigationIcon = { NavIconButton(navIcon) },
+                        actions = {
+                            FindButton { viewModel.setQuery("") }
+                            RefreshButton { viewModel.refresh() }
+                            Overflow(onNewThread = { browser(viewModel.newThreadUrl()) }, onOpenInBrowser = { browser(viewModel.browserUrl()) })
+                        },
+                    )
+                }
                 if (!isPrivate && (groups.isNotEmpty() || pageCount > 1)) {
                     Surface(tonalElevation = 2.dp) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -237,6 +246,7 @@ fun ForumScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: ForumViewModel 
                 emptyText = stringResource(R.string.empty_private_forum),
                 browserUrl = viewModel.browserUrl(),
                 modifier = Modifier.padding(padding),
+                findQuery = query,
             )
         } else {
             HorizontalPager(pager, Modifier.padding(padding).fillMaxSize(), key = { it }) { index ->
@@ -252,6 +262,8 @@ fun ForumScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: ForumViewModel 
                     nav = nav,
                     emptyText = stringResource(R.string.empty_forum),
                     browserUrl = viewModel.browserUrl(),
+                    findQuery = query,
+                    findNoneText = R.string.find_none_on_page,
                 )
             }
         }

@@ -58,6 +58,7 @@ import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.model.TextQuery
 import au.howesthat.whirl.core.ui.FindBar
 import au.howesthat.whirl.core.ui.FindButton
+import au.howesthat.whirl.core.ui.OnFindShortcut
 import au.howesthat.whirl.core.ui.LocalAppStyle
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
@@ -269,6 +270,7 @@ internal fun ListTopBar(
     searchRoute: ((String) -> SearchRoute)? = { SearchRoute(query = it) },
     titleBar: @Composable () -> Unit,
 ) {
+    OnFindShortcut { if (query == null) viewModel.setQuery("") }
     if (query == null) {
         titleBar()
     } else {

@@ -9,7 +9,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -29,18 +28,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import au.howesthat.whirl.core.data.ForumListItem
 import au.howesthat.whirl.core.data.ForumRepository
 import au.howesthat.whirl.core.model.ForumRef
+import au.howesthat.whirl.core.model.TextQuery
 import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.ui.ActionsMenu
+import au.howesthat.whirl.core.ui.EmptyState
 import au.howesthat.whirl.core.ui.ErrorState
+import au.howesthat.whirl.core.ui.FindBar
+import au.howesthat.whirl.core.ui.FindButton
 import au.howesthat.whirl.core.ui.MenuAction
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
+import au.howesthat.whirl.core.ui.OnFindShortcut
 import au.howesthat.whirl.core.ui.RowPosition
 import au.howesthat.whirl.core.ui.SectionHeading
 import au.howesthat.whirl.core.ui.SectionRow
@@ -71,10 +76,26 @@ fun forumSections(forums: List<ForumListItem>, favouritesTitle: String): List<Fo
     return listOfNotNull(favourites.takeIf { it.isNotEmpty() }?.let { ForumSection(favouritesTitle, it, isFavourites = true) }) + sections
 }
 
+/**
+ * Find in list: forums whose title matches [query], or every forum in a section whose title does (words may mix the
+ * two); sections left empty drop.
+ */
+fun filterForums(sections: List<ForumSection>, query: TextQuery): List<ForumSection> =
+    if (query.isBlank) sections
+    else sections.map { section -> section.copy(forums = section.forums.filter { query.matches(it.forum.title, section.title) }) }
+        .filter { it.forums.isNotEmpty() }
+
 data class ForumsState(val forums: List<ForumListItem>?, val updatedAt: Instant?)
 
 @HiltViewModel
-class ForumsViewModel @Inject constructor(private val repo: ForumRepository) : ViewModel() {
+class ForumsViewModel @Inject constructor(private val repo: ForumRepository, private val savedState: SavedStateHandle) : ViewModel() {
+    /** Find in list: null while the bar is closed. Saved, so it survives process death. */
+    val query: StateFlow<String?> = savedState.getStateFlow(QUERY_KEY, null)
+
+    fun setQuery(query: String?) {
+        savedState[QUERY_KEY] = query
+    }
+
     val state: StateFlow<ForumsState> = repo.forums
         .map { ForumsState(it.value.takeIf { _ -> it.updatedAt != null || it.value.isNotEmpty() }, it.updatedAt) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ForumsState(null, null))
@@ -109,30 +130,53 @@ class ForumsViewModel @Inject constructor(private val repo: ForumRepository) : V
     fun setFavourite(forumId: Int, favourite: Boolean) {
         viewModelScope.launch { repo.setFavourite(forumId, favourite) }
     }
+
+    private companion object {
+        const val QUERY_KEY = "findQuery"
+    }
 }
 
-/** The forum list. Public forums open in the app ([onOpenForum]); private ones in the browser, where the user is logged in. */
+/**
+ * The forum list. Public forums open in the app ([onOpenForum]); private ones in the browser, where the user is logged
+ * in. The find bar's chip is the app's site-wide Whirlpool search ([onSearch], with the words typed).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ForumsScreen(navIcon: NavIcon, onOpenForum: (ForumRef) -> Unit, onSearch: () -> Unit, viewModel: ForumsViewModel = hiltViewModel()) {
+fun ForumsScreen(navIcon: NavIcon, onOpenForum: (ForumRef) -> Unit, onSearch: (String) -> Unit, viewModel: ForumsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    val query by viewModel.query.collectAsStateWithLifecycle()
     val browser = rememberOpenInBrowser()
     val urls = remember { WhirlpoolUrls() }
-    val sections = state.forums?.let { forumSections(it, stringResource(R.string.favourites)) }
+    val favourites = stringResource(R.string.favourites)
+    // About 100 forums: cheap enough to filter here, where the localised "Favourites" title is known.
+    val sections = remember(state.forums, favourites, query) { state.forums?.let { filterForums(forumSections(it, favourites), TextQuery(query)) } }
 
+    OnFindShortcut { if (query == null) viewModel.setQuery("") }
     Scaffold(
         topBar = {
-            TopAppBar(
-                colors = whirlTopBarColors(),
-                title = { Text(stringResource(R.string.forums_title)) },
-                navigationIcon = { NavIconButton(navIcon) },
-                actions = {
-                    IconButton(onClick = onSearch) { Icon(Icons.Default.Search, stringResource(R.string.search)) }
-                    IconButton(onClick = { viewModel.refresh() }) { Icon(Icons.Default.Refresh, stringResource(R.string.refresh)) }
-                },
-            )
+            val find = query
+            if (find == null) {
+                TopAppBar(
+                    colors = whirlTopBarColors(),
+                    title = { Text(stringResource(R.string.forums_title)) },
+                    navigationIcon = { NavIconButton(navIcon) },
+                    actions = {
+                        FindButton { viewModel.setQuery("") }
+                        IconButton(onClick = { viewModel.refresh() }) { Icon(Icons.Default.Refresh, stringResource(R.string.refresh)) }
+                    },
+                )
+            } else {
+                FindBar(
+                    query = find,
+                    onQueryChange = viewModel::setQuery,
+                    onClose = { viewModel.setQuery(null) },
+                    label = stringResource(au.howesthat.whirl.core.ui.R.string.find_in, stringResource(R.string.forums_title)),
+                    matches = sections?.sumOf { it.forums.size },
+                    onSearchWhirlpool = onSearch,
+                )
+            }
         },
     ) { padding ->
         PullToRefreshBox(isRefreshing = refreshing, onRefresh = { viewModel.refresh() }, modifier = Modifier.padding(padding).fillMaxSize()) {
@@ -144,6 +188,11 @@ fun ForumsScreen(navIcon: NavIcon, onOpenForum: (ForumRef) -> Unit, onSearch: ()
                     item(key = "updated") {
                         UpdatedAgo(state.updatedAt, Instant.now(), Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
                         failed?.let { Text(errorMessage(it), Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error) }
+                    }
+                    if (sections != null && sections.isEmpty() && !query.isNullOrBlank()) {
+                        item(key = "empty") {
+                            EmptyState(stringResource(au.howesthat.whirl.core.ui.R.string.find_none, query.orEmpty().trim()), Modifier.fillMaxWidth())
+                        }
                     }
                     sections.orEmpty().forEach { section ->
                         item(key = "h-${section.isFavourites}-${section.title}") { SectionHeading(section.title) }

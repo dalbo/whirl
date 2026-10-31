@@ -3,6 +3,10 @@ package au.howesthat.whirl
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.view.KeyEvent
+import android.view.KeyboardShortcutGroup
+import android.view.KeyboardShortcutInfo
+import android.view.Menu
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -27,6 +31,8 @@ import au.howesthat.whirl.core.data.WatchedPosition
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.notifications.WatchedNotifier
 import au.howesthat.whirl.core.ui.LocalBrowserApp
+import au.howesthat.whirl.core.ui.LocalFindRequests
+import au.howesthat.whirl.core.ui.isFindShortcut
 import au.howesthat.whirl.core.ui.Styles
 import au.howesthat.whirl.core.ui.WhirlTheme
 import au.howesthat.whirl.core.ui.usesWallpaper
@@ -38,6 +44,7 @@ import au.howesthat.whirl.navigation.route
 import au.howesthat.whirl.navigation.routeForLink
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import java.time.LocalTime
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -46,6 +53,9 @@ import kotlin.time.Duration.Companion.milliseconds
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+
+    /** Hardware keyboard Find shortcuts, for the screen on top. */
+    private val findRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen().setKeepOnScreenCondition { viewModel.state.value == null }
@@ -78,7 +88,7 @@ class MainActivity : ComponentActivity() {
                     // Fixed while this tree lives: a changed homepage setting must not re-route an open NavHost.
                     val startRoute = remember { loaded.settings.homepage.route() }
                     val link by viewModel.link.collectAsStateWithLifecycle()
-                    CompositionLocalProvider(LocalBrowserApp provides loaded.settings.browserApp) {
+                    CompositionLocalProvider(LocalBrowserApp provides loaded.settings.browserApp, LocalFindRequests provides findRequests) {
                         WhirlApp(
                             startRoute = startRoute,
                             account = account,
@@ -93,6 +103,25 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /** Only keys nothing on screen used arrive here, so "/" typed into a text field stays text. */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (isFindShortcut(keyCode, event.metaState)) {
+            findRequests.tryEmit(Unit)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    /** Listed in the keyboard shortcuts helper (Meta+/). */
+    override fun onProvideKeyboardShortcuts(data: MutableList<KeyboardShortcutGroup>, menu: Menu?, deviceId: Int) {
+        super.onProvideKeyboardShortcuts(data, menu, deviceId)
+        val find = getString(au.howesthat.whirl.core.ui.R.string.find_in_list)
+        data += KeyboardShortcutGroup(
+            getString(R.string.app_name),
+            listOf(KeyboardShortcutInfo(find, KeyEvent.KEYCODE_F, KeyEvent.META_CTRL_ON), KeyboardShortcutInfo(find, KeyEvent.KEYCODE_SLASH, 0)),
+        )
     }
 
     override fun onNewIntent(intent: Intent) {
