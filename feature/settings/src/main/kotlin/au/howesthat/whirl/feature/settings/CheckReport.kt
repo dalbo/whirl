@@ -24,7 +24,8 @@ fun shortDuration(d: Duration): String {
  * identifies the account or its threads.
  */
 fun checkReport(state: CheckHistoryState, app: String, device: String, zone: ZoneId): String = buildString {
-    val time = DateTimeFormatter.ofPattern("EEE d MMM HH:mm", Locale.ROOT).withZone(zone)
+    // English, not ROOT: Android's root locale has no month or day names ("M10").
+    val time = DateTimeFormatter.ofPattern("EEE d MMM HH:mm", Locale.ENGLISH).withZone(zone)
     val d = state.device
     appendLine("$app check history")
     appendLine(device)
