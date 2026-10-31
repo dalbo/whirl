@@ -103,6 +103,10 @@ fun ThreadListBody(
     showForum: Boolean = sections?.any { it.forum != null } == true,
     header: (LazyListScope.() -> Unit)? = null,
     footer: (LazyListScope.() -> Unit)? = null,
+    /** Find in list's words; when they leave nothing, the empty text says so instead of [emptyText]. */
+    findQuery: String? = null,
+    /** Offered under "Nothing here matches" (Watched's "Show N in All"). */
+    findEmptyAction: (@Composable () -> Unit)? = null,
 ) {
     val launch = rememberThreadLauncher(nav)
     val browser = rememberOpenInBrowser()
@@ -129,7 +133,11 @@ fun ThreadListBody(
                         )
                     }
                 }
-                if (sections != null && sections.all { it.items.isEmpty() }) {
+                if (sections != null && sections.all { it.items.isEmpty() } && !findQuery.isNullOrBlank()) {
+                    item(key = "empty") {
+                        EmptyState(stringResource(au.howesthat.whirl.core.ui.R.string.find_none, findQuery.trim()), Modifier.fillMaxWidth(), action = findEmptyAction)
+                    }
+                } else if (sections != null && sections.all { it.items.isEmpty() }) {
                     item(key = "empty") {
                         EmptyState(
                             emptyText,

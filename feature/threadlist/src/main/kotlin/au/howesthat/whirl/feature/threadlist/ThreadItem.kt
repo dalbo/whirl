@@ -3,6 +3,7 @@ package au.howesthat.whirl.feature.threadlist
 import au.howesthat.whirl.core.data.WatchedPosition
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.RowKind
+import au.howesthat.whirl.core.model.TextQuery
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.model.ThreadRow
 import au.howesthat.whirl.core.model.ThreadSummary
@@ -87,6 +88,16 @@ fun WatchedThread.toItem() = ThreadItem(
 /** Groups rows under forum headers, forums in order of first appearance (so the most active forum leads). */
 fun groupByForum(items: List<ThreadItem>): List<Section> =
     items.groupBy { it.forum?.id }.values.map { rows -> Section(rows.first().forum?.copy(groupId = null), rows) }
+
+/**
+ * Find in list: the rows whose title, group or (with [matchForum]) forum match [query], each section keeping its
+ * header while any row is left. A forum page leaves its own forum out, since every row would match it.
+ */
+fun filterSections(sections: List<Section>, query: TextQuery, matchForum: Boolean = true): List<Section> =
+    if (query.isBlank) sections
+    else sections.map { section ->
+        section.copy(items = section.items.filter { query.matches(it.title, it.group, it.forum?.title?.takeIf { matchForum }) })
+    }.filter { it.items.isNotEmpty() }
 
 /** Keeps a scraped page's own section headers (Popular, search), or one unheaded section for a forum page. */
 fun sectionsOf(items: List<ThreadItem>, sectioned: Boolean): List<Section> =
