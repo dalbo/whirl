@@ -33,10 +33,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
+import androidx.navigation3.runtime.NavKey
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import au.howesthat.whirl.core.data.OpenedFrom
 import au.howesthat.whirl.core.data.ScrapedList
 import au.howesthat.whirl.core.data.ScrapedListRepository
@@ -55,24 +57,26 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.serialization.Serializable
-import javax.inject.Inject
 
 /** Thread-title search, optionally scoped to a forum (and group), as the forum screen's search box did in 2.14.12. */
 @Serializable
-data class SearchRoute(val query: String = "", val forumId: Int? = null, val groupId: Int? = null, val scopeTitle: String? = null)
+data class SearchRoute(val query: String = "", val forumId: Int? = null, val groupId: Int? = null, val scopeTitle: String? = null) : NavKey
 
 /**
  * Search results in list view (`/forum/?action=search&o=list`), the thread table 2.14.12 parsed: 100 per page, with
  * forum section headers. The page has no usable page count, so "Next" shows while a page is full.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-@HiltViewModel
-class SearchViewModel @Inject constructor(
-    savedState: SavedStateHandle,
+@HiltViewModel(assistedFactory = SearchViewModel.Factory::class)
+class SearchViewModel @AssistedInject constructor(
+    @Assisted private val route: SearchRoute,
     deps: ListDeps,
     private val repo: ScrapedListRepository,
 ) : ListViewModel(deps, OpenedFrom.LIST) {
-    private val route = savedState.toRoute<SearchRoute>()
+    @AssistedFactory
+    interface Factory {
+        fun create(route: SearchRoute): SearchViewModel
+    }
 
     private val _text = MutableStateFlow(route.query)
     val text: StateFlow<String> = _text.asStateFlow()
@@ -139,7 +143,12 @@ class SearchViewModel @Inject constructor(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: SearchViewModel = hiltViewModel()) {
+fun SearchScreen(
+    route: SearchRoute,
+    navIcon: NavIcon,
+    nav: ThreadListNav,
+    viewModel: SearchViewModel = hiltViewModel<SearchViewModel, SearchViewModel.Factory> { it.create(route) },
+) {
     val text by viewModel.text.collectAsStateWithLifecycle()
     val search by viewModel.search.collectAsStateWithLifecycle()
     val scoped by viewModel.scoped.collectAsStateWithLifecycle()

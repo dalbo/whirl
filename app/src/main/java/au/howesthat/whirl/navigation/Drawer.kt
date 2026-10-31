@@ -27,12 +27,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.navigation3.runtime.NavKey
 import au.howesthat.whirl.R
 import au.howesthat.whirl.core.data.Account
 import kotlin.reflect.KClass
 
 /** A drawer entry: [route] is the destination object, [label] a string resource. */
-data class DrawerEntry(val route: Any, val label: Int, val icon: ImageVector)
+data class DrawerEntry(val route: NavKey, val label: Int, val icon: ImageVector)
 
 /** 2.14.12's drawer order, Whims dropped, Latest added after Recent. */
 val TOP_LEVEL = listOf(
