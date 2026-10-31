@@ -3,6 +3,7 @@
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
 ## Unreleased
+- Watched threads: a "New posts" line marks where the unread posts start, like the orange line on Whirlpool, as asked for by a tester. It stays put after the thread is marked read, and also shows when a watched thread is opened from Recent, a link or elsewhere. The page picker (tap the title) gains "First unread post (page N)".
 - Settings › Notifications › "Check history": the last 20 background checks for watched-thread replies (when each ran, how long after the one before, what it found, and whether it notified), with what can delay them: battery use, app standby, Battery Saver, Data Saver, and whether notifications are allowed. The share button sends it as text, to paste into the Whirl thread when notifications seem late. It contains no thread titles or account details.
 - Checks now run in the last few minutes of each interval instead of anywhere in it, so on a phone that is awake they are about one interval apart.
 

@@ -8,6 +8,7 @@ import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository
 import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.data.WatchedRepository
+import au.howesthat.whirl.core.database.WatchedThreadColumns
 import au.howesthat.whirl.core.database.WhirlDatabase
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.PostFilter
@@ -96,6 +97,44 @@ class ThreadViewModelTest {
         assertEquals("/thread/97r5wzn3?p=-1", server.takeRequest().target)
         assertEquals(2290, vm.pageCount.value)
         assertEquals(17, await { vm.page(2290).filterNotNull().first() }.posts.size)
+    }
+
+    @Test
+    fun `the first unread post comes from Watched and can be jumped to`() = runTest {
+        enqueueHtml("thread_3pxj858k_p2.html")
+        val vm = viewModel(ThreadRoute("3pxj858k", 1, lastReadPost = 30, fromWatched = true))
+        await { vm.pageCount.first { it >= 2 } }
+        assertEquals(31, vm.firstUnread.value)
+        assertEquals(2, vm.firstUnreadPage())
+        vm.goToFirstUnread()
+        assertEquals(ScrollTarget(2, postNumber = 31), vm.scrollTarget.value)
+        assertEquals(2, await { vm.jumpTo.filterNotNull().first() })
+    }
+
+    @Test
+    fun `a watched thread opened elsewhere keeps its new-posts marker after auto mark as read`() = runTest {
+        val row = WatchedThreadColumns(
+            "3pxj858k", "NBN", 92, "Choosing an ISP", replies = 60, firstUserId = 1, firstUserName = "a", firstDate = 0,
+            lastUserId = 2, lastUserName = "b", lastDate = 0, unreadCount = 9, lastReadPost = 52, lastPage = 3,
+        )
+        db.threadDao().replaceWatchedList("all", listOf(row))
+        settings.update { it.copy(watchedAutoMarkAsRead = true) }
+        enqueueHtml("thread_3pxj858k_p2.html")
+        val vm = viewModel(ThreadRoute("3pxj858k", 2))
+        assertEquals(53, await { vm.firstUnread.filterNotNull().first() })
+        // Marked read as it opened: the cache moves on, the marker does not.
+        await { watched.watched(unreadOnly = false).first { it.value.single().unreadCount == 0 } }
+        assertEquals(53, vm.firstUnread.value)
+        settings.update { it.copy(watchedAutoMarkAsRead = false) }
+    }
+
+    @Test
+    fun `an unwatched thread has no new-posts marker`() = runTest {
+        enqueueHtml("thread_3pxj858k_p2.html")
+        val vm = viewModel(ThreadRoute("3pxj858k", 2))
+        await { vm.startPage.filterNotNull().first() }
+        assertEquals(null, vm.firstUnread.value)
+        assertEquals(null, vm.firstUnreadPage())
     }
 
     @Test

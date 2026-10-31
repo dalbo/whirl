@@ -39,4 +39,5 @@
         <item quantity="one">%1$d match</item>
         <item quantity="other">%1$d matches</item>
     </plurals>
+    <string name="first_unread_page">First unread post (page %1$d)</string>
 </resources>

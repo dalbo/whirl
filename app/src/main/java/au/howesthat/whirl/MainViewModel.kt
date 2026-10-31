@@ -72,6 +72,7 @@ class MainViewModel @Inject constructor(
             _link.value = when (val target = opener.open(id, forumId, forumId in forums.privateIds.first(), OpenedFrom.WATCHED, s, position)) {
                 is OpenThread.InApp -> ThreadRoute(
                     target.id.value, target.page, scrollToPost = target.scrollToPost, forumId = target.forumId, fromWatched = target.fromWatched,
+                    lastReadPost = target.lastReadPost,
                 )
                 is OpenThread.Browser -> target
             }

@@ -20,7 +20,14 @@ import kotlin.math.roundToInt
 
 /** "Go to page" for forums and threads: a slider, since both run to hundreds or thousands of pages. */
 @Composable
-fun PagePickerDialog(pageCount: Int, current: Int, onDismiss: () -> Unit, onPick: (Int) -> Unit) {
+fun PagePickerDialog(
+    pageCount: Int,
+    current: Int,
+    onDismiss: () -> Unit,
+    firstUnreadPage: Int? = null,
+    onFirstUnread: () -> Unit = {},
+    onPick: (Int) -> Unit,
+) {
     var value by remember { mutableFloatStateOf(current.toFloat()) }
     val page = value.roundToInt().coerceIn(1, pageCount)
     AlertDialog(
@@ -39,6 +46,8 @@ fun PagePickerDialog(pageCount: Int, current: Int, onDismiss: () -> Unit, onPick
                     valueRange = 1f..pageCount.toFloat(),
                     steps = if (pageCount <= 100) pageCount - 2 else 0,
                 )
+                // A watched thread's unread posts, as Whirlpool highlights their page in its page list.
+                firstUnreadPage?.let { TextButton(onClick = onFirstUnread) { Text(stringResource(R.string.first_unread_page, it)) } }
                 Row {
                     TextButton(onClick = { onPick(1) }) { Text(stringResource(R.string.first_page)) }
                     TextButton(onClick = { onPick(pageCount) }) { Text(stringResource(R.string.last_page)) }

@@ -123,7 +123,7 @@ fun WhirlApp(
         ThreadListNav(
             // In two panes the tap comes from the list beside a thread, which it replaces; on a phone this is a push.
             openThread = { t ->
-                backStack.openFromList(ThreadRoute(t.id.value, t.page, scrollToPost = t.scrollToPost, forumId = t.forumId, fromWatched = t.fromWatched), ::isListPane)
+                backStack.openFromList(ThreadRoute(t.id.value, t.page, scrollToPost = t.scrollToPost, forumId = t.forumId, fromWatched = t.fromWatched, lastReadPost = t.lastReadPost), ::isListPane)
             },
             openForum = { f -> backStack.push(ForumRoute(f.id, f.title, f.groupId)) },
             openSearch = { backStack.push(it) },

@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -99,6 +100,13 @@ class WatchedRepository @Inject constructor(
     val watchedIds: Flow<Set<ThreadId>> = dao.observeWatchedIds().map { ids -> ids.mapTo(mutableSetOf(), ::ThreadId) }
 
     fun isWatched(id: ThreadId): Flow<Boolean> = watchedIds.map { id in it }
+
+    /** The last post read in a watched thread with unread posts, as the cached lists know it; null otherwise. */
+    suspend fun lastReadPost(id: ThreadId): Int? {
+        if (!isWatched(id).first()) return null
+        val t = dao.get(id.value) ?: return null
+        return t.lastReadPost?.takeIf { it > 0 && (t.unreadCount ?: 0) > 0 }
+    }
 
     suspend fun refresh(unreadOnly: Boolean, force: Boolean = false): Boolean {
         val key = key(unreadOnly)
