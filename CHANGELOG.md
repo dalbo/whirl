@@ -2,6 +2,11 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.4.0
+Tablets and other wide screens, as an experiment.
+- Settings › Layout › "Threads beside the list (experimental)": on tablets, unfolded phones and other wide windows (at least 840 dp wide and 480 dp tall), a thread opens next to the list it came from, with its row highlighted. Choosing another thread replaces it; Back steps back through threads you reached by links, then to the list. Watched, Recent, Latest activity, Popular, a forum, search results and a user's page work this way. Off by default; phones, including in landscape, are unchanged.
+- Under the hood, the app moved to Navigation 3, which makes the side-by-side layout possible. Nothing else should look or behave differently; if a notification opens Watched while you are deep in another part of the app, Back now returns to where you were.
+
 ## v1.3.0
 Find in list, asked for by a tester.
 - A search icon on Watched, Recent, Latest activity, Popular, a forum's threads, Forums and Industry news filters what the list shows as you type: every word must appear in the thread title or the forum or group name (case and accents ignored). Forums also matches section names; Industry news matches titles, sources and summaries. On a forum it filters the page you are on.

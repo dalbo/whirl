@@ -1,0 +1,3 @@
+Whirl 1.4
+- Experimental: on tablets and other wide screens, threads can open beside the list they came from (Settings › Layout › Threads beside the list)
+- Navigation rebuilt underneath; it should work as before
