@@ -32,4 +32,5 @@
     <!-- Above the post filters in the thread menu: Whirlpool shows filtered views only to signed-in users. -->
     <string name="filters_in_browser">In your browser</string>
     <string name="filter_user">One user\'s posts</string>
+    <string name="new_posts">New posts</string>
 </resources>

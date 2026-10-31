@@ -2,6 +2,9 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## Unreleased
+- Watched threads: a "New posts" line marks where the unread posts start, like the orange line on Whirlpool, as asked for by a tester. It stays put after the thread is marked read, and also shows when a watched thread is opened from Recent, a link or elsewhere. The page picker (tap the title) gains "First unread post (page N)".
+
 ## v1.4.1
 - About: "Whirl on Whirlpool" opens Whirl's thread in the app, and "Google Play" opens Whirl's Play Store page, to rate or share it.
 

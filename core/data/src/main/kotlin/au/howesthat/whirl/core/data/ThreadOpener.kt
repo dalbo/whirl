@@ -7,7 +7,8 @@ import au.howesthat.whirl.core.network.WhirlpoolUrls
 sealed interface OpenThread {
     /**
      * [page] may be [ThreadPageRepository.LAST_PAGE]; [scrollToPost] is a post number (1-based in the thread);
-     * [fromWatched] offers Mark as read and Unwatch, and "back to list" after marking read.
+     * [fromWatched] offers Mark as read and Unwatch, and "back to list" after marking read. [lastReadPost] is the
+     * last post read (`LASTREAD`), to mark where the new posts start, even when the thread opens at the top.
      */
     data class InApp(
         val id: ThreadId,
@@ -15,6 +16,7 @@ sealed interface OpenThread {
         val scrollToPost: Int? = null,
         val forumId: Int? = null,
         val fromWatched: Boolean = false,
+        val lastReadPost: Int? = null,
     ) : OpenThread
     data class Browser(val url: String) : OpenThread
 }
@@ -64,6 +66,7 @@ class ThreadOpener(private val urls: WhirlpoolUrls = WhirlpoolUrls()) {
                 scrollToPost = watched.lastReadPost.takeIf { it > 0 && !settings.loadWatchedAtTop },
                 forumId = forumId,
                 fromWatched = true,
+                lastReadPost = watched.lastReadPost.takeIf { it > 0 },
             )
             atLastPage -> OpenThread.InApp(id, ThreadPageRepository.LAST_PAGE, forumId = forumId)
             else -> OpenThread.InApp(id, 1, forumId = forumId)
