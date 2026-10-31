@@ -49,4 +49,24 @@ class MigrationTest {
             db.close()
         }
     }
+
+    @Test
+    fun `v2 to v3 adds the check history and keeps v2 data`() = runTest {
+        helper.createDatabase(name, 2).use { db ->
+            db.execSQL("INSERT INTO notified (thread_id, last_date) VALUES ('3pxj858k', 5)")
+            db.execSQL("INSERT INTO fetch_log (`key`, fetched_at) VALUES ('forums', 123)")
+        }
+        helper.runMigrationsAndValidate(name, 3, true).close()
+
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), WhirlDatabase::class.java, name)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            assertEquals(listOf(NotifiedEntity("3pxj858k", 5)), db.notifiedDao().all())
+            assertEquals(123L, db.fetchLogDao().fetchedAt("forums"))
+            assertEquals(emptyList(), db.checkLogDao().observe().first())
+        } finally {
+            db.close()
+        }
+    }
 }

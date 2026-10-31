@@ -263,3 +263,22 @@ interface ThreadPageDao {
         evict(keep)
     }
 }
+
+@Dao
+interface CheckLogDao {
+    @Query("SELECT * FROM check_log ORDER BY started_at DESC, id DESC")
+    fun observe(): Flow<List<CheckLogEntity>>
+
+    @Insert
+    suspend fun insert(entry: CheckLogEntity)
+
+    @Query("DELETE FROM check_log WHERE id NOT IN (SELECT id FROM check_log ORDER BY started_at DESC, id DESC LIMIT :keep)")
+    suspend fun trim(keep: Int)
+
+    /** Adds [entry] and keeps only the [keep] most recent. */
+    @Transaction
+    suspend fun add(entry: CheckLogEntity, keep: Int) {
+        insert(entry)
+        trim(keep)
+    }
+}

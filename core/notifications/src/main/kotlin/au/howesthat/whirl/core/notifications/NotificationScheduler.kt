@@ -47,7 +47,9 @@ class NotificationScheduler @Inject constructor(
             notifier.cancel()
             return
         }
-        val request = PeriodicWorkRequestBuilder<WatchedCheckWorker>(maxOf(intervalMinutes, 15).toLong(), TimeUnit.MINUTES)
+        // The flex window puts each run in the last minutes of its period, not anywhere in it, so checks are about
+        // one interval apart when the phone is awake. Doze and standby buckets still defer them.
+        val request = PeriodicWorkRequestBuilder<WatchedCheckWorker>(maxOf(intervalMinutes, 15).toLong(), TimeUnit.MINUTES, FLEX_MINUTES, TimeUnit.MINUTES)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .build()
         // UPDATE keeps the running schedule and changes only the interval.
@@ -56,5 +58,7 @@ class NotificationScheduler @Inject constructor(
 
     companion object {
         const val WORK_NAME = "watched-check"
+        /** WorkManager's minimum flex. */
+        const val FLEX_MINUTES = 5L
     }
 }
