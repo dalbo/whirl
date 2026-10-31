@@ -40,6 +40,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.File
 import java.time.Clock
+import java.time.Instant
 import java.time.OffsetDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -325,20 +326,50 @@ class WatchedNotifierTest {
     }
 
     @Test
-    fun `the worker retries network failures and gives up on the rest`() = runTest {
+    fun `the worker retries network failures, gives up on the rest, and records every run`() = runTest {
+        val history = CheckHistory(context, db.checkLogDao(), settings, Clock.systemUTC())
+        settings.update { it.copy(notifyIntervalMinutes = 240) }
         val factory = object : WorkerFactory() {
             override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters) =
-                WatchedCheckWorker(appContext, workerParameters, notifier)
+                WatchedCheckWorker(appContext, workerParameters, notifier, history)
         }
+        // WorkManager counts a scheduled run as attempt 0; the test builder starts at 1 unless told.
+        fun worker(attempt: Int = 0) = TestListenableWorkerBuilder<WatchedCheckWorker>(context).setWorkerFactory(factory).setRunAttemptCount(attempt).build()
         enqueue(unreadTwo)
-        val ok = TestListenableWorkerBuilder<WatchedCheckWorker>(context).setWorkerFactory(factory).build().doWork()
+        val ok = worker().doWork()
         assertIs<ListenableWorker.Result.Success>(ok)
         assertNotNull(shown())
 
         server.close()
-        val offline = TestListenableWorkerBuilder<WatchedCheckWorker>(context).setWorkerFactory(factory).build().doWork()
-        assertIs<ListenableWorker.Result.Retry>(offline)
-        val last = TestListenableWorkerBuilder<WatchedCheckWorker>(context).setWorkerFactory(factory).setRunAttemptCount(3).build().doWork()
-        assertIs<ListenableWorker.Result.Success>(last, "the next period tries again")
+        assertIs<ListenableWorker.Result.Retry>(worker().doWork())
+        assertIs<ListenableWorker.Result.Success>(worker(attempt = 3).doWork(), "the next period tries again")
+
+        // Newest first.
+        val records = history.records.first()
+        assertEquals(listOf(CheckResult.NETWORK, CheckResult.NETWORK, CheckResult.OK), records.map { it.outcome.result })
+        assertEquals(listOf(3, 0, 0), records.map { it.attempt })
+        assertEquals(CheckOutcome(CheckResult.OK, unreadThreads = 2, newThreads = 2), records.last().outcome)
+        assertEquals("Network", records.first().outcome.detail)
+        assertEquals(240, records.first().intervalMinutes)
+    }
+
+    @Test
+    fun `a check says why it fetched nothing`() = runTest {
+        assertEquals(CheckOutcome(CheckResult.OK, unreadThreads = 2, newThreads = 2), run { enqueue(unreadTwo); notifier.check() })
+        assertEquals(CheckOutcome(CheckResult.OK, unreadThreads = 2, newThreads = 0), run { enqueue(unreadTwo); notifier.check() })
+        shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        assertEquals(CheckResult.BLOCKED, notifier.check().result)
+        settings.update { it.copy(watchedNotify = false) }
+        assertEquals(CheckResult.OFF, notifier.check().result)
+    }
+
+    @Test
+    fun `the history keeps the most recent checks`() = runTest {
+        val history = CheckHistory(context, db.checkLogDao(), settings, Clock.systemUTC())
+        repeat(CheckHistory.KEEP + 5) { i -> history.record(Instant.ofEpochSecond(i * 3600L), attempt = 0, CheckOutcome(CheckResult.OK, unreadThreads = i)) }
+        val records = history.records.first()
+        assertEquals(CheckHistory.KEEP, records.size)
+        assertEquals(CheckHistory.KEEP + 4, records.first().outcome.unreadThreads)
+        assertEquals(5, records.last().outcome.unreadThreads)
     }
 }

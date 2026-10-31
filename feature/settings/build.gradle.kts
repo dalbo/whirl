@@ -8,5 +8,6 @@ android {
 
 dependencies {
     implementation(project(":feature:setup"))
+    implementation(project(":core:notifications"))
     implementation(libs.compose.material.icons.core)
 }

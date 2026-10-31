@@ -65,7 +65,7 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, onCheckHistory: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val layouts = remember(context) { Styles.layouts(context) }
@@ -129,6 +129,7 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, viewModel: Setti
                         }
                     }
                 }
+                SettingRow(stringResource(R.string.settings_check_history), stringResource(R.string.settings_check_history_summary), onCheckHistory)
             }
 
             Group(stringResource(R.string.settings_threads)) {

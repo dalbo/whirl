@@ -62,6 +62,7 @@ class NotificationSchedulerTest {
         assertEquals(WorkInfo.State.ENQUEUED, info.state)
         assertEquals(TimeUnit.MINUTES.toMillis(60), info.periodicityInfo!!.repeatIntervalMillis)
         assertEquals(NetworkType.CONNECTED, info.constraints.requiredNetworkType)
+        assertEquals(TimeUnit.MINUTES.toMillis(NotificationScheduler.FLEX_MINUTES), info.periodicityInfo!!.flexIntervalMillis, "runs late in each period")
 
         scheduler.apply(240)
         val updated = work().single()

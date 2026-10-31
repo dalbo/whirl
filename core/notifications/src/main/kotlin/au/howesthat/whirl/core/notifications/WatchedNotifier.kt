@@ -1,17 +1,13 @@
 package au.howesthat.whirl.core.notifications
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import au.howesthat.whirl.core.data.NotifyStyle
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.SettingsRepository
@@ -57,20 +53,21 @@ class WatchedNotifier @Inject constructor(
     private val posting = Mutex()
 
     /** One check. Network and API failures propagate (the worker decides whether to retry). */
-    suspend fun check() {
+    suspend fun check(): CheckOutcome {
         val s = settings.settings.first()
         if (!s.watchedNotify || settings.apiKey() == null) {
             cancel()
-            return
+            return CheckOutcome(CheckResult.OFF)
         }
         // Blocked: skip the call and record nothing, so the threads still alert once notifications are allowed.
-        if (!canNotify()) return
+        if (!canNotify()) return CheckOutcome(CheckResult.BLOCKED)
         val me = settings.account.first()?.userId
         val before = notified.all().associate { it.threadId to it.lastDate }
         val plan = planAlert(watched.fetchUnread(), before, me, s.ignoreOwnRepliesWatched)
         posting.withLock { render(plan.threads, plan.newIds, s) }
         notified.put(plan.threads.map { NotifiedEntity(it.id.value, it.lastDate.toInstant().toEpochMilli()) })
         notified.keepOnly(plan.threads.map { it.id.value })
+        return CheckOutcome(CheckResult.OK, unreadThreads = plan.threads.size, newThreads = plan.newIds.size)
     }
 
     /** Brings what is showing in line with [unread] (the app's Unread list) and the style setting, silently. */
@@ -147,9 +144,7 @@ class WatchedNotifier @Inject constructor(
         }
     }
 
-    private fun canNotify(): Boolean =
-        (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) &&
-            manager.areNotificationsEnabled()
+    private fun canNotify(): Boolean = canPostNotifications(context)
 
     /** Title, text and inbox lines for a list of threads. */
     private fun NotificationCompat.Builder.listing(threads: List<WatchedThread>): NotificationCompat.Builder {

@@ -85,6 +85,28 @@ data class NotifiedEntity(
     @ColumnInfo(name = "last_date") val lastDate: Long,
 )
 
+/**
+ * One background watched-thread check, for Settings › Check history (the last few are kept). [result] is a
+ * `CheckResult` name; [standbyBucket] is a `UsageStatsManager` bucket, null before Android 9; [network] a
+ * `NetworkKind` name. Times are epoch milliseconds. Nothing here identifies the account or its threads.
+ */
+@Entity(tableName = "check_log")
+data class CheckLogEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "started_at") val startedAt: Long,
+    @ColumnInfo(name = "duration_ms") val durationMs: Long,
+    val attempt: Int,
+    @ColumnInfo(name = "interval_minutes") val intervalMinutes: Int,
+    val result: String,
+    val detail: String?,
+    @ColumnInfo(name = "unread_threads") val unreadThreads: Int?,
+    @ColumnInfo(name = "new_threads") val newThreads: Int?,
+    @ColumnInfo(name = "standby_bucket") val standbyBucket: Int?,
+    @ColumnInfo(name = "power_save") val powerSave: Boolean,
+    @ColumnInfo(name = "device_idle") val deviceIdle: Boolean,
+    val network: String,
+)
+
 /** When each cached list was last fetched, for max-age and refresh throttling. */
 @Entity(tableName = "fetch_log")
 data class FetchLogEntity(
