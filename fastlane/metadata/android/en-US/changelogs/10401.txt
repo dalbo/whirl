@@ -1,0 +1,2 @@
+Whirl 1.4.1
+- About: links to Whirl's Whirlpool thread and its Google Play page

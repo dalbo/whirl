@@ -2,6 +2,9 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.4.1
+- About: "Whirl on Whirlpool" opens Whirl's thread in the app, and "Google Play" opens Whirl's Play Store page, to rate or share it.
+
 ## v1.4.0
 Tablets and other wide screens, as an experiment.
 - Settings › Layout › "Threads beside the list (experimental)": on tablets, unfolded phones and other wide windows (at least 840 dp wide and 480 dp tall), a thread opens next to the list it came from, with its row highlighted. Choosing another thread replaces it; Back steps back through threads you reached by links, then to the list. Watched, Recent, Latest activity, Popular, a forum, search results and a user's page work this way. Off by default; phones, including in landscape, are unchanged.
