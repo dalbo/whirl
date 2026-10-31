@@ -1,0 +1,3 @@
+Whirl 1.5
+- Watched threads: a "New posts" line shows where your unread posts start; tap the title for "First unread post"
+- Settings › Notifications › Check history: when Whirl last checked for replies, and what can delay the checks
