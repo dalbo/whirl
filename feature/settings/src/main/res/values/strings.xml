@@ -11,6 +11,7 @@
     <string name="settings_screen_animations">Screen animations</string>
     <string name="settings_two_pane">Threads beside the list (experimental)</string>
     <string name="settings_two_pane_summary">On tablets, unfolded phones and other wide windows, a thread opens next to the list it came from</string>
+    <string name="settings_two_pane_landscape">Only in landscape</string>
     <string name="settings_browser_app">Open Whirlpool pages in the browser app</string>
     <string name="settings_layout">Layout</string>
     <string name="settings_palette">Colours</string>

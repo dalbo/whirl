@@ -103,6 +103,8 @@ class ThreadNav(
     val openForum: (ForumRef) -> Unit,
     val openUser: (Long) -> Unit,
     val back: () -> Unit,
+    /** The Watched threads list, straight from however deep the thread was reached. */
+    val openWatched: () -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -155,7 +157,7 @@ fun ThreadScreen(
                 }
             }
         } else {
-            ThreadPager(start, pageCount, title, filter, error, refreshing, navIcon, viewModel, Modifier.padding(outer))
+            ThreadPager(start, pageCount, title, filter, error, refreshing, navIcon, nav.openWatched, viewModel, Modifier.padding(outer))
         }
     }
 }
@@ -170,6 +172,7 @@ private fun ThreadPager(
     error: Throwable?,
     refreshing: Boolean,
     navIcon: NavIcon,
+    onWatched: () -> Unit,
     viewModel: ThreadViewModel,
     modifier: Modifier,
 ) {
@@ -228,6 +231,7 @@ private fun ThreadPager(
                     onGoTo = { picking = true },
                     onReply = { browser(viewModel.replyToThreadUrl()) },
                     onOpenInBrowser = { browser(viewModel.threadUrl(pager.currentPage + 1)) },
+                    onWatched = onWatched,
                 )
             },
         )
@@ -283,8 +287,12 @@ private fun PageContent(page: Int, viewModel: ThreadViewModel, error: Throwable?
     LaunchedEffect(loaded, target) {
         val t = target ?: return@LaunchedEffect
         if (loaded == null || t.page != page) return@LaunchedEffect
-        val index = loaded.posts.indexOfFirst { p ->
-            (t.replyId != null && p.post.replyId == t.replyId) || (t.postNumber != null && p.post.number == t.postNumber)
+        val index = if (t.lastPost) {
+            loaded.posts.lastIndex
+        } else {
+            loaded.posts.indexOfFirst { p ->
+                (t.replyId != null && p.post.replyId == t.replyId) || (t.postNumber != null && p.post.number == t.postNumber)
+            }
         }
         // Past the marker, a post is one row further down; the first unread post itself scrolls to the marker.
         if (index >= 0) list.scrollToItem(headerCount + index + if (markerAt in 0 until index) 1 else 0)
@@ -576,6 +584,7 @@ private fun ThreadMenu(
     onGoTo: () -> Unit,
     onReply: () -> Unit,
     onOpenInBrowser: () -> Unit,
+    onWatched: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, stringResource(R.string.more)) }
@@ -586,6 +595,7 @@ private fun ThreadMenu(
         } else {
             DropdownMenuItem(text = { Text(stringResource(R.string.watch)) }, onClick = { open = false; onWatchAction(WatchAction.WATCH) })
         }
+        DropdownMenuItem(text = { Text(stringResource(R.string.watched_threads)) }, onClick = { open = false; onWatched() })
         HorizontalDivider()
         DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.first_page)) }, onClick = { open = false; onFirst() })
         DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.last_page)) }, onClick = { open = false; onLast() })

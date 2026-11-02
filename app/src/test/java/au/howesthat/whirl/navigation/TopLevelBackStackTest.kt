@@ -54,6 +54,23 @@ class TopLevelBackStackTest {
     }
 
     @Test
+    fun `going home to a drawer destination clears the screens above it`() {
+        val s = stack()
+        s.select(WatchedRoute)
+        s.push(ThreadRoute("a"))
+        s.push(ThreadRoute("b"))
+        s.goHome(WatchedRoute)
+        assertEquals(listOf(ForumsRoute, WatchedRoute), s.visible)
+
+        s.select(NewsRoute)
+        s.push(ThreadRoute("c"))
+        s.goHome(WatchedRoute)
+        assertEquals(listOf(ForumsRoute, WatchedRoute), s.visible, "from another stack")
+        s.select(NewsRoute)
+        assertEquals(listOf(ForumsRoute, NewsRoute, ThreadRoute("c")), s.visible, "which keeps its screens")
+    }
+
+    @Test
     fun `Settings push onto whichever stack is showing`() {
         val s = stack()
         s.select(WatchedRoute)

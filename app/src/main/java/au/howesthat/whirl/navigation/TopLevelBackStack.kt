@@ -39,6 +39,13 @@ class TopLevelBackStack(val start: NavKey, tops: List<NavKey>, saved: Saved? = n
         current = top
     }
 
+    /** A drawer destination's own screen, with the screens that were above it gone (the thread menu's "Watched threads"). */
+    fun goHome(top: NavKey) {
+        select(top)
+        val stack = stack(top)
+        while (stack.size > 1) stack.removeAt(stack.lastIndex)
+    }
+
     fun push(key: NavKey) {
         stack(current).add(key)
     }

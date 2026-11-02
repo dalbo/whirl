@@ -43,7 +43,7 @@ import kotlinx.serialization.Serializable
 import java.time.Instant
 
 /**
- * A thread, opened at [page] (1-based, or -1 for the last page). [scrollToPost] is a post number, [scrollToReply] a
+ * A thread, opened at [page] (1-based, or -1 for the last page, at its newest post). [scrollToPost] is a post number, [scrollToReply] a
  * reply id; [userId] opens it filtered to one user's posts (`ux=`); [fromWatched] when opened from Watched;
  * [lastReadPost] the last post read when it was opened, for the "New posts" marker.
  */
@@ -64,8 +64,8 @@ data class UiPost(val post: Post, val body: PostBody)
 
 data class UiPage(val page: ThreadPage, val posts: List<UiPost>, val note: PostBody?, val updatedAt: Instant?)
 
-/** A post to bring into view once its page is showing. */
-data class ScrollTarget(val page: Int, val postNumber: Int? = null, val replyId: Long? = null)
+/** A post to bring into view once its page is showing: by number, by reply id, or the page's last. */
+data class ScrollTarget(val page: Int, val postNumber: Int? = null, val replyId: Long? = null, val lastPost: Boolean = false)
 
 /** One-off navigation out of the thread. */
 sealed interface ThreadEvent {
@@ -122,6 +122,12 @@ class ThreadViewModel @AssistedInject constructor(
         },
     )
     val scrollTarget: StateFlow<ScrollTarget?> = _scrollTarget.asStateFlow()
+
+    /**
+     * Opening at the last page, or "Last page" from the menu, lands on the newest post, as Whirlpool's `?p=-1#bottom`
+     * does. Which page that is is known only once `?p=-1` resolves (the cached guess may be stale).
+     */
+    private var toLastPost = route.page == LAST_PAGE && route.scrollToReply == null && route.scrollToPost == null
 
     private val currentPage = MutableStateFlow<Int?>(null)
 
@@ -209,7 +215,10 @@ class ThreadViewModel @AssistedInject constructor(
             val filter = _filter.value
             val known = repo.lastKnownPage(threadId, filter)
             if (page == LAST_PAGE) {
-                known?.let { start(it, it) }
+                known?.let {
+                    start(it, it)
+                    if (toLastPost) _scrollTarget.value = ScrollTarget(it, lastPost = true)
+                }
             } else {
                 start(page, maxOf(page, known ?: 1))
             }
@@ -249,6 +258,10 @@ class ThreadViewModel @AssistedInject constructor(
                     _pageCount.value = loaded.pageCount
                     _title.value = loaded.title
                 }
+                if (page == LAST_PAGE && toLastPost) {
+                    toLastPost = false
+                    _scrollTarget.value = ScrollTarget(resolved, lastPost = true)
+                }
                 if (_startPage.value == null) {
                     start(resolved, loaded?.pageCount ?: resolved)
                 } else if (page == LAST_PAGE && resolved != currentPage.value) {
@@ -280,8 +293,9 @@ class ThreadViewModel @AssistedInject constructor(
         _jumpTo.value = page.coerceIn(1, _pageCount.value)
     }
 
-    /** Loads `?p=-1`; [load] then moves the pager to the page it resolves to. */
+    /** Loads `?p=-1`; [load] then moves the pager to the page it resolves to, at its newest post. */
     fun lastPage() {
+        toLastPost = true
         load(LAST_PAGE, force = false)
     }
 
