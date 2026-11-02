@@ -2,6 +2,7 @@ package au.howesthat.whirl.core.scraper
 
 import au.howesthat.whirl.core.model.Block
 import au.howesthat.whirl.core.model.Inline
+import au.howesthat.whirl.core.model.ListItem
 import au.howesthat.whirl.core.model.QuoteKind
 import au.howesthat.whirl.core.model.Style
 import org.junit.jupiter.api.Test
@@ -36,8 +37,32 @@ class PostBodyParserTest {
         assertTrue(lists.isNotEmpty())
         val first = lists.first()
         assertEquals(false, first.ordered)
-        assertEquals(listOf(Inline.Text("Bricks and Mortar (Brisbane)")), first.items[0])
-        assertEquals(listOf(Inline.Text("Online")), first.items[1])
+        assertEquals(ListItem(listOf(Inline.Text("Bricks and Mortar (Brisbane)"))), first.items[0])
+        assertEquals(ListItem(listOf(Inline.Text("Online"))), first.items[1])
+    }
+
+    @Test
+    fun `a nested list beside its item belongs to the item before it`() {
+        val post = ThreadPageParser.parse(Fixtures.html("thread_9244p8v1_p2.html")).posts.single { it.number == 34 }
+        val lists = PostBodyParser.parse(post.bodyHtml).blocks.filterIsInstance<Block.ListBlock>()
+        val people = lists[0].items
+        assertEquals(listOf("RayMondo:", "leo27:"), people.map { (it.inlines.single() as Inline.Text).text })
+        assertEquals(listOf(2, 2), people.map { it.sublists.single().items.size })
+        val ray = people[0].sublists.single().items
+        assertTrue((ray[1].inlines.single() as Inline.Text).text.contains("\"Watched threads\" now"))
+
+        val next = lists[1].items
+        assertEquals(3, next.size)
+        assertEquals(emptyList(), next[0].sublists)
+        assertEquals(1, next[1].sublists.single().items.size, "the undo item's note")
+    }
+
+    @Test
+    fun `a list nested inside its item is kept too`() {
+        val list = PostBodyParser.parse("<ol><li>one<ul><li>a</li><li>b</li></ul></li><li>two</li></ol>").blocks.single() as Block.ListBlock
+        assertEquals(listOf(Inline.Text("one")), list.items[0].inlines)
+        assertEquals(listOf(ListItem(listOf(Inline.Text("a"))), ListItem(listOf(Inline.Text("b")))), list.items[0].sublists.single().items)
+        assertEquals(ListItem(listOf(Inline.Text("two"))), list.items[1])
     }
 
     @Test

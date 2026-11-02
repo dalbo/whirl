@@ -44,6 +44,8 @@ import au.howesthat.whirl.core.model.PostBody
 import au.howesthat.whirl.core.model.QuoteKind
 import au.howesthat.whirl.core.model.Style
 
+private val BULLETS = listOf("•", "◦", "▪")
+
 private class BodyColors(val repliedUser: Color, val other: Color, val link: Color, val spoiler: Color, val codeBackground: Color)
 
 @Composable
@@ -96,13 +98,23 @@ fun PostBodyView(
                         QuoteBox(if (quote == QuoteKind.REPLIED_USER) colors.repliedUser else colors.other) { Text(text, style = textStyle) }
                     }
                 }
-                is Block.ListBlock -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    block.items.forEachIndexed { i, item ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(if (block.ordered) "${i + 1}." else "•", style = textStyle)
-                            Text(annotate(item, colors, onLink, revealed, reveal, counter), style = textStyle)
+                is Block.ListBlock -> {
+                    // Nested lists sit under their item, indented past its bullet, with the next bullet shape.
+                    @Composable
+                    fun ListView(list: Block.ListBlock, depth: Int) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            list.items.forEachIndexed { i, item ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(if (list.ordered) "${i + 1}." else BULLETS[depth % BULLETS.size], style = textStyle)
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        if (item.inlines.isNotEmpty()) Text(annotate(item.inlines, colors, onLink, revealed, reveal, counter), style = textStyle)
+                                        item.sublists.forEach { ListView(it, depth + 1) }
+                                    }
+                                }
+                            }
                         }
                     }
+                    ListView(block, 0)
                 }
                 is Block.Code -> Surface(color = colors.codeBackground, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth()) {
                     Text(

@@ -2,6 +2,7 @@ package au.howesthat.whirl.core.scraper
 
 import au.howesthat.whirl.core.model.Block
 import au.howesthat.whirl.core.model.Inline
+import au.howesthat.whirl.core.model.ListItem
 import au.howesthat.whirl.core.model.PostBody
 import au.howesthat.whirl.core.model.QuoteKind
 import au.howesthat.whirl.core.model.Style
@@ -65,10 +66,7 @@ object PostBodyParser {
                         ?: JUMP_TO_REPLY.find(a?.attr("onclick").orEmpty())?.groupValues?.get(1)?.toLong()
                     out.block(Block.QuoteAttribution(node.text().squash(), postId))
                 }
-                node.tagName() == "ul" || node.tagName() == "ol" -> {
-                    val items = node.select("> li").map { li -> trim(collectInlines(li, style)) }
-                    out.block(Block.ListBlock(ordered = node.tagName() == "ol", items = items))
-                }
+                node.isList() -> out.block(listBlock(node, style))
                 node.tagName() == "pre" -> out.block(Block.Code(node.wholeText().trimEnd()))
                 node.tagName() == "img" -> out.block(Block.Image(absoluteUrl(node.attr("src")), node.attr("alt").ifEmpty { null }))
                 node.tagName() == "hr" -> out.flush()
@@ -88,9 +86,33 @@ object PostBodyParser {
         }
     }
 
-    private fun collectInlines(element: Element, style: Style): List<Inline> {
+    private fun Element.isList() = tagName() == "ul" || tagName() == "ol"
+
+    /**
+     * A list and the lists nested in it. Whirlpool's editor puts a nested list beside the items rather than inside one
+     * (`<ul><li>a</li><ul><li>b</li></ul></ul>`), so a list there belongs to the item before it.
+     */
+    private fun listBlock(list: Element, style: Style): Block.ListBlock {
+        val items = mutableListOf<ListItem>()
+        for (child in list.children()) {
+            when {
+                child.tagName() == "li" -> {
+                    val (nested, text) = child.childNodes().partition { it is Element && it.isList() }
+                    items += ListItem(trim(collectInlines(text, style)), nested.map { listBlock(it as Element, style) })
+                }
+                child.isList() -> {
+                    val sub = listBlock(child, style)
+                    val last = items.removeLastOrNull() ?: ListItem(emptyList())
+                    items += last.copy(sublists = last.sublists + sub)
+                }
+            }
+        }
+        return Block.ListBlock(ordered = list.tagName() == "ol", items = items)
+    }
+
+    private fun collectInlines(nodes: List<Node>, style: Style): List<Inline> {
         val b = Builder()
-        for (child in element.childNodes()) inline(child, b::add, style)
+        for (child in nodes) inline(child, b::add, style)
         return b.run { flushInlinesForList() }
     }
 

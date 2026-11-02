@@ -7,10 +7,13 @@ sealed interface Block {
     /** "samuria writes..." linking to the quoted post. */
     data class QuoteAttribution(val text: String, val postId: Long?) : Block
     data class Paragraph(val inlines: List<Inline>) : Block
-    data class ListBlock(val ordered: Boolean, val items: List<List<Inline>>) : Block
+    data class ListBlock(val ordered: Boolean, val items: List<ListItem>) : Block
     data class Code(val text: String) : Block
     data class Image(val url: String, val alt: String?) : Block
 }
+
+/** A list item's text, and any lists nested under it. */
+data class ListItem(val inlines: List<Inline>, val sublists: List<Block.ListBlock> = emptyList())
 
 sealed interface Inline {
     data class Text(val text: String, val style: Style = Style()) : Inline
