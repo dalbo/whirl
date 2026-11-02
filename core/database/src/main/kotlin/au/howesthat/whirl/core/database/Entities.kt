@@ -107,6 +107,25 @@ data class CheckLogEntity(
     val network: String,
 )
 
+/**
+ * A watch action applied on this device and not yet sent to Whirlpool, so it survives the app closing (v1.6). Rows are
+ * sent in [id] order; [threadIds] is comma-separated; [state] is a `PendingState` name. Times are epoch milliseconds.
+ */
+@Entity(tableName = "pending_watch")
+data class PendingWatchEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val action: String,
+    @ColumnInfo(name = "thread_ids") val threadIds: String,
+    @ColumnInfo(name = "send_after") val sendAfter: Long,
+    val state: String = PendingState.WAITING.name,
+    val attempts: Int = 0,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+) {
+    val ids: List<String> get() = threadIds.split(',').filter { it.isNotEmpty() }
+}
+
+enum class PendingState { WAITING, SENDING }
+
 /** When each cached list was last fetched, for max-age and refresh throttling. */
 @Entity(tableName = "fetch_log")
 data class FetchLogEntity(

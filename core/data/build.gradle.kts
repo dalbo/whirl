@@ -13,6 +13,10 @@ dependencies {
     implementation(project(":core:scraper"))
     implementation(project(":core:database"))
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.work.runtime)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
 
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.work.testing)
 }

@@ -9,6 +9,7 @@ import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
 import au.howesthat.whirl.core.data.Account
 import au.howesthat.whirl.core.data.SettingsRepository
+import au.howesthat.whirl.core.data.WatchSendScheduler
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.database.WhirlDatabase
 import au.howesthat.whirl.core.network.WhirlpoolApi
@@ -40,7 +41,7 @@ class NotificationSchedulerTest {
     private val db = Room.inMemoryDatabaseBuilder(context, WhirlDatabase::class.java).allowMainThreadQueries().build()
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val settings = SettingsRepository(context)
-    private val watched = WatchedRepository(WhirlpoolApi(WhirlpoolHttp.client("t"), { null }), db.threadDao(), db.fetchLogDao(), Clock.systemUTC(), appScope)
+    private val watched = WatchedRepository(WhirlpoolApi(WhirlpoolHttp.client("t"), { null }), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, Clock.systemUTC(), appScope)
     private val notifier = WatchedNotifier(context, settings, watched, db.notifiedDao())
     private val scheduler = NotificationScheduler(context, settings, notifier, appScope)
 

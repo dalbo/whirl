@@ -8,6 +8,7 @@ import au.howesthat.whirl.core.data.OpenedFrom
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.data.WatchedPosition
+import au.howesthat.whirl.core.data.WatchSendScheduler
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.ThreadId
@@ -50,7 +51,7 @@ class ListViewModelTest {
         .allowMainThreadQueries().build()
     private val api = WhirlpoolApi(WhirlpoolHttp.client("t"), { null })
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val watched = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), Clock.systemUTC(), appScope)
+    private val watched = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, Clock.systemUTC(), appScope)
     private val deps = ListDeps(
         SettingsRepository(ApplicationProvider.getApplicationContext()),
         ForumRepository(api, db.forumDao(), db.fetchLogDao(), Clock.systemUTC()),

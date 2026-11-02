@@ -7,6 +7,7 @@ import au.howesthat.whirl.core.data.ForumRepository
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository
 import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.data.WatchSendScheduler
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.database.WatchedThreadColumns
 import au.howesthat.whirl.core.database.WhirlDatabase
@@ -71,7 +72,7 @@ class ThreadViewModelTest {
     private val settings = SettingsRepository(ApplicationProvider.getApplicationContext())
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     // No key: watch actions apply locally and their sends fail without a request.
-    private val watched = WatchedRepository(WhirlpoolApi(client, { null }, server.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), clock, appScope)
+    private val watched = WatchedRepository(WhirlpoolApi(client, { null }, server.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, clock, appScope)
 
     @Before
     fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -307,7 +308,7 @@ class ThreadViewModelTest {
             }
             start()
         }
-        val keyed = WatchedRepository(WhirlpoolApi(client, { "k" }, api.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), clock, appScope)
+        val keyed = WatchedRepository(WhirlpoolApi(client, { "k" }, api.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, clock, appScope)
         val pages = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(api.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock)
         settings.update { it.copy(watchedAutoMarkAsRead = true) }
         ThreadViewModel(ThreadRoute("9yvx1663", 1), pages, settings, keyed)

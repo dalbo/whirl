@@ -11,6 +11,7 @@ class AccountRepository @Inject constructor(
     private val api: WhirlpoolApi,
     private val settings: SettingsRepository,
     private val db: WhirlDatabase,
+    private val watched: WatchedRepository,
 ) {
     val account = settings.account
 
@@ -23,12 +24,16 @@ class AccountRepository @Inject constructor(
         val user = api.user(trimmed)
         val account = Account(user.id, user.name)
         val previous = settings.account.first()
-        if (previous != null && previous.userId != account.userId) db.clearAccountData()
+        if (previous != null && previous.userId != account.userId) {
+            watched.forgetPending()
+            db.clearAccountData()
+        }
         settings.signIn(trimmed, account)
         return account
     }
 
     suspend fun signOut() {
+        watched.forgetPending()
         settings.signOut()
         db.clearAccountData()
     }
