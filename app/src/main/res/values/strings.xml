@@ -26,6 +26,7 @@
     <string name="about_disclaimer">Whirl is not made by or affiliated with Whirlpool. Posting, private forums and private messages open in your browser, where you log in to Whirlpool.</string>
     <string name="undo">Undo</string>
     <string name="watch_done">Thread watched</string>
+    <string name="shortcut_find">Find in list or on page</string>
     <string name="mark_read_done">Marked as read</string>
     <plurals name="mark_read_done_threads">
         <item quantity="one">Marked %1$d thread as read</item>
