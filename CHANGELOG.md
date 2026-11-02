@@ -2,6 +2,14 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.5.2
+Posts now show every kind of Whirlpool formatting, checked against a test post using every code on the Whirlcode page.
+- Nested lists show under their item; they were missing, as a tester noticed.
+- Reply quotes (`>`) nest, with a bar beside them and the site's colour for each level; an indent (`:`) is indented rather than coloured as a quote.
+- Subscript and superscript, small and serif text, and the grey alternate quote.
+- Tables show as a grid, with a header row and each cell's alignment, instead of running together on one line.
+- Horizontal rules show as a line.
+
 ## v1.5.1
 Tester feedback from tablets and foldables.
 - Threads beside the list now works on unfolded phones such as the Galaxy Z Fold: it starts at 600 dp wide instead of 840 dp. On narrower windows the list takes a little under half the width.
