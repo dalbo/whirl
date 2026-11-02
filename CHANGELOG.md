@@ -2,6 +2,15 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.5.1
+Tester feedback from tablets and foldables.
+- Threads beside the list now works on unfolded phones such as the Galaxy Z Fold: it starts at 600 dp wide instead of 840 dp. On narrower windows the list takes a little under half the width.
+- Settings › General › "Only in landscape", under "Threads beside the list", keeps a tablet held upright to one pane.
+- The panes are separated by a thin line instead of a wide bar, which showed white in dark themes.
+- Forums shows as a list beside an empty pane, like the other lists.
+- A thread's ⋮ menu has "Watched threads", to get back to Watched without backing out of every screen.
+- Threads opened at their last page (Recent, jump to last post, ⋮ › Last page) now land on the newest post, as on Whirlpool.
+
 ## v1.5.0
 - Watched threads: a "New posts" line marks where the unread posts start, like the orange line on Whirlpool, as asked for by a tester. It stays put after the thread is marked read, and also shows when a watched thread is opened from Recent, a link or elsewhere. The page picker (tap the title) gains "First unread post (page N)".
 - Settings › Notifications › "Check history": the last 20 background checks for watched-thread replies (when each ran, how long after the one before, what it found, and whether it notified), with what can delay them: battery use, app standby, Battery Saver, Data Saver, and whether notifications are allowed. The share button sends it as text, to paste into the Whirl thread when notifications seem late. It contains no thread titles or account details.

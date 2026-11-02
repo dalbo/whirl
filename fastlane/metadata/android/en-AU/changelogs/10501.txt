@@ -1,0 +1,4 @@
+Whirl 1.5.1
+- Threads beside the list now works on unfolded phones, with an "Only in landscape" option and a thin line between the panes
+- Thread menu: "Watched threads" goes straight back to Watched
+- Threads opened at the last page land on the newest post
