@@ -1,0 +1,4 @@
+Whirl 1.5.2
+- Posts show nested lists, which were missing
+- Reply quotes nest with a bar for each level, like the site
+- Tables, horizontal rules, subscript, superscript, small and serif text
