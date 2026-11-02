@@ -1,6 +1,7 @@
 package au.howesthat.whirl.core.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,17 +36,31 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.BaselineShift
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import au.howesthat.whirl.core.model.Block
+import au.howesthat.whirl.core.model.CellAlign
+import au.howesthat.whirl.core.model.TableCell
 import au.howesthat.whirl.core.model.Inline
 import au.howesthat.whirl.core.model.PostBody
 import au.howesthat.whirl.core.model.QuoteKind
 import au.howesthat.whirl.core.model.Style
 
-private class BodyColors(val repliedUser: Color, val other: Color, val link: Color, val spoiler: Color, val codeBackground: Color)
+private val BULLETS = listOf("•", "◦", "▪")
+
+private class BodyColors(val repliedUser: Color, val other: Color, val alternate: Color, val link: Color, val spoiler: Color, val codeBackground: Color) {
+    fun quote(kind: QuoteKind): Color = when (kind) {
+        QuoteKind.REPLIED_USER -> repliedUser
+        QuoteKind.OTHER -> other
+        QuoteKind.ALTERNATE -> alternate
+    }
+}
 
 @Composable
 private fun bodyColors(): BodyColors {
@@ -53,6 +69,7 @@ private fun bodyColors(): BodyColors {
     return BodyColors(
         repliedUser = style.quoteRepliedUser,
         other = style.quoteOther,
+        alternate = scheme.onSurfaceVariant,
         link = scheme.primary,
         spoiler = scheme.onSurfaceVariant,
         codeBackground = scheme.surfaceContainerHighest,
@@ -77,52 +94,116 @@ fun PostBodyView(
     val reveal: (Int) -> Unit = { if (it !in revealed) revealed += it }
     val counter = SpoilerCounter()
     val boxedQuotes = LocalAppStyle.current.layout.quotes == Quotes.BOXED
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        body.blocks.forEach { block ->
-            when (block) {
-                is Block.QuoteAttribution -> Text(
-                    block.text,
-                    modifier = block.postId?.let { id -> Modifier.clickable(role = Role.Button) { onQuote(id) } } ?: Modifier,
-                    style = textStyle,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.repliedUser,
-                )
-                is Block.Paragraph -> {
-                    val text = annotate(block.inlines, colors, onLink, revealed, reveal, counter)
-                    val quote = if (boxedQuotes) wholeQuote(block.inlines) else null
-                    if (quote == null) {
-                        Text(text, style = textStyle)
-                    } else {
-                        QuoteBox(if (quote == QuoteKind.REPLIED_USER) colors.repliedUser else colors.other) { Text(text, style = textStyle) }
-                    }
-                }
-                is Block.ListBlock -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    block.items.forEachIndexed { i, item ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(if (block.ordered) "${i + 1}." else "•", style = textStyle)
-                            Text(annotate(item, colors, onLink, revealed, reveal, counter), style = textStyle)
+    // A quote's blocks are drawn inside it; boxed quotes box a whole quote once, not each paragraph in it.
+    @Composable
+    fun Blocks(blocks: List<Block>, inQuote: Boolean, modifier: Modifier = Modifier) {
+        Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            blocks.forEach { block ->
+                when (block) {
+                    is Block.QuoteAttribution -> Text(
+                        block.text,
+                        modifier = block.postId?.let { id -> Modifier.clickable(role = Role.Button) { onQuote(id) } } ?: Modifier,
+                        style = textStyle,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.repliedUser,
+                    )
+                    is Block.Paragraph -> {
+                        val text = annotate(block.inlines, colors, onLink, revealed, reveal, counter)
+                        val quote = if (boxedQuotes && !inQuote) wholeQuote(block.inlines) else null
+                        if (quote == null) {
+                            Text(text, style = textStyle)
+                        } else {
+                            QuoteBox(colors.quote(quote)) { Text(text, style = textStyle) }
                         }
                     }
+                    is Block.Quote -> when (val kind = block.kind) {
+                        // A `:` indent.
+                        null -> Blocks(block.blocks, inQuote, Modifier.padding(start = 24.dp))
+                        else -> if (boxedQuotes && !inQuote) {
+                            QuoteBox(colors.quote(kind)) { Blocks(block.blocks, inQuote = true) }
+                        } else {
+                            Row(Modifier.height(IntrinsicSize.Min)) {
+                                Box(Modifier.width(3.dp).fillMaxHeight().background(colors.quote(kind).copy(alpha = 0.5f)))
+                                Blocks(block.blocks, inQuote = true, Modifier.padding(start = 12.dp))
+                            }
+                        }
+                    }
+                    is Block.ListBlock -> {
+                        // Nested lists sit under their item, indented past its bullet, with the next bullet shape. A
+                        // list with no item above it (`##` straight after a `*` list) is only indented.
+                        @Composable
+                        fun ListView(list: Block.ListBlock, depth: Int) {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                list.items.forEachIndexed { i, item ->
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        val marker = if (list.ordered) "${i + 1}." else BULLETS[depth % BULLETS.size]
+                                        if (item.inlines.isEmpty()) Box(Modifier.width(16.dp)) else Text(marker, style = textStyle)
+                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            if (item.inlines.isNotEmpty()) Text(annotate(item.inlines, colors, onLink, revealed, reveal, counter), style = textStyle)
+                                            item.sublists.forEach { ListView(it, depth + 1) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        ListView(block, 0)
+                    }
+                    is Block.Code -> Surface(color = colors.codeBackground, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            block.text,
+                            Modifier.horizontalScroll(rememberScrollState()).padding(8.dp),
+                            style = textStyle.copy(fontFamily = FontFamily.Monospace),
+                        )
+                    }
+                    // Images are not loaded yet (no fixture with one); a tappable placeholder opens it.
+                    is Block.Image -> Surface(
+                        color = colors.codeBackground,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.widthIn(min = 120.dp).clickable(role = Role.Button) { onLink(block.url) },
+                    ) {
+                        Text(
+                            block.alt?.let { stringResource(R.string.image_named, it) } ?: stringResource(R.string.image),
+                            Modifier.padding(12.dp),
+                            style = textStyle,
+                            color = colors.link,
+                        )
+                    }
+                    Block.Rule -> HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                    is Block.Table -> TableView(block) { cell ->
+                        Text(
+                            annotate(cell.inlines, colors, onLink, revealed, reveal, counter),
+                            style = textStyle,
+                            textAlign = when (cell.align) {
+                                CellAlign.START -> TextAlign.Start
+                                CellAlign.CENTER -> TextAlign.Center
+                                CellAlign.END -> TextAlign.End
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
-                is Block.Code -> Surface(color = colors.codeBackground, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        block.text,
-                        Modifier.horizontalScroll(rememberScrollState()).padding(8.dp),
-                        style = textStyle.copy(fontFamily = FontFamily.Monospace),
-                    )
-                }
-                // Images are not loaded yet (no fixture with one); a tappable placeholder opens it.
-                is Block.Image -> Surface(
-                    color = colors.codeBackground,
-                    shape = MaterialTheme.shapes.small,
-                    modifier = Modifier.widthIn(min = 120.dp).clickable(role = Role.Button) { onLink(block.url) },
-                ) {
-                    Text(
-                        block.alt?.let { stringResource(R.string.image_named, it) } ?: stringResource(R.string.image),
-                        Modifier.padding(12.dp),
-                        style = textStyle,
-                        color = colors.link,
-                    )
+            }
+        }
+    }
+    Blocks(body.blocks, inQuote = false, modifier)
+}
+
+/** A table as a grid of equal columns (enough for the short tables in posts), the header row shaded. */
+@Composable
+private fun TableView(table: Block.Table, cell: @Composable (TableCell) -> Unit) {
+    val columns = table.rows.maxOfOrNull { it.size } ?: return
+    val line = MaterialTheme.colorScheme.outlineVariant
+    Column(Modifier.fillMaxWidth().border(1.dp, line)) {
+        table.rows.forEach { row ->
+            val header = row.isNotEmpty() && row.all { it.header }
+            Row(
+                Modifier.fillMaxWidth().height(IntrinsicSize.Min)
+                    .background(if (header) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Unspecified),
+            ) {
+                for (i in 0 until columns) {
+                    Box(Modifier.weight(1f).fillMaxHeight().border(0.5.dp, line).padding(horizontal = 8.dp, vertical = 6.dp)) {
+                        row.getOrNull(i)?.let { cell(it) }
+                    }
                 }
             }
         }
@@ -160,7 +241,8 @@ internal fun wholeQuote(inlines: List<Inline>): QuoteKind? {
     return when {
         kinds.isEmpty() || null in kinds -> null
         QuoteKind.REPLIED_USER in kinds -> QuoteKind.REPLIED_USER
-        else -> QuoteKind.OTHER
+        QuoteKind.OTHER in kinds -> QuoteKind.OTHER
+        else -> QuoteKind.ALTERNATE
     }
 }
 
@@ -215,13 +297,25 @@ private fun span(style: Style, colors: BodyColors, hidden: Boolean): SpanStyle {
     return SpanStyle(
         fontWeight = if (style.bold) FontWeight.Bold else null,
         fontStyle = if (style.italic) FontStyle.Italic else null,
-        fontFamily = if (style.code) FontFamily.Monospace else null,
+        fontFamily = when {
+            style.code -> FontFamily.Monospace
+            style.serif -> FontFamily.Serif
+            else -> null
+        },
+        fontSize = when {
+            style.sub || style.sup -> 0.75.em
+            style.small -> 0.85.em
+            else -> TextUnit.Unspecified
+        },
+        baselineShift = when {
+            style.sup -> BaselineShift.Superscript
+            style.sub -> BaselineShift.Subscript
+            else -> null
+        },
         textDecoration = if (decorations.isEmpty()) null else TextDecoration.combine(decorations),
         color = when {
             hidden -> Color.Transparent
-            style.quote == QuoteKind.REPLIED_USER -> colors.repliedUser
-            style.quote == QuoteKind.OTHER -> colors.other
-            else -> Color.Unspecified
+            else -> style.quote?.let(colors::quote) ?: Color.Unspecified
         },
         background = if (style.code && !hidden) colors.codeBackground else Color.Unspecified,
     )

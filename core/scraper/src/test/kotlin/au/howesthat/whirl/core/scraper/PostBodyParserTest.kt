@@ -1,7 +1,10 @@
 package au.howesthat.whirl.core.scraper
 
 import au.howesthat.whirl.core.model.Block
+import au.howesthat.whirl.core.model.CellAlign
+import au.howesthat.whirl.core.model.TableCell
 import au.howesthat.whirl.core.model.Inline
+import au.howesthat.whirl.core.model.ListItem
 import au.howesthat.whirl.core.model.QuoteKind
 import au.howesthat.whirl.core.model.Style
 import org.junit.jupiter.api.Test
@@ -36,8 +39,96 @@ class PostBodyParserTest {
         assertTrue(lists.isNotEmpty())
         val first = lists.first()
         assertEquals(false, first.ordered)
-        assertEquals(listOf(Inline.Text("Bricks and Mortar (Brisbane)")), first.items[0])
-        assertEquals(listOf(Inline.Text("Online")), first.items[1])
+        assertEquals(ListItem(listOf(Inline.Text("Bricks and Mortar (Brisbane)"))), first.items[0])
+        assertEquals(ListItem(listOf(Inline.Text("Online"))), first.items[1])
+    }
+
+    @Test
+    fun `a nested list beside its item belongs to the item before it`() {
+        val post = ThreadPageParser.parse(Fixtures.html("thread_9244p8v1_p2.html")).posts.single { it.number == 34 }
+        val lists = PostBodyParser.parse(post.bodyHtml).blocks.filterIsInstance<Block.ListBlock>()
+        val people = lists[0].items
+        assertEquals(listOf("RayMondo:", "leo27:"), people.map { (it.inlines.single() as Inline.Text).text })
+        assertEquals(listOf(2, 2), people.map { it.sublists.single().items.size })
+        val ray = people[0].sublists.single().items
+        assertTrue((ray[1].inlines.single() as Inline.Text).text.contains("\"Watched threads\" now"))
+
+        val next = lists[1].items
+        assertEquals(3, next.size)
+        assertEquals(emptyList(), next[0].sublists)
+        assertEquals(1, next[1].sublists.single().items.size, "the undo item's note")
+    }
+
+    /** The Whirlcode test post: every code on the wiki's Whirlcode page. */
+    private val whirlcode by lazy {
+        val post = ThreadPageParser.parse(Fixtures.html("thread_9244p8v1_whirlcode.html")).posts.single { it.number == 37 }
+        PostBodyParser.parse(post.bodyHtml).blocks
+    }
+
+    private fun paragraph(startsWith: String) =
+        whirlcode.filterIsInstance<Block.Paragraph>().single { (it.inlines.first() as? Inline.Text)?.text?.startsWith(startsWith) == true }.inlines
+
+    @Test
+    fun `whirlcode inline styles`() {
+        val inline = paragraph("Inline:")
+        fun styleOf(text: String) = inline.filterIsInstance<Inline.Text>().single { it.text == text }.style
+        assertEquals(Style(small = true), styleOf("small"))
+        assertEquals(Style(serif = true), styleOf("serif"))
+        // H[\2\]O and 500m[^2^]
+        assertEquals(listOf(Style(sub = true), Style(sup = true)), inline.filterIsInstance<Inline.Text>().filter { it.text == "2" }.map { it.style })
+        assertEquals(Style(bold = true, italic = true), styleOf("bold italic"))
+        val quotes = paragraph("Quotes inline:").filterIsInstance<Inline.Text>().associate { it.text to it.style.quote }
+        assertEquals(QuoteKind.REPLIED_USER, quotes["forum quote"])
+        assertEquals(QuoteKind.OTHER, quotes["external quote"])
+        assertEquals(QuoteKind.ALTERNATE, quotes["alternate quote"])
+    }
+
+    @Test
+    fun `whirlcode quotes nest and take the site's colour for each depth, and an indent is no quote`() {
+        val quotes = whirlcode.filterIsInstance<Block.Quote>()
+        assertEquals(listOf(null, QuoteKind.REPLIED_USER, null), quotes.map { it.kind })
+        assertEquals(Block.Paragraph(listOf(Inline.Text("An indented line"))), quotes[0].blocks.single())
+
+        val reply = quotes[1].blocks
+        val two = assertIs<Block.Quote>(reply[1])
+        assertEquals(QuoteKind.OTHER, two.kind)
+        assertEquals(QuoteKind.ALTERNATE, assertIs<Block.Quote>(two.blocks[1]).kind)
+        assertEquals(Block.Paragraph(listOf(Inline.Text("Reply quote, three deep", Style(quote = QuoteKind.ALTERNATE)))), assertIs<Block.Quote>(two.blocks[1]).blocks.single())
+        assertIs<Block.ListBlock>(reply[3])
+        assertEquals(QuoteKind.OTHER, assertIs<Block.Quote>(reply[4]).kind, "the numbered list's two-deep quote")
+
+        // ": >": a reply quote inside an indent is the first reply quote level.
+        assertEquals(QuoteKind.REPLIED_USER, assertIs<Block.Quote>(quotes[2].blocks.single()).kind)
+    }
+
+    @Test
+    fun `whirlcode lists, rule and table`() {
+        val lists = whirlcode.filterIsInstance<Block.ListBlock>()
+        // "##" straight after a "*" list: a numbered list with no item above it.
+        val orphan = lists.last()
+        assertEquals(emptyList(), orphan.items.single().inlines)
+        assertEquals("a numbered list under it", (orphan.items.single().sublists.single().items.single().inlines.single() as Inline.Text).text)
+
+        assertTrue(Block.Rule in whirlcode)
+        val table = whirlcode.filterIsInstance<Block.Table>().single()
+        assertEquals(3, table.rows.size)
+        assertEquals(
+            listOf(
+                TableCell(listOf(Inline.Text("Left", Style(bold = true))), header = true),
+                TableCell(listOf(Inline.Text("Centre", Style(bold = true))), header = true, align = CellAlign.CENTER),
+                TableCell(listOf(Inline.Text("Right", Style(bold = true))), header = true, align = CellAlign.END),
+            ),
+            table.rows[0],
+        )
+        assertEquals(4, table.rows[2].size)
+    }
+
+    @Test
+    fun `a list nested inside its item is kept too`() {
+        val list = PostBodyParser.parse("<ol><li>one<ul><li>a</li><li>b</li></ul></li><li>two</li></ol>").blocks.single() as Block.ListBlock
+        assertEquals(listOf(Inline.Text("one")), list.items[0].inlines)
+        assertEquals(listOf(ListItem(listOf(Inline.Text("a"))), ListItem(listOf(Inline.Text("b")))), list.items[0].sublists.single().items)
+        assertEquals(ListItem(listOf(Inline.Text("two"))), list.items[1])
     }
 
     @Test
