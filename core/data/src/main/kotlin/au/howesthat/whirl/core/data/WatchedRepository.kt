@@ -201,11 +201,11 @@ class WatchedRepository @Inject constructor(
                 withTimeoutOrNull(undoWindow) { p.go.await() }
                 if (p.go.isCancelled) return@launch
                 queue.makeDue(p.rowId, clock.millis())
-                drain()
+                drainInBackground()
             }
             _events.emit(WatchEvent.Applied(p))
         } else {
-            scope.launch { drain() }
+            scope.launch { drainInBackground() }
         }
         return p
     }
@@ -230,6 +230,20 @@ class WatchedRepository @Inject constructor(
     /** The Undo offer went away: send now rather than at the end of [UNDO_WINDOW]. */
     fun commit(p: PendingWatch) {
         p.go.complete(Unit)
+    }
+
+    /**
+     * [drain] from the app's own scope, where an unexpected error (the database, say) must not crash the app: the
+     * action stays queued for [WatchSendWorker].
+     */
+    private suspend fun drainInBackground() {
+        try {
+            drain()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            scheduler.schedule(Duration.ZERO)
+        }
     }
 
     /** Sends the queued actions that are due, oldest first. Called by the app and by [WatchSendWorker]. */
