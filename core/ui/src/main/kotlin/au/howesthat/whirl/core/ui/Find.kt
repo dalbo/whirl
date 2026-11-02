@@ -4,6 +4,7 @@ import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -102,6 +103,8 @@ fun FindBar(
     onSearchWhirlpool: ((String) -> Unit)? = null,
     /** Back closes the bar; false (a thread open beside the list) leaves Back to the thread unless the field has focus. */
     closeOnBack: Boolean = true,
+    /** Buttons after the field, such as the screen's ⋮ menu, so they stay within reach while finding. */
+    actions: @Composable RowScope.() -> Unit = {},
 ) {
     val state = rememberTextFieldState(query)
     val change by rememberUpdatedState(onQueryChange)
@@ -127,7 +130,7 @@ fun FindBar(
     val colors = whirlTopBarColors()
     Surface(modifier, color = colors.containerColor, contentColor = colors.titleContentColor) {
         Column(Modifier.windowInsetsPadding(TopAppBarDefaults.windowInsets)) {
-            Row(Modifier.heightIn(min = 64.dp).padding(start = 4.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.heightIn(min = 64.dp).padding(start = 4.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.find_close)) }
                 SearchBarDefaults.InputField(
                     state = state,
@@ -148,6 +151,7 @@ fun FindBar(
                         }
                     },
                 )
+                actions()
             }
             val words = query.trim()
             if (onSearchWhirlpool != null && words.isNotEmpty()) {

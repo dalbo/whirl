@@ -120,4 +120,30 @@ class DaoTest {
         assertEquals(1, threads.observeSource("LATEST", "").first().size)
         assertNull(db.fetchLogDao().fetchedAt("watched:all"))
     }
+
+    @Test
+    fun `a queued action can be undone only until it is claimed for sending`() = runTest {
+        val queue = db.pendingWatchDao()
+        val a = queue.insert(PendingWatchEntity(action = "MARK_READ", threadIds = "a,b", sendAfter = 500, createdAt = 0))
+        val b = queue.insert(PendingWatchEntity(action = "UNWATCH", threadIds = "c", sendAfter = 500, createdAt = 0))
+        assertEquals(listOf(listOf("a", "b"), listOf("c")), queue.all().map { it.ids })
+
+        assertEquals(1, queue.claim(a))
+        assertEquals(0, queue.claim(a), "claimed once")
+        assertEquals(0, queue.deleteWaiting(a), "too late to undo")
+        assertEquals(1, queue.deleteWaiting(b))
+
+        queue.release(a, "b")
+        val row = queue.all().single()
+        assertEquals(listOf("b"), row.ids)
+        assertEquals("WAITING", row.state)
+        assertEquals(1, row.attempts)
+
+        queue.makeDue(a, now = 100)
+        queue.makeDue(a, now = 900)
+        assertEquals(100, queue.all().single().sendAfter, "never later than it was")
+        queue.claim(a)
+        queue.resetSending()
+        assertEquals("WAITING", queue.all().single().state)
+    }
 }

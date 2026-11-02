@@ -75,7 +75,7 @@ class RepositoryTest {
 
     @Test
     fun `sign in stores the key and account, bad key stores nothing`() = runTest {
-        val account = AccountRepository(api, settings, db)
+        val account = AccountRepository(api, settings, db, WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, Clock.systemUTC(), backgroundScope))
         enqueue("api_badkey.json", 403)
         assertFailsWith<WhirlpoolError.BadKey> { account.signIn("bad") }
         assertNull(settings.apiKey())
@@ -160,7 +160,7 @@ class RepositoryTest {
     @Test
     fun `watched list refreshes and respects max age`() = runTest {
         settings.signIn("k", Account(216903, "d@llin"))
-        val repo = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), clock, backgroundScope)
+        val repo = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, clock, backgroundScope)
         enqueue("api_watched_mode0.json")
         assertTrue(repo.refresh(unreadOnly = true))
         val cached = repo.watched(unreadOnly = true).first()

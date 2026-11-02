@@ -4,11 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -54,6 +56,7 @@ import au.howesthat.whirl.core.data.OpenedFrom
 import au.howesthat.whirl.core.data.RecentRepository
 import au.howesthat.whirl.core.data.ScrapedList
 import au.howesthat.whirl.core.data.ScrapedListRepository
+import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.model.TextQuery
@@ -270,6 +273,7 @@ internal fun ListTopBar(
     query: String?,
     sections: List<Section>?,
     searchRoute: ((String) -> SearchRoute)? = { SearchRoute(query = it) },
+    findActions: @Composable RowScope.() -> Unit = {},
     titleBar: @Composable () -> Unit,
 ) {
     OnFindShortcut { if (query == null) viewModel.setQuery("") }
@@ -284,6 +288,7 @@ internal fun ListTopBar(
             matches = sections?.sumOf { it.items.size },
             onSearchWhirlpool = searchRoute?.let { route -> { words -> nav.openSearch(route(words)) } },
             closeOnBack = LocalSelectedThread.current == null,
+            actions = findActions,
         )
     }
 }
@@ -341,6 +346,20 @@ class WatchedViewModel @Inject constructor(deps: ListDeps, private val repo: Wat
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /**
+     * Mark all as read: the unread threads the list shows, so only the matching ones while finding. Checked against
+     * the Unread list, since the thread kept open beside the list there is already read.
+     */
+    val markAllIds: StateFlow<List<ThreadId>> = combine(state, repo.watched(unreadOnly = true)) { shown, unread ->
+        val unreadIds = unread.value.filter { it.unreadCount > 0 }.mapTo(mutableSetOf()) { it.id }
+        shown.sections.orEmpty().flatMap { it.items }.mapNotNull { it.openId }.filter { it in unreadIds }.distinct()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun markAllRead() {
+        val ids = markAllIds.value
+        if (ids.isNotEmpty()) viewModelScope.launch { repo.perform(WatchAction.MARK_READ, ids) }
+    }
+
     /** Threads with unread posts, for "N unread" in the title. */
     val unreadThreads: StateFlow<Int> = repo.watched(unreadOnly = true)
         .map { cached -> cached.value.count { it.unreadCount > 0 } }
@@ -381,6 +400,8 @@ fun WatchedScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: WatchedViewMo
     val error by viewModel.error.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
     val allMatches by viewModel.allMatches.collectAsStateWithLifecycle()
+    val markAll by viewModel.markAllIds.collectAsStateWithLifecycle()
+    val menu: @Composable RowScope.() -> Unit = { WatchedMenu(markAll.size, finding = !query.isNullOrBlank(), viewModel::markAllRead) }
     LifecycleResumeEffect(viewModel) {
         viewModel.onShown()
         onPauseOrDispose {}
@@ -388,7 +409,7 @@ fun WatchedScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: WatchedViewMo
     Scaffold(
         topBar = {
             Column {
-                ListTopBar(stringResource(R.string.watched_title), viewModel, nav, query, state.sections) {
+                ListTopBar(stringResource(R.string.watched_title), viewModel, nav, query, state.sections, findActions = menu) {
                     TopAppBar(
                         colors = whirlTopBarColors(),
                         title = {
@@ -402,6 +423,7 @@ fun WatchedScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: WatchedViewMo
                         actions = {
                             FindButton { viewModel.setQuery("") }
                             RefreshButton { viewModel.refresh() }
+                            menu()
                         },
                     )
                 }
@@ -425,6 +447,23 @@ fun WatchedScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: WatchedViewMo
                         Text(all.count?.let { pluralStringResource(R.plurals.find_show_in_all, it, it) } ?: stringResource(R.string.find_look_in_all))
                     }
                 }
+            },
+        )
+    }
+}
+
+/** Watched's ⋮: Mark all as read, which while finding marks only the [count] threads shown. */
+@Composable
+private fun WatchedMenu(count: Int, finding: Boolean, onMarkAll: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, stringResource(R.string.more)) }
+    DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        DropdownMenuItem(
+            text = { Text(if (finding) pluralStringResource(R.plurals.mark_shown_read, count, count) else stringResource(R.string.mark_all_read)) },
+            enabled = count > 0,
+            onClick = {
+                open = false
+                onMarkAll()
             },
         )
     }
