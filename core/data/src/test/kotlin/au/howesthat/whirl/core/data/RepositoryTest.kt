@@ -127,8 +127,10 @@ class RepositoryTest {
     @Test
     fun `two panes are off until turned on`() = runTest {
         assertFalse(settings.settings.first().twoPane)
-        settings.update { it.copy(twoPane = true) }
+        assertFalse(settings.settings.first().twoPaneLandscapeOnly)
+        settings.update { it.copy(twoPane = true, twoPaneLandscapeOnly = true) }
         assertTrue(settings.settings.first().twoPane)
+        assertTrue(settings.settings.first().twoPaneLandscapeOnly)
     }
 
     @Test

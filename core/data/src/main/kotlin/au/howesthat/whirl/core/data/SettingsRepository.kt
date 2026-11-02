@@ -46,6 +46,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
         val textScale = stringPreferencesKey("text_scale")
         val screenAnimations = booleanPreferencesKey("screen_animations")
         val twoPane = booleanPreferencesKey("two_pane")
+        val twoPaneLandscapeOnly = booleanPreferencesKey("two_pane_landscape_only")
         val browserApp = booleanPreferencesKey("browser_app")
         val watchedNotify = booleanPreferencesKey("watched_notify")
         val notifyInterval = intPreferencesKey("notify_interval")
@@ -72,6 +73,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
             layout = p[Keys.layout] ?: d.layout,
             screenAnimations = p[Keys.screenAnimations] ?: d.screenAnimations,
             twoPane = p[Keys.twoPane] ?: d.twoPane,
+            twoPaneLandscapeOnly = p[Keys.twoPaneLandscapeOnly] ?: d.twoPaneLandscapeOnly,
             browserApp = p[Keys.browserApp] ?: d.browserApp,
             nightStart = p[Keys.nightStart]?.let(LocalTime::parse) ?: d.nightStart,
             nightEnd = p[Keys.nightEnd]?.let(LocalTime::parse) ?: d.nightEnd,
@@ -136,6 +138,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
             p[Keys.layout] = s.layout
             p[Keys.screenAnimations] = s.screenAnimations
             p[Keys.twoPane] = s.twoPane
+            p[Keys.twoPaneLandscapeOnly] = s.twoPaneLandscapeOnly
             p[Keys.browserApp] = s.browserApp
             p[Keys.nightStart] = s.nightStart.toString()
             p[Keys.nightEnd] = s.nightEnd.toString()

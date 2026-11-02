@@ -108,6 +108,9 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, onCheckHistory: 
                 Choice(stringResource(R.string.settings_font_size), PostFontSize.entries, settings.postFontSize, { fontLabel(it) }) { v -> update { it.copy(postFontSize = v) } }
                 Toggle(stringResource(R.string.settings_screen_animations), settings.screenAnimations) { v -> update { it.copy(screenAnimations = v) } }
                 Toggle(stringResource(R.string.settings_two_pane), settings.twoPane, stringResource(R.string.settings_two_pane_summary)) { v -> update { it.copy(twoPane = v) } }
+                if (settings.twoPane) {
+                    Toggle(stringResource(R.string.settings_two_pane_landscape), settings.twoPaneLandscapeOnly) { v -> update { it.copy(twoPaneLandscapeOnly = v) } }
+                }
                 Toggle(stringResource(R.string.settings_browser_app), settings.browserApp) { v -> update { it.copy(browserApp = v) } }
             }
 
