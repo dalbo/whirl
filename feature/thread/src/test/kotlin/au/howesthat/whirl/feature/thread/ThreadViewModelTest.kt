@@ -37,6 +37,10 @@ import mockwebserver3.MockResponse
 import mockwebserver3.RecordedRequest
 import okhttp3.Dns
 import mockwebserver3.MockWebServer
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -72,8 +76,13 @@ class ThreadViewModelTest {
     @Before
     fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
 
+    // Cleared after each test, which cancels the view models' work: left running, it could reach Dispatchers.Main
+    // while the next test sets it, failing that test.
+    private val viewModels = ViewModelStore()
+
     @After
     fun tearDown() {
+        viewModels.clear()
         Dispatchers.resetMain()
         appScope.cancel()
         server.close()
@@ -83,7 +92,12 @@ class ThreadViewModelTest {
     private fun enqueueHtml(name: String) =
         server.enqueue(MockResponse.Builder().body(File(System.getProperty("whirl.fixtures"), "html/$name").readText()).build())
 
-    private fun viewModel(route: ThreadRoute) = ThreadViewModel(route, repo, settings, watched)
+    private fun viewModel(route: ThreadRoute): ThreadViewModel {
+        val factory = viewModelFactory { initializer { ThreadViewModel(route, repo, settings, watched) } }
+        return ViewModelProvider.create(viewModels, factory)["vm${viewModelCount++}", ThreadViewModel::class]
+    }
+
+    private var viewModelCount = 0
 
     // Room and MockWebServer do real I/O, so wait in wall-clock time, not runTest's virtual time.
     private suspend fun <T> await(block: suspend () -> T): T =
@@ -104,7 +118,11 @@ class ThreadViewModelTest {
         enqueueHtml("thread_97r5wzn3_last.html")
         val vm = viewModel(ThreadRoute("97r5wzn3", -1))
         assertEquals(ScrollTarget(2290, lastPost = true), await { vm.scrollTarget.filterNotNull().first() })
-        assertEquals(null, viewModel(ThreadRoute("97r5wzn3", -1, scrollToPost = 45795)).scrollTarget.value?.lastPost?.takeIf { it })
+
+        enqueueHtml("thread_97r5wzn3_last.html")
+        val toPost = viewModel(ThreadRoute("97r5wzn3", -1, scrollToPost = 45795))
+        await { toPost.startPage.filterNotNull().first() }
+        assertEquals(ScrollTarget(-1, postNumber = 45795), toPost.scrollTarget.value)
     }
 
     @Test
