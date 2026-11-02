@@ -1,7 +1,10 @@
 package au.howesthat.whirl.core.scraper
 
 import au.howesthat.whirl.core.model.Block
+import au.howesthat.whirl.core.model.CellAlign
+import au.howesthat.whirl.core.model.TableCell
 import au.howesthat.whirl.core.model.Inline
+import au.howesthat.whirl.core.model.ListItem
 import au.howesthat.whirl.core.model.PostBody
 import au.howesthat.whirl.core.model.QuoteKind
 import au.howesthat.whirl.core.model.Style
@@ -65,17 +68,17 @@ object PostBodyParser {
                         ?: JUMP_TO_REPLY.find(a?.attr("onclick").orEmpty())?.groupValues?.get(1)?.toLong()
                     out.block(Block.QuoteAttribution(node.text().squash(), postId))
                 }
-                node.tagName() == "ul" || node.tagName() == "ol" -> {
-                    val items = node.select("> li").map { li -> trim(collectInlines(li, style)) }
-                    out.block(Block.ListBlock(ordered = node.tagName() == "ol", items = items))
-                }
+                node.isList() -> out.block(listBlock(node, style))
                 node.tagName() == "pre" -> out.block(Block.Code(node.wholeText().trimEnd()))
                 node.tagName() == "img" -> out.block(Block.Image(absoluteUrl(node.attr("src")), node.attr("alt").ifEmpty { null }))
-                node.tagName() == "hr" -> out.flush()
+                node.tagName() == "hr" -> out.block(Block.Rule)
+                node.tagName() == "table" -> out.block(table(node, style))
                 node.tagName() == "blockquote" -> {
-                    out.flush()
-                    blocks(node, out, style.copy(quote = QuoteKind.OTHER))
-                    out.flush()
+                    val kind = quoteKind(node)
+                    val inner = Builder()
+                    blocks(node, inner, if (kind != null) style.copy(quote = kind) else style)
+                    inner.flush()
+                    out.block(Block.Quote(kind, inner.blocks))
                 }
                 // Block elements, and wrappers holding blocks (archive pages wrap bodies in span[itemprop=text]).
                 node.tagName() in BLOCK_TAGS || node.children().any { it.tagName() in BLOCK_TAGS } -> {
@@ -88,9 +91,64 @@ object PostBodyParser {
         }
     }
 
-    private fun collectInlines(element: Element, style: Style): List<Inline> {
+    /**
+     * `>` quotes are `blockquote.wcrep1` at every depth; the site colours them by depth (the replied-to user's colour,
+     * then the other quote colours). A plain `blockquote` is a `:` indent, null here.
+     */
+    private fun quoteKind(quote: Element): QuoteKind? {
+        if (!quote.isReplyQuote()) return null
+        val depth = quote.parents().count { it.tagName() == "blockquote" && it.isReplyQuote() }
+        return QUOTE_DEPTHS[depth.coerceAtMost(QUOTE_DEPTHS.lastIndex)]
+    }
+
+    private fun Element.isReplyQuote() = hasClass("wcrep1") || hasClass("wcrep2")
+
+    private val QUOTE_DEPTHS = listOf(QuoteKind.REPLIED_USER, QuoteKind.OTHER, QuoteKind.ALTERNATE)
+
+    /** A table's rows; a cell's `text-align` style gives its alignment. */
+    private fun table(table: Element, style: Style): Block.Table = Block.Table(
+        table.select("tr").map { row ->
+            row.children().filter { it.tagName() == "td" || it.tagName() == "th" }.map { cell ->
+                val header = cell.tagName() == "th"
+                val align = when (TEXT_ALIGN.find(cell.attr("style"))?.groupValues?.get(1)) {
+                    "center" -> CellAlign.CENTER
+                    "right" -> CellAlign.END
+                    else -> CellAlign.START
+                }
+                TableCell(trim(collectInlines(cell.childNodes(), if (header) style.copy(bold = true) else style)), header, align)
+            }
+        },
+    )
+
+    private val TEXT_ALIGN = Regex("""text-align:\s*(\w+)""")
+
+    private fun Element.isList() = tagName() == "ul" || tagName() == "ol"
+
+    /**
+     * A list and the lists nested in it. Whirlpool's editor puts a nested list beside the items rather than inside one
+     * (`<ul><li>a</li><ul><li>b</li></ul></ul>`), so a list there belongs to the item before it.
+     */
+    private fun listBlock(list: Element, style: Style): Block.ListBlock {
+        val items = mutableListOf<ListItem>()
+        for (child in list.children()) {
+            when {
+                child.tagName() == "li" -> {
+                    val (nested, text) = child.childNodes().partition { it is Element && it.isList() }
+                    items += ListItem(trim(collectInlines(text, style)), nested.map { listBlock(it as Element, style) })
+                }
+                child.isList() -> {
+                    val sub = listBlock(child, style)
+                    val last = items.removeLastOrNull() ?: ListItem(emptyList())
+                    items += last.copy(sublists = last.sublists + sub)
+                }
+            }
+        }
+        return Block.ListBlock(ordered = list.tagName() == "ol", items = items)
+    }
+
+    private fun collectInlines(nodes: List<Node>, style: Style): List<Inline> {
         val b = Builder()
-        for (child in element.childNodes()) inline(child, b::add, style)
+        for (child in nodes) inline(child, b::add, style)
         return b.run { flushInlinesForList() }
     }
 
@@ -141,9 +199,14 @@ object PostBodyParser {
         "u", "ins" -> s.copy(underline = true)
         "s", "strike", "del" -> s.copy(strike = true)
         "code", "tt", "kbd", "samp" -> s.copy(code = true)
+        "small" -> s.copy(small = true)
+        "sub" -> s.copy(sub = true)
+        "sup" -> s.copy(sup = true)
         "span" -> when {
             el.hasClass("wcrep1") -> s.copy(quote = QuoteKind.REPLIED_USER)
             el.hasClass("wcrep2") -> s.copy(quote = QuoteKind.OTHER)
+            el.hasClass("wcgrey") -> s.copy(quote = QuoteKind.ALTERNATE)
+            el.hasClass("wcserif") -> s.copy(serif = true)
             else -> s
         }
         else -> s
