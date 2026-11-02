@@ -27,6 +27,10 @@
     <string name="undo">Undo</string>
     <string name="watch_done">Thread watched</string>
     <string name="mark_read_done">Marked as read</string>
+    <plurals name="mark_read_done_threads">
+        <item quantity="one">Marked %1$d thread as read</item>
+        <item quantity="other">Marked %1$d threads as read</item>
+    </plurals>
     <string name="unwatch_done">Thread unwatched</string>
     <string name="watch_failed">Could not watch the thread: %1$s</string>
     <string name="mark_read_failed">Could not mark the thread read: %1$s</string>

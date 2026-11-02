@@ -4,6 +4,10 @@ import android.view.KeyEvent
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +51,8 @@ class FindBarTest {
     private var closed = false
     private var searched: String? = null
 
+    private var actionTapped = false
+
     private fun bar(fontScale: Float = 1f, matches: Int? = 3, search: Boolean = true) = compose.setContent {
         val density = LocalDensity.current
         CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
@@ -59,6 +65,7 @@ class FindBarTest {
                     matches = matches,
                     modifier = Modifier.testTag("bar"),
                     onSearchWhirlpool = if (search) { words -> searched = words } else null,
+                    actions = { IconButton(onClick = { actionTapped = true }) { Icon(Icons.Default.MoreVert, "More") } },
                 )
             }
         }
@@ -165,5 +172,14 @@ class FindBarTest {
         compose.waitForIdle()
         assertEquals(0, closedBy, "the bar stays open")
         assertEquals(1, reachedThread)
+    }
+
+    @Test
+    fun `the screen's actions stay within reach while finding`() {
+        bar(fontScale = 2f)
+        field.performTextInput("bike")
+        compose.onNodeWithContentDescription("More").assertIsDisplayed().performClick()
+        assertTrue(actionTapped)
+        compose.onNodeWithContentDescription("Clear").assertIsDisplayed()
     }
 }

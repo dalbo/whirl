@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import au.howesthat.whirl.R
 import au.howesthat.whirl.core.data.PendingWatch
@@ -35,6 +36,7 @@ fun WatchSnackbars(
         WatchAction.MARK_READ to stringResource(R.string.mark_read_done),
         WatchAction.UNWATCH to stringResource(R.string.unwatch_done),
     )
+    val resources = LocalResources.current
     var failure by remember { mutableStateOf<WatchEvent.Failed?>(null) }
 
     LaunchedEffect(host, events) {
@@ -44,7 +46,13 @@ fun WatchSnackbars(
                     val p = event.pending
                     var undone = false
                     try {
-                        val result = host.showSnackbar(applied.getValue(p.action), actionLabel = undo, duration = SnackbarDuration.Long)
+                        // Mark all as read says how many.
+                        val text = if (p.action == WatchAction.MARK_READ && p.ids.size > 1) {
+                            resources.getQuantityString(R.plurals.mark_read_done_threads, p.ids.size, p.ids.size)
+                        } else {
+                            applied.getValue(p.action)
+                        }
+                        val result = host.showSnackbar(text, actionLabel = undo, duration = SnackbarDuration.Long)
                         if (result == SnackbarResult.ActionPerformed) {
                             undone = true
                             onUndo(p)
