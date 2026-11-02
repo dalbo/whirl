@@ -82,6 +82,7 @@ import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.PagePickerDialog
 import au.howesthat.whirl.core.ui.PostBodyView
+import au.howesthat.whirl.core.ui.ScrollThumb
 import au.howesthat.whirl.core.ui.Surfaces
 import au.howesthat.whirl.core.ui.errorMessage
 import au.howesthat.whirl.core.ui.menuClickable
@@ -308,7 +309,11 @@ private fun PageContent(page: Int, viewModel: ThreadViewModel, error: Throwable?
                 onOpenInBrowser = { browser(viewModel.threadUrl(page)) },
             )
             loaded == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            else -> PostList(loaded, page, list, error, textStyle, myUserId, newFrom, viewModel)
+            else -> {
+                PostList(loaded, page, list, error, textStyle, myUserId, newFrom, viewModel)
+                // At the edge of the pane, not of the readable-width column of posts.
+                ScrollThumb(list, Modifier.align(Alignment.CenterEnd))
+            }
         }
     }
 }
