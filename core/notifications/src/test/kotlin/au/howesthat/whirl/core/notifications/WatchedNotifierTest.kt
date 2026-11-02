@@ -16,6 +16,7 @@ import au.howesthat.whirl.core.data.Account
 import au.howesthat.whirl.core.data.NotifyStyle
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.data.WatchSendScheduler
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.database.NotifiedEntity
 import au.howesthat.whirl.core.database.WhirlDatabase
@@ -59,7 +60,7 @@ class WatchedNotifierTest {
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val settings = SettingsRepository(context)
     private val api = WhirlpoolApi(WhirlpoolHttp.client("Whirl/test"), settings::apiKey, server.url("/api/"), RetryPolicy.NONE)
-    private val watched = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), Clock.systemUTC(), appScope)
+    private val watched = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, Clock.systemUTC(), appScope)
     private val notifier = WatchedNotifier(context, settings, watched, db.notifiedDao())
     private val manager = context.getSystemService(NotificationManager::class.java)
 
@@ -214,6 +215,7 @@ class WatchedNotifierTest {
         enqueue(unreadTwo)
         notifier.check()
         enqueue(fixture("api_cmd_bogus_id_500.html"), code = 500)
+        enqueue(fixture("api_watched_mode1.json"))
         assertFalse(notifier.act(WatchAction.UNWATCH, listOf(ThreadId("9yvx1663"))))
         assertNotNull(shown())
         assertEquals(2, watched.watched(unreadOnly = true).first().value.size, "rolled back")

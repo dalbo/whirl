@@ -24,14 +24,17 @@ import javax.inject.Singleton
         ThreadPageEntity::class,
         PostEntity::class,
         CheckLogEntity::class,
+        PendingWatchEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
     autoMigrations = [
         // v2: thread page cache (thread_pages, posts).
         AutoMigration(from = 1, to = 2),
         // v3: background check history (check_log).
         AutoMigration(from = 2, to = 3),
+        // v4: watch actions waiting to be sent (pending_watch).
+        AutoMigration(from = 3, to = 4),
     ],
 )
 abstract class WhirlDatabase : RoomDatabase() {
@@ -42,6 +45,7 @@ abstract class WhirlDatabase : RoomDatabase() {
     abstract fun notifiedDao(): NotifiedDao
     abstract fun threadPageDao(): ThreadPageDao
     abstract fun checkLogDao(): CheckLogDao
+    abstract fun pendingWatchDao(): PendingWatchDao
 
     /** Clears everything tied to the signed-in account (on log out or key change). Favourites are kept. */
     suspend fun clearAccountData() {
@@ -51,6 +55,7 @@ abstract class WhirlDatabase : RoomDatabase() {
         threadDao().deleteOrphans()
         notifiedDao().keepOnly(emptyList())
         fetchLogDao().clear()
+        pendingWatchDao().clear()
     }
 }
 
@@ -69,4 +74,5 @@ object DatabaseModule {
     @Provides fun notifiedDao(db: WhirlDatabase) = db.notifiedDao()
     @Provides fun threadPageDao(db: WhirlDatabase) = db.threadPageDao()
     @Provides fun checkLogDao(db: WhirlDatabase) = db.checkLogDao()
+    @Provides fun pendingWatchDao(db: WhirlDatabase) = db.pendingWatchDao()
 }

@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Duration.Companion.seconds
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -90,9 +91,12 @@ class WatchedNotifier @Inject constructor(
 
     fun cancel() = manager.cancelAll()
 
-    /** A notification button: sends [action] for [ids] at once and removes them from the notifications. False if it failed (rolled back). */
+    /**
+     * A notification button: sends [action] for [ids] at once and removes them from the notifications. False if
+     * Whirlpool rejected it (rolled back). With no network it stays queued and is sent later, so the notification goes.
+     */
     suspend fun act(action: WatchAction, ids: List<ThreadId>): Boolean {
-        val sent = watched.perform(action, ids, undoable = false).error == null
+        val sent = watched.awaitSend(watched.perform(action, ids, undoable = false), ACT_WAIT)
         if (sent) {
             // The summary is gone along with its threads; a thread's own notification takes the rest with it.
             manager.cancel(NOTIFICATION_ID)
@@ -260,6 +264,8 @@ class WatchedNotifier @Inject constructor(
         /** The per-thread style's notifications, tagged with the thread id. */
         const val THREAD_NOTIFICATION_ID = 3
         private const val GROUP_WATCHED = "au.howesthat.whirl.WATCHED"
+        /** How long a button waits for the send; a receiver has about 10 s. */
+        private val ACT_WAIT = 5.seconds
 
         /** Boolean extra on the launch intent: open the Watched screen. */
         const val EXTRA_OPEN_WATCHED = "au.howesthat.whirl.OPEN_WATCHED"

@@ -31,8 +31,10 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -45,7 +47,23 @@ class WatchedRepositoryTest {
     // Sends run on a real scope, as they do in the app; tests wait on the database instead of virtual time.
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val api = WhirlpoolApi(WhirlpoolHttp.client("Whirl/test"), { "k" }, server.url("/api/"), RetryPolicy.NONE)
-    private val repo = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), clock, appScope).apply { undoWindow = 10.minutes }
+    private val scheduler = RecordingScheduler()
+    private val repo = newRepository()
+
+    /** Another repository over the same database: what the app has after its process was ended and restarted. */
+    private fun newRepository() =
+        WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), scheduler, clock, appScope).apply { undoWindow = 10.minutes }
+
+    class RecordingScheduler : WatchSendScheduler {
+        val delays = mutableListOf<Duration>()
+        var cancelled = false
+        override fun schedule(delay: Duration) {
+            delays += delay
+        }
+        override fun cancel() {
+            cancelled = true
+        }
+    }
 
     @After
     fun tearDown() {
@@ -112,6 +130,8 @@ class WatchedRepositoryTest {
         val p = repo.perform(WatchAction.MARK_READ, listOf(bike))
         assertEquals(listOf("9q684xp3"), ids(unreadOnly = true))
         enqueue(fixture("api_cmd_bogus_id_500.html"), code = 500)
+        // Whirlpool is up and still lists the thread: the 500 was a refusal, not an outage.
+        enqueue(fixture("api_watched_mode1.json"))
         repo.commit(p)
         val event = failed.await()
         assertEquals(WatchAction.MARK_READ, event.action)
@@ -159,5 +179,136 @@ class WatchedRepositoryTest {
         enqueue(fixture("api_watched_mode1.json"))
         repo.perform(WatchAction.UNWATCH, listOf(ThreadId("9q684xp3")))
         assertEquals("9q684xp3", server.takeRequest(5, TimeUnit.SECONDS)!!.url.queryParameter("watchedremove"))
+    }
+
+    private val queue get() = db.pendingWatchDao()
+
+    @Test
+    fun `an action is stored until it is sent and the backstop is scheduled`() = runTest {
+        loadBothLists()
+        val p = repo.perform(WatchAction.MARK_READ, listOf(bike))
+        assertEquals(listOf("MARK_READ"), queue.all().map { it.action })
+        assertEquals(listOf(10.minutes), scheduler.delays)
+        enqueue(fixture("api_watched_mode1.json").replace("\"UNREAD\":683", "\"UNREAD\":0"))
+        repo.commit(p)
+        server.takeRequest(5, TimeUnit.SECONDS)!!
+        assertTrue(repo.awaitSend(p, 5.seconds))
+        assertEquals(emptyList(), queue.all())
+    }
+
+    @Test
+    fun `after the process ends a queued action is kept on the lists and sent when due`() = runTest {
+        loadBothLists()
+        repo.perform(WatchAction.UNWATCH, listOf(bike))
+        appScope.cancel() // the in-app timer dies with the process
+
+        val restarted = newRepository()
+        enqueue(fixture("api_watched_mode1.json"))
+        clock.now = clock.now.plusSeconds(3600)
+        restarted.refresh(unreadOnly = false, force = true)
+        server.takeRequest()
+        assertFalse(bike.value in ids(unreadOnly = false), "a refresh does not bring the thread back")
+
+        scheduler.delays.clear()
+        restarted.resume()
+        assertEquals(listOf(Duration.ZERO), scheduler.delays)
+        enqueue(fixture("api_watched_mode1.json"))
+        assertEquals(Drain.Empty, restarted.drain())
+        assertEquals("9yvx1663", server.takeRequest().url.queryParameter("watchedremove"))
+        assertEquals(emptyList(), queue.all())
+    }
+
+    @Test
+    fun `a row cut off while sending is sent again`() = runTest {
+        loadBothLists()
+        val p = repo.perform(WatchAction.MARK_READ, listOf(bike))
+        queue.claim(queue.all().single().id)
+        assertFalse(repo.undo(p), "too late once it is being sent")
+        queue.makeDue(queue.all().single().id, clock.millis())
+        enqueue(fixture("api_watched_mode1.json"))
+        assertEquals(Drain.Empty, newRepository().drain())
+        assertEquals("9yvx1663", server.takeRequest().url.queryParameter("watchedread"))
+    }
+
+    @Test
+    fun `an action on a thread waits for an earlier one on it, but not for other threads`() = runTest {
+        loadBothLists()
+        val nbn = ThreadId("3pxj858k")
+        repo.perform(WatchAction.WATCH, listOf(nbn))
+        // Still in Watch's Undo window: marking it read must not overtake the Watch.
+        repo.perform(WatchAction.MARK_READ, listOf(nbn), undoable = false)
+        enqueue(fixture("api_watched_mode1.json"))
+        repo.perform(WatchAction.UNWATCH, listOf(bike), undoable = false)
+        assertEquals("9yvx1663", server.takeRequest(5, TimeUnit.SECONDS)!!.url.queryParameter("watchedremove"))
+        val waiting = assertIs<Drain.Waiting>(repo.drain())
+        assertEquals(10.minutes, waiting.wait)
+        assertEquals(listOf("WATCH", "MARK_READ"), queue.all().map { it.action })
+        assertNull(server.takeRequest(200, TimeUnit.MILLISECONDS))
+    }
+
+    @Test
+    fun `a send that does not get through stays queued for a retry`() = runTest {
+        loadBothLists()
+        enqueue("", code = 429)
+        val p = repo.perform(WatchAction.MARK_READ, listOf(bike), undoable = false)
+        server.takeRequest(5, TimeUnit.SECONDS)!!
+        assertTrue(repo.awaitSend(p, 200.milliseconds), "still queued counts as sent for a notification button")
+        val row = queue.all().single()
+        assertEquals(1, row.attempts)
+        assertEquals("WAITING", row.state)
+        assertEquals(Duration.ZERO, scheduler.delays.last())
+        assertEquals(listOf("9q684xp3"), ids(unreadOnly = true), "still shown as read")
+
+        enqueue(fixture("api_watched_mode1.json"))
+        assertEquals(Drain.Empty, repo.drain())
+        assertEquals(emptyList(), queue.all())
+    }
+
+    @Test
+    fun `a send that keeps failing for a day is given up and rolled back`() = runTest {
+        loadBothLists()
+        repo.perform(WatchAction.MARK_READ, listOf(bike))
+        val failed = async(start = CoroutineStart.UNDISPATCHED) { repo.events.filterIsInstance<WatchEvent.Failed>().first() }
+        clock.now = clock.now.plusSeconds(25 * 3600)
+        enqueue("", code = 429)
+        assertEquals(Drain.Empty, repo.drain())
+        assertIs<WhirlpoolError.RateLimited>(failed.await().error)
+        assertEquals(listOf("9yvx1663", "9q684xp3"), ids(unreadOnly = true))
+    }
+
+    @Test
+    fun `mark read of a thread deleted since the list was fetched is sent again without it`() = runTest {
+        loadBothLists()
+        val gone = ThreadId("zzzz9999")
+        db.threadDao().insertSource(listOf(au.howesthat.whirl.core.database.ThreadSourceEntity("WATCHED", "unread", gone.value, 99)))
+        val p = repo.perform(WatchAction.MARK_READ, listOf(bike, gone))
+        enqueue(fixture("api_cmd_bogus_id_500.html"), code = 500)
+        enqueue(fixture("api_watched_mode1.json"))
+        enqueue(fixture("api_watched_mode1.json"))
+        repo.commit(p)
+        assertEquals("9yvx1663,zzzz9999", server.takeRequest(5, TimeUnit.SECONDS)!!.url.queryParameter("watchedread"))
+        assertEquals("1", server.takeRequest(5, TimeUnit.SECONDS)!!.url.queryParameter("watchedmode"))
+        assertEquals("9yvx1663", server.takeRequest(5, TimeUnit.SECONDS)!!.url.queryParameter("watchedread"))
+        assertTrue(repo.awaitSend(p, 5.seconds))
+        assertEquals(emptyList(), queue.all())
+    }
+
+    @Test
+    fun `the notification check leaves out threads marked read but not yet sent`() = runTest {
+        loadBothLists()
+        repo.perform(WatchAction.MARK_READ, listOf(bike))
+        enqueue(fixture("api_watched_mode0.json"))
+        assertEquals(listOf("9q684xp3"), repo.fetchUnread().map { it.id.value })
+    }
+
+    @Test
+    fun `signing out forgets queued actions`() = runTest {
+        loadBothLists()
+        repo.perform(WatchAction.UNWATCH, listOf(bike))
+        repo.forgetPending()
+        assertTrue(scheduler.cancelled)
+        assertEquals(emptyList(), queue.all())
+        assertEquals(Drain.Empty, repo.drain())
+        assertNull(server.takeRequest(200, TimeUnit.MILLISECONDS))
     }
 }

@@ -44,7 +44,7 @@ fun WatchSnackbars(
                     val p = event.pending
                     var undone = false
                     try {
-                        val result = host.showSnackbar(applied.getValue(p.action), actionLabel = undo, duration = SnackbarDuration.Short)
+                        val result = host.showSnackbar(applied.getValue(p.action), actionLabel = undo, duration = SnackbarDuration.Long)
                         if (result == SnackbarResult.ActionPerformed) {
                             undone = true
                             onUndo(p)

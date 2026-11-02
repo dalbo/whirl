@@ -282,3 +282,39 @@ interface CheckLogDao {
         trim(keep)
     }
 }
+
+/** The watch actions waiting to be sent ([PendingWatchEntity]). Claims and Undo are single conditional statements. */
+@Dao
+interface PendingWatchDao {
+    @Query("SELECT * FROM pending_watch ORDER BY id")
+    suspend fun all(): List<PendingWatchEntity>
+
+    @Insert
+    suspend fun insert(row: PendingWatchEntity): Long
+
+    /** Marks [id] as being sent; 0 if it was undone or already claimed. */
+    @Query("UPDATE pending_watch SET state = 'SENDING' WHERE id = :id AND state = 'WAITING'")
+    suspend fun claim(id: Long): Int
+
+    /** Undo: removes [id] only while it is still waiting; 0 if it is too late. */
+    @Query("DELETE FROM pending_watch WHERE id = :id AND state = 'WAITING'")
+    suspend fun deleteWaiting(id: Long): Int
+
+    @Query("DELETE FROM pending_watch WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    /** The Undo offer went away: send [id] as soon as possible. */
+    @Query("UPDATE pending_watch SET send_after = MIN(send_after, :now) WHERE id = :id")
+    suspend fun makeDue(id: Long, now: Long)
+
+    /** A send that did not get through: back to waiting, one attempt more, with [threadIds] still to send. */
+    @Query("UPDATE pending_watch SET state = 'WAITING', attempts = attempts + 1, thread_ids = :threadIds WHERE id = :id")
+    suspend fun release(id: Long, threadIds: String)
+
+    /** Sends cut off by the process ending; called only when nothing is being sent. */
+    @Query("UPDATE pending_watch SET state = 'WAITING' WHERE state = 'SENDING'")
+    suspend fun resetSending()
+
+    @Query("DELETE FROM pending_watch")
+    suspend fun clear()
+}

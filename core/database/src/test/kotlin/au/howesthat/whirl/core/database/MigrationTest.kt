@@ -69,4 +69,22 @@ class MigrationTest {
             db.close()
         }
     }
+
+    @Test
+    fun `v3 to v4 adds the queue of watch actions and keeps v3 data`() = runTest {
+        helper.createDatabase(name, 3).use { db ->
+            db.execSQL("INSERT INTO fetch_log (`key`, fetched_at) VALUES ('forums', 123)")
+        }
+        helper.runMigrationsAndValidate(name, 4, true).close()
+
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), WhirlDatabase::class.java, name)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            assertEquals(123L, db.fetchLogDao().fetchedAt("forums"))
+            assertEquals(emptyList(), db.pendingWatchDao().all())
+        } finally {
+            db.close()
+        }
+    }
 }
