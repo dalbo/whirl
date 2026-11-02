@@ -16,6 +16,7 @@ import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.layout.PaneScaffoldDirective
@@ -25,6 +26,9 @@ import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.scene.SinglePaneSceneStrategy
 import androidx.window.core.layout.WindowSizeClass
@@ -96,6 +100,8 @@ fun WhirlApp(
     animations: Boolean = true,
     /** The "Threads beside the list" setting (experimental). */
     twoPane: Boolean = false,
+    /** Its "Only in landscape" option. */
+    twoPaneLandscapeOnly: Boolean = false,
     /** How many panes fit; null measures the window. Tests pass one, since Robolectric's window is not the point. */
     paneDirective: PaneScaffoldDirective? = null,
     onLinkHandled: () -> Unit = {},
@@ -110,7 +116,7 @@ fun WhirlApp(
             restore = { TopLevelBackStack(startRoute, tops, TopLevelBackStack.decode(it)) },
         ),
     ) { TopLevelBackStack(startRoute, tops) }
-    val directive = paneDirective ?: windowDirective(twoPane)
+    val directive = paneDirective ?: windowDirective(twoPane, twoPaneLandscapeOnly)
     val twoPanes = directive.maxHorizontalPartitions > 1
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -135,6 +141,7 @@ fun WhirlApp(
             openForum = listNav.openForum,
             openUser = { backStack.push(UserRoute(it)) },
             back = { backStack.pop() },
+            openWatched = { backStack.goHome(WatchedRoute) },
         )
     }
 
@@ -162,19 +169,29 @@ fun WhirlApp(
     // List screens and threads carry pane metadata; each list is its own scene (its key), and a thread joins the scene
     // of the list below it, so a list pushed above a thread starts with the placeholder, not that thread.
     val paneMotion = if (animations) emptyMap() else ListDetailSceneStrategy.paneAnimation(EnterTransition.None, ExitTransition.None, snap())
+    val listWidth = listPaneWidth()
     val listMeta: (NavKey) -> Map<String, Any> = { key ->
         ListDetailSceneStrategy.listPane(sceneKey = key, detailPlaceholder = { ChooseThread() }) +
-            ListDetailSceneStrategy.preferredPaneSize(width = LIST_PANE_WIDTH) + paneMotion
+            ListDetailSceneStrategy.preferredPaneSize(width = listWidth) + paneMotion
     }
     val threadMeta: (ThreadRoute) -> Map<String, Any> = { key ->
         backStack.listBelow(key, ::isListPane)?.let { list -> ListDetailSceneStrategy.detailPane(sceneKey = list) + paneMotion }.orEmpty()
     }
 
-    /** A list screen, told which thread is open beside it when there are two panes. */
+    /** A list screen, told which thread is open beside it when there are two panes, and a line between the panes. */
     @Composable
     fun ListPane(key: NavKey, content: @Composable () -> Unit) {
         val selected = (backStack.above(key) as? ThreadRoute)?.takeIf { twoPanes }?.let { ThreadId(it.threadId) }
-        CompositionLocalProvider(LocalSelectedThread provides selected) { content() }
+        CompositionLocalProvider(LocalSelectedThread provides selected) {
+            if (twoPanes) {
+                Box {
+                    content()
+                    VerticalDivider(Modifier.align(Alignment.CenterEnd))
+                }
+            } else {
+                content()
+            }
+        }
     }
 
     val provider: (NavKey) -> NavEntry<NavKey> = entryProvider {
@@ -187,7 +204,7 @@ fun WhirlApp(
         entry<ThreadRoute>(metadata = threadMeta) { ThreadScreen(it, backIcon, threadNav) }
         entry<UserRoute>(metadata = listMeta) { ListPane(it) { UserScreen(it, backIcon, listNav) } }
         entry<SearchRoute>(metadata = listMeta) { ListPane(it) { SearchScreen(it, backIcon, listNav) } }
-        entry<ForumsRoute> { ForumsScreen(drawerIcon, onOpenForum = listNav.openForum, onSearch = { words -> listNav.openSearch(SearchRoute(query = words)) }) }
+        entry<ForumsRoute>(metadata = listMeta) { ListPane(it) { ForumsScreen(drawerIcon, onOpenForum = listNav.openForum, onSearch = { words -> listNav.openSearch(SearchRoute(query = words)) }) } }
         entry<SettingsRoute> {
             SettingsScreen(
                 onBack = { backStack.pop() },
@@ -218,7 +235,8 @@ fun WhirlApp(
     val shown = if (backStack.current == backStack.start) startEntries else startEntries.take(1) + entries.getValue(backStack.current)
 
     snackbars(snackbarHost)
-    Box(Modifier.fillMaxSize()) {
+    // Behind the screens, so a cross-fade does not show the activity's light window background in a dark theme.
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         ModalNavigationDrawer(
             drawerState = drawerState,
             // Edge swipes stay free for pagers on pushed screens; the drawer opens from the menu button there anyway. In
@@ -274,7 +292,15 @@ fun WhirlApp(
 }
 
 private const val FADE_MILLIS = 700
-private val LIST_PANE_WIDTH = 400.dp
+private val LIST_PANE_MAX_WIDTH = 400.dp
+private const val LIST_PANE_FRACTION = 0.45f
+
+/** 400 dp on a tablet; on narrower two-pane windows (an unfolded phone) a little under half, leaving the thread room. */
+@Composable
+private fun listPaneWidth(): Dp {
+    val width = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
+    return (width * LIST_PANE_FRACTION).coerceAtMost(LIST_PANE_MAX_WIDTH)
+}
 
 /** Screens shown as the list beside a thread. */
 internal fun isListPane(key: NavKey): Boolean =
@@ -282,16 +308,20 @@ internal fun isListPane(key: NavKey): Boolean =
         key is ForumRoute || key is SearchRoute || key is UserRoute
 
 /**
- * Two panes when the setting is on and the window is at least 840 dp wide and 480 dp tall: the height rule keeps a
- * phone in landscape (about 900 x 400 dp) to one pane, where a 400 dp list would leave the thread too narrow.
+ * Two panes when the setting is on and the window is at least 600 dp wide and 480 dp tall (and, with "Only in
+ * landscape", wider than tall). 600 dp takes in an unfolded phone (a Galaxy Z Fold is about 750 dp wide either way up),
+ * which the library's own 840 dp rule left out; the height rule keeps a phone in landscape (about 900 x 400 dp) to one
+ * pane. The panes meet with no gap; [ListPane] draws a line between them.
  */
 @Composable
-private fun windowDirective(twoPane: Boolean): PaneScaffoldDirective {
+private fun windowDirective(twoPane: Boolean, landscapeOnly: Boolean): PaneScaffoldDirective {
     val info = currentWindowAdaptiveInfoV2()
-    val directive = calculatePaneScaffoldDirective(info)
-    val wide = info.windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND) &&
-        info.windowSizeClass.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND)
-    return if (twoPane && wide) directive else directive.copy(maxHorizontalPartitions = 1)
+    val window = LocalWindowInfo.current.containerSize
+    val size = info.windowSizeClass
+    val wide = size.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND) &&
+        size.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND)
+    val panes = if (twoPane && wide && (!landscapeOnly || window.width > window.height)) 2 else 1
+    return calculatePaneScaffoldDirective(info).copy(maxHorizontalPartitions = panes, horizontalPartitionSpacerSize = 0.dp)
 }
 
 /** The detail pane before a thread is chosen. */

@@ -22,6 +22,8 @@ data class Settings(
     val screenAnimations: Boolean = true,
     /** On wide windows, a thread opens beside the list it came from. Experimental: off until tried on a real tablet. */
     val twoPane: Boolean = false,
+    /** [twoPane] only while the window is wider than it is tall. */
+    val twoPaneLandscapeOnly: Boolean = false,
     /** Whirlpool pages (replies, private forums, "Open in browser") open in the browser app, not a Custom Tab. */
     val browserApp: Boolean = false,
     // Notifications

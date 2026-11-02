@@ -100,6 +100,14 @@ class ThreadViewModelTest {
     }
 
     @Test
+    fun `the last page opens at its newest post, and a post to scroll to wins`() = runTest {
+        enqueueHtml("thread_97r5wzn3_last.html")
+        val vm = viewModel(ThreadRoute("97r5wzn3", -1))
+        assertEquals(ScrollTarget(2290, lastPost = true), await { vm.scrollTarget.filterNotNull().first() })
+        assertEquals(null, viewModel(ThreadRoute("97r5wzn3", -1, scrollToPost = 45795)).scrollTarget.value?.lastPost?.takeIf { it })
+    }
+
+    @Test
     fun `the first unread post comes from Watched and can be jumped to`() = runTest {
         enqueueHtml("thread_3pxj858k_p2.html")
         val vm = viewModel(ThreadRoute("3pxj858k", 1, lastReadPost = 30, fromWatched = true))
