@@ -130,6 +130,23 @@ Other candidates, roughly by value:
 - **Housekeeping on a schedule**: targetSdk 37 before August 2027; Google developer verification (2027); keep AGP/Kotlin/Compose current; re-check reproducibility when the build changes (`docs/fdroid/README.md`).
 - **Parked until Whirlpool's moderators approve in writing** (PLAN.md §5): any in-app login and what it unlocks (posting, private forums, PMs, mark read to here).
 
+## Where the v1.6 session left things (2026-11-03)
+**v1.6.0 released** 2026-11-03 (GitHub Latest, Play Alpha), from `docs/plan-v1.6.md` (Dallin's decisions in its §6):
+- **Watch actions kept until sent** (#96): Room table `pending_watch`; `WatchedRepository.perform` applies locally and queues; sent after the 10 s snackbar (Long) or at once; `drain()` sends oldest first; `WatchSendWorker` (WorkManager, unique `watch-send`, needs network) is the backstop when the app is gone. Checked on the phone: a Mark as read queued, app killed, sent by the worker about 5 minutes later.
+- **Mark all as read** on Watched's ⋮ (#97); while filtering, "Mark N shown as read" marks only the visible rows. Always offers Undo.
+- **Scroll indicator** in threads (#98, `core/ui` `ScrollThumb`): indicator only, not draggable.
+- **Find on page** (#99): `TextQuery.ranges`, `PostBody.searchText()` (spoilers excluded), `PostBodyView(highlight)`, query in `ThreadViewModel`'s `SavedStateHandle`; searches the current page only. Checked on the phone (highlights, Post i of n, next/previous).
+- **Settings › Watched threads › Offer Undo** (#100, default on): off, Watch/Unwatch/Mark as read go at once with a short snackbar. Checked on the phone.
+
+Not checked on a device: queued sends across airplane mode or a reboot; "Mark N shown as read"; the thumb fading; find with spoilers or Ctrl+F; Mark all as read with Offer Undo off.
+
+Open ideas, roughly by value:
+- **Archive reader** (PLAN.md §9, "Idea, undecided"): `/archive/<id>` gives 800 posts per request, which would allow scrolling a thread without paging, **find in the whole thread** (leo27 asked; not answered whether current page is enough) and **post filters in the app** (Posts by OP/me without the browser). First step: raw fixtures of a multi-page archive via `tools/capture`.
+- Find: scrolling brings the matching post's top into view, not the match inside a long post (`BringIntoViewRequester` if it matters).
+- Draggable scroll thumb (plan §3.5); "Mark forum as read" per forum header (plan §3.3).
+- Small: display-cutout insets, TalkBack `paneTitle`, tablet screenshots for the store, F-Droid reproducibility re-check, app widget, linked images.
+- The Windows emulator's network is broken (hung on install); the phone is the test device.
+
 ## Known unknowns to resolve as you go
 - Shape of `get=recent` when non-empty (assumed to match `THREADS`; the Recent screen must cope with it failing as Drift).
 - Markup of a deleted post and of a post with an image (capture when found: add the URL to `tools/capture/public.json`, run `npm run public`).
