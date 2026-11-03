@@ -51,6 +51,7 @@ import au.howesthat.whirl.core.model.Inline
 import au.howesthat.whirl.core.model.PostBody
 import au.howesthat.whirl.core.model.QuoteKind
 import au.howesthat.whirl.core.model.Style
+import au.howesthat.whirl.core.model.TextQuery
 
 private val BULLETS = listOf("•", "◦", "▪")
 
@@ -78,7 +79,8 @@ private fun bodyColors(): BodyColors {
 
 /**
  * Renders a post body natively. [onLink] receives every link (the caller routes Whirlpool links in the app and the
- * rest to the browser), [onQuote] the reply id of a quote attribution. Spoilers stay hidden until tapped.
+ * rest to the browser), [onQuote] the reply id of a quote attribution. Spoilers stay hidden until tapped. With
+ * [highlight], find on page marks its words (never inside a spoiler).
  */
 @Composable
 fun PostBodyView(
@@ -87,8 +89,10 @@ fun PostBodyView(
     onQuote: (Long) -> Unit,
     modifier: Modifier = Modifier,
     textStyle: TextStyle = MaterialTheme.typography.bodyMedium,
+    highlight: FindHighlight? = null,
 ) {
     val colors = bodyColors()
+    val marks = highlight?.let { it.query to it.style() }
     // Spoilers are numbered in body order; this holds the revealed ones.
     val revealed = remember(body) { mutableStateListOf<Int>() }
     val reveal: (Int) -> Unit = { if (it !in revealed) revealed += it }
@@ -101,14 +105,14 @@ fun PostBodyView(
             blocks.forEach { block ->
                 when (block) {
                     is Block.QuoteAttribution -> Text(
-                        block.text,
+                        highlighted(block.text, marks),
                         modifier = block.postId?.let { id -> Modifier.clickable(role = Role.Button) { onQuote(id) } } ?: Modifier,
                         style = textStyle,
                         fontWeight = FontWeight.Bold,
                         color = colors.repliedUser,
                     )
                     is Block.Paragraph -> {
-                        val text = annotate(block.inlines, colors, onLink, revealed, reveal, counter)
+                        val text = annotate(block.inlines, colors, onLink, revealed, reveal, counter, marks)
                         val quote = if (boxedQuotes && !inQuote) wholeQuote(block.inlines) else null
                         if (quote == null) {
                             Text(text, style = textStyle)
@@ -139,7 +143,7 @@ fun PostBodyView(
                                         val marker = if (list.ordered) "${i + 1}." else BULLETS[depth % BULLETS.size]
                                         if (item.inlines.isEmpty()) Box(Modifier.width(16.dp)) else Text(marker, style = textStyle)
                                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            if (item.inlines.isNotEmpty()) Text(annotate(item.inlines, colors, onLink, revealed, reveal, counter), style = textStyle)
+                                            if (item.inlines.isNotEmpty()) Text(annotate(item.inlines, colors, onLink, revealed, reveal, counter, marks), style = textStyle)
                                             item.sublists.forEach { ListView(it, depth + 1) }
                                         }
                                     }
@@ -150,7 +154,7 @@ fun PostBodyView(
                     }
                     is Block.Code -> Surface(color = colors.codeBackground, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            block.text,
+                            highlighted(block.text, marks),
                             Modifier.horizontalScroll(rememberScrollState()).padding(8.dp),
                             style = textStyle.copy(fontFamily = FontFamily.Monospace),
                         )
@@ -171,7 +175,7 @@ fun PostBodyView(
                     Block.Rule -> HorizontalDivider(Modifier.padding(vertical = 4.dp))
                     is Block.Table -> TableView(block) { cell ->
                         Text(
-                            annotate(cell.inlines, colors, onLink, revealed, reveal, counter),
+                            annotate(cell.inlines, colors, onLink, revealed, reveal, counter, marks),
                             style = textStyle,
                             textAlign = when (cell.align) {
                                 CellAlign.START -> TextAlign.Start
@@ -246,6 +250,20 @@ internal fun wholeQuote(inlines: List<Inline>): QuoteKind? {
     }
 }
 
+/** Find on page in a post: [query]'s words marked, more strongly in the [current] match. */
+class FindHighlight(val query: TextQuery, val current: Boolean = false)
+
+@Composable
+fun FindHighlight.style(): SpanStyle = MaterialTheme.colorScheme.let {
+    if (current) SpanStyle(background = it.tertiary, color = it.onTertiary) else SpanStyle(background = it.tertiaryContainer, color = it.onTertiaryContainer)
+}
+
+/** [text] with the find marks; for text drawn outside [annotate] (code, quote attributions, the poster's name). */
+fun highlighted(text: String, marks: Pair<TextQuery, SpanStyle>?): AnnotatedString = buildAnnotatedString {
+    append(text)
+    marks?.let { (query, style) -> query.ranges(text).forEach { addStyle(style, it.first, it.last + 1) } }
+}
+
 /** Numbers spoilers in the order they are rendered, so reveal state survives recomposition. */
 private class SpoilerCounter {
     var next = 0
@@ -258,7 +276,10 @@ private fun annotate(
     revealed: List<Int>,
     reveal: (Int) -> Unit,
     counter: SpoilerCounter,
+    marks: Pair<TextQuery, SpanStyle>?,
 ): AnnotatedString = buildAnnotatedString {
+    // Spoiler text, revealed or not, is never marked: a mark over hidden text would show where the word is.
+    val spoilers = mutableListOf<IntRange>()
     fun append(list: List<Inline>, hidden: Boolean) {
         for (inline in list) {
             when (inline) {
@@ -274,6 +295,7 @@ private fun annotate(
                     withLink(link) { withStyle(span(inline.style, colors, hidden = false)) { append(inline.text) } }
                 }
                 is Inline.Spoiler -> {
+                    val from = length
                     val index = counter.next++
                     if (index in revealed) {
                         append(inline.inlines, hidden)
@@ -282,11 +304,19 @@ private fun annotate(
                             withStyle(SpanStyle(background = colors.spoiler, color = Color.Transparent)) { append(inline.inlines, hidden = true) }
                         }
                     }
+                    spoilers += from until length
                 }
             }
         }
     }
     append(inlines, hidden = false)
+    // Over the finished text, so a word split across styles is found, and last, so the mark wins over link and code
+    // styles.
+    marks?.let { (query, style) ->
+        query.ranges(toAnnotatedString().text).forEach { r ->
+            if (spoilers.none { it.first <= r.last && r.first <= it.last }) addStyle(style, r.first, r.last + 1)
+        }
+    }
 }
 
 private fun span(style: Style, colors: BodyColors, hidden: Boolean): SpanStyle {
