@@ -1,6 +1,7 @@
 package au.howesthat.whirl.core.model
 
 import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -34,5 +35,35 @@ class TextQueryTest {
         assertTrue(TextQuery("telstra &").matches("Telstra and Optus"), "a lone & is ignored")
         assertTrue(TextQuery("c++").matches("C++ compilers"), "punctuation inside a word is kept")
         assertFalse(TextQuery("c++").matches("C compilers"))
+    }
+
+    @Test
+    fun `ranges point into the original text, accents and all`() {
+        assertEquals(listOf(0..3), TextQuery("cafe").ranges("Café au lait"))
+        assertEquals(listOf(6..9, 17..20), TextQuery("CAFÉ").ranges("Nice, cafe or a 'café'"))
+        // Decomposed: "e" then a combining accent, two characters for one letter.
+        assertEquals(listOf(0..4), TextQuery("cafe").ranges("cafe\u0301 time"))
+        assertEquals(listOf(2..6), TextQuery("naive").ranges("a naïve plan"))
+    }
+
+    @Test
+    fun `ranges of several words merge where they touch or overlap`() {
+        assertEquals(listOf(0..6, 11..14), TextQuery("plan nbn").ranges("nbnplan is plan"))
+        assertEquals(listOf(0..3), TextQuery("nbn bnp").ranges("nbnpq"))
+    }
+
+    @Test
+    fun `no ranges for a blank query or no match`() {
+        assertEquals(emptyList(), TextQuery("").ranges("anything"))
+        assertEquals(emptyList(), TextQuery("modem").ranges("router"))
+    }
+
+    @Test
+    fun `matching and ranges agree on Greek final sigma`() {
+        // A final sigma is "ς", but "Σ" lowercases to "σ" on its own: both count as one letter.
+        val q = TextQuery("ΟΔΟΣ")
+        assertTrue(q.matches("οδος"))
+        assertEquals(listOf(0..3), q.ranges("οδος"))
+        assertTrue(TextQuery("οδος").matches("ΟΔΟΣ"))
     }
 }

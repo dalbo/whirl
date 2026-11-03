@@ -3,26 +3,36 @@ package au.howesthat.whirl.feature.threadlist
 import androidx.lifecycle.SavedStateHandle
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import au.howesthat.whirl.core.data.AppVisits
 import au.howesthat.whirl.core.data.ForumRepository
 import au.howesthat.whirl.core.data.OpenedFrom
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.data.WatchEvent
 import au.howesthat.whirl.core.data.WatchedPosition
 import au.howesthat.whirl.core.data.WatchSendScheduler
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.ThreadId
+import au.howesthat.whirl.core.database.FetchLogEntity
+import au.howesthat.whirl.core.database.WatchedThreadColumns
 import au.howesthat.whirl.core.database.WhirlDatabase
 import au.howesthat.whirl.core.network.WhirlpoolApi
 import au.howesthat.whirl.core.network.WhirlpoolHttp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -135,5 +145,36 @@ class ListViewModelTest {
 
         vm.setQuery(null)
         assertEquals(2, vm.filter(list).first().sections!!.single().items.size)
+    }
+
+    private fun watchedRow(id: String, title: String, unread: Int) = WatchedThreadColumns(
+        id, title, 92, "Choosing an ISP", 40, 1, "a", 1000, 2, "b", 3000, unread, 41 - unread, 3,
+    )
+
+    @Test
+    fun `mark all marks the unread threads shown, only the matching ones while finding`() = TestScope(dispatcher).runTest {
+        val threads = db.threadDao()
+        threads.replaceWatchedList("unread", listOf(watchedRow("a", "NBN plans", 3), watchedRow("b", "Bike lights", 2)))
+        threads.replaceWatchedList("all", listOf(watchedRow("a", "NBN plans", 3), watchedRow("b", "Bike lights", 2), watchedRow("c", "Bike racks", 0)))
+        db.fetchLogDao().put(FetchLogEntity("watched:unread", 1))
+        db.fetchLogDao().put(FetchLogEntity("watched:all", 1))
+        val vm = WatchedViewModel(deps, watched, AppVisits())
+        backgroundScope.launch { vm.markAllIds.collect {} }
+
+        assertEquals(listOf(ThreadId("a"), ThreadId("b")), vm.markAllIds.first { it.isNotEmpty() })
+        vm.setQuery("bike")
+        assertEquals(listOf(ThreadId("b")), vm.markAllIds.first { it.size == 1 })
+        // All shows a read thread matching too; only the unread one is marked.
+        vm.showUnreadOnly(false)
+        advanceUntilIdle()
+        assertEquals(listOf(ThreadId("b")), vm.markAllIds.first { it.size == 1 })
+
+        vm.setQuery(null)
+        vm.markAllIds.first { it.size == 2 }
+        val applied = async(start = CoroutineStart.UNDISPATCHED) { watched.events.filterIsInstance<WatchEvent.Applied>().first() }
+        vm.markAllRead()
+        val p = withContext(Dispatchers.IO) { withTimeout(5_000) { applied.await().pending } }
+        assertEquals(WatchAction.MARK_READ, p.action)
+        assertEquals(listOf(ThreadId("a"), ThreadId("b")), p.ids, "one action for all of them, with Undo")
     }
 }

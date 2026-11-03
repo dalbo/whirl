@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
                             twoPane = loaded.settings.twoPane,
                             twoPaneLandscapeOnly = loaded.settings.twoPaneLandscapeOnly,
                         ) { host ->
-                            WatchSnackbars(host, viewModel.watchEvents, viewModel::undo, viewModel::commit)
+                            WatchSnackbars(host, viewModel.watchEvents, loaded.settings.undoSeconds, viewModel::undo, viewModel::commit)
                         }
                     }
                 }
@@ -119,7 +119,7 @@ class MainActivity : ComponentActivity() {
     /** Listed in the keyboard shortcuts helper (Meta+/). */
     override fun onProvideKeyboardShortcuts(data: MutableList<KeyboardShortcutGroup>, menu: Menu?, deviceId: Int) {
         super.onProvideKeyboardShortcuts(data, menu, deviceId)
-        val find = getString(au.howesthat.whirl.core.ui.R.string.find_in_list)
+        val find = getString(R.string.shortcut_find)
         data += KeyboardShortcutGroup(
             getString(R.string.app_name),
             listOf(KeyboardShortcutInfo(find, KeyEvent.KEYCODE_F, KeyEvent.META_CTRL_ON), KeyboardShortcutInfo(find, KeyEvent.KEYCODE_SLASH, 0)),
