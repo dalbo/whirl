@@ -45,6 +45,8 @@ data class Settings(
     val ignoreOwnRepliesWatched: Boolean = false,
     val watchedAutoMarkAsRead: Boolean = false,
     val watchedBackToList: Boolean = false,
+    /** Watch, Unwatch and Mark as read wait for an Undo snackbar before they are sent; off, they are sent at once. */
+    val watchUndo: Boolean = true,
 ) {
     companion object {
         val NOTIFY_INTERVALS = listOf(15, 30, 60, 240, 720, 1440)

@@ -18,6 +18,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
@@ -120,7 +121,7 @@ abstract class ListViewModel(private val deps: ListDeps, private val from: Opene
 
     fun perform(action: WatchAction, item: ThreadItem) {
         val id = item.openId ?: return
-        viewModelScope.launch { deps.watched.perform(action, listOf(id)) }
+        viewModelScope.launch { deps.watched.perform(action, listOf(id), undoable = deps.settings.settings.first().watchUndo, announce = true) }
     }
 
     fun lastPost(item: ThreadItem): OpenThread? {

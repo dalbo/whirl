@@ -159,6 +159,16 @@ class WatchedRepositoryTest {
     }
 
     @Test
+    fun `with undo turned off the action is sent at once and still announced, without undo`() = runTest {
+        loadBothLists()
+        val applied = async(start = CoroutineStart.UNDISPATCHED) { repo.events.filterIsInstance<WatchEvent.Applied>().first() }
+        enqueue(fixture("api_watched_mode1.json"))
+        val p = repo.perform(WatchAction.MARK_READ, listOf(bike), undoable = false, announce = true)
+        assertEquals(WatchEvent.Applied(p, undoable = false), applied.await())
+        assertEquals("9yvx1663", server.takeRequest(5, TimeUnit.SECONDS)!!.url.queryParameter("watchedread"))
+    }
+
+    @Test
     fun `a refresh during the undo window keeps the pending change`() = runTest {
         loadBothLists()
         repo.perform(WatchAction.UNWATCH, listOf(bike))

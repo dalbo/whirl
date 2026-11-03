@@ -185,10 +185,13 @@ class ThreadViewModel @AssistedInject constructor(
         if (watchedRepo.isWatched(threadId).first()) watchedRepo.perform(WatchAction.MARK_READ, listOf(threadId), undoable = false)
     }
 
-    /** Watch, mark read or unwatch (with Undo); marking read can return to the list (2.14.12 `pref_watchedbacktolist`). */
+    /**
+     * Watch, mark read or unwatch (with Undo unless it is turned off); marking read can return to the list (2.14.12
+     * `pref_watchedbacktolist`).
+     */
     fun perform(action: WatchAction) {
         viewModelScope.launch {
-            watchedRepo.perform(action, listOf(threadId))
+            watchedRepo.perform(action, listOf(threadId), undoable = settingsRepo.settings.first().watchUndo, announce = true)
             if (action == WatchAction.MARK_READ && route.fromWatched && settings.value.watchedBackToList) events.send(ThreadEvent.Back)
         }
     }
