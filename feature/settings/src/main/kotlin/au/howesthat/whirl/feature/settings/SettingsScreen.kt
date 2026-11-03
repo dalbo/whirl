@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -152,6 +153,9 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, onCheckHistory: 
                 Toggle(stringResource(R.string.settings_auto_mark_read), settings.watchedAutoMarkAsRead) { v -> update { it.copy(watchedAutoMarkAsRead = v) } }
                 Toggle(stringResource(R.string.settings_back_to_list), settings.watchedBackToList) { v -> update { it.copy(watchedBackToList = v) } }
                 Toggle(stringResource(R.string.settings_watch_undo), settings.watchUndo, stringResource(R.string.settings_watch_undo_summary)) { v -> update { it.copy(watchUndo = v) } }
+                Choice(stringResource(R.string.settings_undo_time), Settings.UNDO_SECONDS, settings.undoSeconds, { pluralStringResource(R.plurals.settings_seconds, it, it) }) { v ->
+                    update { it.copy(undoSeconds = v) }
+                }
             }
         }
     }

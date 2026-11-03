@@ -418,7 +418,7 @@ class WatchedRepository @Inject constructor(
 
     companion object {
         /**
-         * The longest an action waits for its Undo offer to close. The snackbar normally closes after 10 s, but
+         * The longest an action waits for its Undo offer to close. The snackbar closes after Settings.undoSeconds (at most 10 s), but
          * Android's "Time to take action" setting can stretch it to 2 minutes; this is also when the backstop runs.
          */
         val UNDO_WINDOW = 3.minutes

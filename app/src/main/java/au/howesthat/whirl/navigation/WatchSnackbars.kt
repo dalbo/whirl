@@ -8,7 +8,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import au.howesthat.whirl.R
@@ -18,6 +20,7 @@ import au.howesthat.whirl.core.data.WatchEvent
 import au.howesthat.whirl.core.ui.errorMessage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Snackbars for watch actions, app-wide so they survive "back to list". An action is sent when its snackbar goes away
@@ -28,6 +31,7 @@ import kotlinx.coroutines.flow.collectLatest
 fun WatchSnackbars(
     host: SnackbarHostState,
     events: Flow<WatchEvent>,
+    undoSeconds: Int,
     onUndo: suspend (PendingWatch) -> Unit,
     onCommit: (PendingWatch) -> Unit,
 ) {
@@ -39,6 +43,9 @@ fun WatchSnackbars(
     )
     val resources = LocalResources.current
     var failure by remember { mutableStateOf<WatchEvent.Failed?>(null) }
+    // Read per snackbar, so changing the setting does not restart the collector (which would send a pending action).
+    val seconds by rememberUpdatedState(undoSeconds)
+    val accessibility = LocalAccessibilityManager.current
 
     LaunchedEffect(host, events) {
         events.collectLatest { event ->
@@ -58,7 +65,13 @@ fun WatchSnackbars(
                             host.showSnackbar(text, duration = SnackbarDuration.Short)
                             return@collectLatest
                         }
-                        val result = host.showSnackbar(text, actionLabel = undo, duration = SnackbarDuration.Long)
+                        // SnackbarDuration only offers 4 s or 10 s, so time it here; Android's "Time to take action"
+                        // can still stretch it, as it does Material's own durations.
+                        val millis = seconds * 1000L
+                        val timeout = accessibility?.calculateRecommendedTimeoutMillis(millis, containsIcons = false, containsText = true, containsControls = true) ?: millis
+                        val result = withTimeoutOrNull(timeout) {
+                            host.showSnackbar(text, actionLabel = undo, duration = SnackbarDuration.Indefinite)
+                        }
                         if (result == SnackbarResult.ActionPerformed) {
                             undone = true
                             onUndo(p)
