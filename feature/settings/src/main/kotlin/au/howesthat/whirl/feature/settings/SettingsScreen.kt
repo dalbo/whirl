@@ -151,6 +151,7 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, onCheckHistory: 
                 Toggle(stringResource(R.string.settings_ignore_own_watched), settings.ignoreOwnRepliesWatched) { v -> update { it.copy(ignoreOwnRepliesWatched = v) } }
                 Toggle(stringResource(R.string.settings_auto_mark_read), settings.watchedAutoMarkAsRead) { v -> update { it.copy(watchedAutoMarkAsRead = v) } }
                 Toggle(stringResource(R.string.settings_back_to_list), settings.watchedBackToList) { v -> update { it.copy(watchedBackToList = v) } }
+                Toggle(stringResource(R.string.settings_watch_undo), settings.watchUndo, stringResource(R.string.settings_watch_undo_summary)) { v -> update { it.copy(watchUndo = v) } }
             }
         }
     }

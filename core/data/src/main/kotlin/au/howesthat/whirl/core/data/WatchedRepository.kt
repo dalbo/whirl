@@ -59,8 +59,11 @@ class PendingWatch internal constructor(
 }
 
 sealed interface WatchEvent {
-    /** Applied locally; offer Undo, then [WatchedRepository.commit] when the offer goes away. */
-    data class Applied(val pending: PendingWatch) : WatchEvent
+    /**
+     * Applied locally. If [undoable], offer Undo, then [WatchedRepository.commit] when the offer goes away; if not, it
+     * is already being sent and this only says it was done.
+     */
+    data class Applied(val pending: PendingWatch, val undoable: Boolean = true) : WatchEvent
 
     /** Whirlpool rejected the action, or it could not be sent for a day; the local change has been undone. */
     data class Failed(val action: WatchAction, val error: Throwable) : WatchEvent
@@ -177,10 +180,11 @@ class WatchedRepository @Inject constructor(
 
     /**
      * Applies [action] to the cached lists now and queues it. With [undoable] it is sent after its Undo window, and
-     * [WatchEvent.Applied] lets the UI offer Undo; without (auto mark read, notification buttons) it is sent at once,
-     * silently. Either way it is kept until Whirlpool has it; [awaitSend] waits for the outcome.
+     * [WatchEvent.Applied] lets the UI offer Undo; without, it is sent at once, and [announce] says whether the UI
+     * still says it was done (Undo turned off in settings) or not (auto mark read, notification buttons). Either way it
+     * is kept until Whirlpool has it; [awaitSend] waits for the outcome.
      */
-    suspend fun perform(action: WatchAction, ids: List<ThreadId>, undoable: Boolean = true): PendingWatch {
+    suspend fun perform(action: WatchAction, ids: List<ThreadId>, undoable: Boolean = true, announce: Boolean = undoable): PendingWatch {
         require(ids.isNotEmpty())
         val raw = ids.map { it.value }
         val now = clock.millis()
@@ -206,6 +210,7 @@ class WatchedRepository @Inject constructor(
             _events.emit(WatchEvent.Applied(p))
         } else {
             scope.launch { drainInBackground() }
+            if (announce) _events.emit(WatchEvent.Applied(p, undoable = false))
         }
         return p
     }
