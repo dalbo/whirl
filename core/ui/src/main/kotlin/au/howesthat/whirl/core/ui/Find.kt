@@ -4,6 +4,7 @@ import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -71,12 +72,16 @@ fun isFindShortcut(keyCode: Int, metaState: Int): Boolean {
         (keyCode == KeyEvent.KEYCODE_SLASH && modifiers == 0)
 }
 
-/** Runs [onFind] for each find shortcut while this screen is resumed, so only the screen on top answers. */
+/**
+ * Runs [onFind] for each find shortcut while this screen is resumed, so only the screen on top answers. In two panes
+ * both are resumed: the list passes [enabled] false while a thread is open beside it, so the thread takes the key.
+ */
 @Composable
-fun OnFindShortcut(onFind: () -> Unit) {
+fun OnFindShortcut(enabled: Boolean = true, onFind: () -> Unit) {
     val requests = LocalFindRequests.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val action by rememberUpdatedState(onFind)
+    if (!enabled) return
     LaunchedEffect(requests, lifecycle) { lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { requests.collect { action() } } }
 }
 
@@ -105,6 +110,9 @@ fun FindBar(
     closeOnBack: Boolean = true,
     /** Buttons after the field, such as the screen's ⋮ menu, so they stay within reach while finding. */
     actions: @Composable RowScope.() -> Unit = {},
+    /** Under the field, such as find on page's "Page 2 of 3 · Post 1 of 4". */
+    footer: (@Composable () -> Unit)? = null,
+    windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
 ) {
     val state = rememberTextFieldState(query)
     val change by rememberUpdatedState(onQueryChange)
@@ -125,11 +133,11 @@ fun FindBar(
     val focusManager = LocalFocusManager.current
     LaunchedEffect(closeOnBack) { if (!closeOnBack) focusManager.clearFocus() }
     // A shortcut with the bar already open goes back to the field.
-    OnFindShortcut { focus.requestFocus() }
+    OnFindShortcut(enabled = closeOnBack) { focus.requestFocus() }
 
     val colors = whirlTopBarColors()
     Surface(modifier, color = colors.containerColor, contentColor = colors.titleContentColor) {
-        Column(Modifier.windowInsetsPadding(TopAppBarDefaults.windowInsets)) {
+        Column(Modifier.windowInsetsPadding(windowInsets)) {
             Row(Modifier.heightIn(min = 64.dp).padding(start = 4.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.find_close)) }
                 SearchBarDefaults.InputField(
@@ -162,6 +170,7 @@ fun FindBar(
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 4.dp),
                 )
             }
+            footer?.invoke()
         }
     }
 }

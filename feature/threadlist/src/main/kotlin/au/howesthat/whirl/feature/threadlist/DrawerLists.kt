@@ -276,7 +276,8 @@ internal fun ListTopBar(
     findActions: @Composable RowScope.() -> Unit = {},
     titleBar: @Composable () -> Unit,
 ) {
-    OnFindShortcut { if (query == null) viewModel.setQuery("") }
+    // With a thread open beside the list, the shortcut finds in the thread.
+    OnFindShortcut(enabled = LocalSelectedThread.current == null) { if (query == null) viewModel.setQuery("") }
     if (query == null) {
         titleBar()
     } else {

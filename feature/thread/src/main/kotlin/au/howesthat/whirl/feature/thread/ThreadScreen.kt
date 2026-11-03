@@ -83,6 +83,15 @@ import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.PagePickerDialog
 import au.howesthat.whirl.core.ui.PostBodyView
 import au.howesthat.whirl.core.ui.ScrollThumb
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.res.pluralStringResource
+import au.howesthat.whirl.core.ui.FindBar
+import au.howesthat.whirl.core.ui.FindHighlight
+import au.howesthat.whirl.core.ui.OnFindShortcut
+import au.howesthat.whirl.core.ui.highlighted
+import au.howesthat.whirl.core.ui.style
 import au.howesthat.whirl.core.ui.Surfaces
 import au.howesthat.whirl.core.ui.errorMessage
 import au.howesthat.whirl.core.ui.menuClickable
@@ -183,6 +192,19 @@ private fun ThreadPager(
     val scope = rememberCoroutineScope()
     val browser = rememberOpenInBrowser()
     var picking by remember { mutableStateOf(false) }
+    val findQuery by viewModel.findQuery.collectAsStateWithLifecycle()
+    val find by viewModel.findMatches.collectAsStateWithLifecycle()
+    // Which match next/previous last went to; starts again on a new page or query.
+    var findIndex by remember(find?.page, findQuery) { mutableIntStateOf(-1) }
+    val matchIds = find?.replyIds.orEmpty()
+    val currentMatch = matchIds.getOrNull(findIndex)
+    fun step(by: Int) {
+        val f = find ?: return
+        if (f.replyIds.isEmpty()) return
+        findIndex = if (findIndex < 0) (if (by > 0) 0 else f.replyIds.lastIndex) else (findIndex + by).mod(f.replyIds.size)
+        viewModel.showMatch(f.page, f.replyIds[findIndex])
+    }
+    OnFindShortcut { if (findQuery == null) viewModel.setFindQuery("") }
 
     LaunchedEffect(pager.settledPage) { viewModel.showPage(pager.settledPage + 1) }
     LaunchedEffect(jumpTo) {
@@ -192,8 +214,42 @@ private fun ThreadPager(
         }
     }
 
+    val pageOf = stringResource(au.howesthat.whirl.core.ui.R.string.page_of, pager.currentPage + 1, pageCount)
     Column(modifier) {
-        TopAppBar(
+        val query = findQuery
+        if (query != null) {
+            FindBar(
+                query = query,
+                onQueryChange = viewModel::setFindQuery,
+                onClose = { viewModel.setFindQuery(null) },
+                label = stringResource(R.string.find_on_page),
+                matches = null,
+                windowInsets = TopBarInsets,
+                actions = {
+                    IconButton(onClick = { step(-1) }, enabled = matchIds.isNotEmpty()) {
+                        Icon(Icons.Default.KeyboardArrowUp, stringResource(R.string.find_previous))
+                    }
+                    IconButton(onClick = { step(1) }, enabled = matchIds.isNotEmpty()) {
+                        Icon(Icons.Default.KeyboardArrowDown, stringResource(R.string.find_next))
+                    }
+                },
+                footer = {
+                    val status = when {
+                        query.isBlank() -> null
+                        matchIds.isEmpty() -> stringResource(R.string.find_none_on_page)
+                        findIndex < 0 -> pluralStringResource(R.plurals.find_posts, matchIds.size, matchIds.size)
+                        else -> stringResource(R.string.find_post_of, findIndex + 1, matchIds.size)
+                    }
+                    // Announced as the page or the match changes, as the bar's subtitle is otherwise.
+                    Text(
+                        listOfNotNull(pageOf, status).joinToString(" · "),
+                        Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp).semantics { liveRegion = LiveRegionMode.Polite },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = topBarSubtleColor(),
+                    )
+                },
+            )
+        } else TopAppBar(
             colors = whirlTopBarColors(),
             windowInsets = TopBarInsets,
             title = {
@@ -233,6 +289,7 @@ private fun ThreadPager(
                     onReply = { browser(viewModel.replyToThreadUrl()) },
                     onOpenInBrowser = { browser(viewModel.threadUrl(pager.currentPage + 1)) },
                     onWatched = onWatched,
+                    onFind = { viewModel.setFindQuery("") },
                 )
             },
         )
@@ -243,6 +300,8 @@ private fun ThreadPager(
                 viewModel = viewModel,
                 error = error.takeIf { current },
                 refreshing = refreshing && current,
+                find = find,
+                currentMatch = currentMatch,
             )
         }
     }
@@ -266,7 +325,7 @@ private fun ThreadPager(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PageContent(page: Int, viewModel: ThreadViewModel, error: Throwable?, refreshing: Boolean) {
+private fun PageContent(page: Int, viewModel: ThreadViewModel, error: Throwable?, refreshing: Boolean, find: FindMatches?, currentMatch: Long?) {
     val ui by remember(page, viewModel) { viewModel.page(page) }.collectAsStateWithLifecycle(null)
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val target by viewModel.scrollTarget.collectAsStateWithLifecycle()
@@ -310,7 +369,7 @@ private fun PageContent(page: Int, viewModel: ThreadViewModel, error: Throwable?
             )
             loaded == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             else -> {
-                PostList(loaded, page, list, error, textStyle, myUserId, newFrom, viewModel)
+                PostList(loaded, page, list, error, textStyle, myUserId, newFrom, viewModel, find, currentMatch)
                 // At the edge of the pane, not of the readable-width column of posts.
                 ScrollThumb(list, Modifier.align(Alignment.CenterEnd))
             }
@@ -328,6 +387,8 @@ private fun PostList(
     myUserId: Long?,
     newFrom: Int?,
     viewModel: ThreadViewModel,
+    find: FindMatches?,
+    currentMatch: Long?,
 ) {
     val browser = rememberOpenInBrowser()
     val isWatched by viewModel.isWatched.collectAsStateWithLifecycle()
@@ -401,6 +462,8 @@ private fun PostList(
                         onEdit = { browser(viewModel.editPostUrl(post.post)) },
                         onReport = { browser(viewModel.reportPostUrl(post.post)) },
                         onOpenInBrowser = { browser(viewModel.postUrl(post.post, page)) },
+                        highlight = find?.takeIf { it.page == page && post.post.replyId in it.replyIds }
+                            ?.let { FindHighlight(it.query, current = post.post.replyId == currentMatch) },
                     )
                 }
             }
@@ -479,6 +542,7 @@ private fun PostItem(
     onEdit: () -> Unit,
     onReport: () -> Unit,
     onOpenInBrowser: () -> Unit,
+    highlight: FindHighlight?,
 ) {
     val p = post.post
     var menu by remember { mutableStateOf(false) }
@@ -504,7 +568,7 @@ private fun PostItem(
                 fontStyle = FontStyle.Italic,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            else -> PostBodyView(post.body, onLink = onLink, onQuote = onQuote, textStyle = textStyle)
+            else -> PostBodyView(post.body, onLink = onLink, onQuote = onQuote, textStyle = textStyle, highlight = highlight)
         }
     }
     val clickable = Modifier
@@ -520,13 +584,13 @@ private fun PostItem(
             // In a card: the author on a deeper band above the body.
             Column(clickable) {
                 Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    PostHeader(p, onUser)
+                    PostHeader(p, onUser, highlight)
                 }
                 Box(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) { body() }
             }
         } else {
             Column(clickable.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                PostHeader(p, onUser)
+                PostHeader(p, onUser, highlight)
                 body()
             }
         }
@@ -535,11 +599,11 @@ private fun PostItem(
 }
 
 @Composable
-private fun PostHeader(p: Post, onUser: () -> Unit) {
+private fun PostHeader(p: Post, onUser: () -> Unit, highlight: FindHighlight?) {
     Column {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(
-                p.author.name,
+                highlighted(p.author.name, highlight?.let { it.query to it.style() }),
                 Modifier.weight(1f, fill = false).clickable(role = Role.Button, onClick = onUser),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
@@ -590,6 +654,7 @@ private fun ThreadMenu(
     onReply: () -> Unit,
     onOpenInBrowser: () -> Unit,
     onWatched: () -> Unit,
+    onFind: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, stringResource(R.string.more)) }
@@ -600,6 +665,7 @@ private fun ThreadMenu(
         } else {
             DropdownMenuItem(text = { Text(stringResource(R.string.watch)) }, onClick = { open = false; onWatchAction(WatchAction.WATCH) })
         }
+        DropdownMenuItem(text = { Text(stringResource(R.string.find_on_page)) }, onClick = { open = false; onFind() })
         DropdownMenuItem(text = { Text(stringResource(R.string.watched_threads)) }, onClick = { open = false; onWatched() })
         HorizontalDivider()
         DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.first_page)) }, onClick = { open = false; onFirst() })

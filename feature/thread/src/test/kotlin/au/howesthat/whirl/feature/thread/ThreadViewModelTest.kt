@@ -1,5 +1,6 @@
 package au.howesthat.whirl.feature.thread
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
@@ -27,6 +28,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -53,6 +55,7 @@ import java.net.UnknownHostException
 import java.time.Clock
 import java.time.Duration
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -93,8 +96,8 @@ class ThreadViewModelTest {
     private fun enqueueHtml(name: String) =
         server.enqueue(MockResponse.Builder().body(File(System.getProperty("whirl.fixtures"), "html/$name").readText()).build())
 
-    private fun viewModel(route: ThreadRoute): ThreadViewModel {
-        val factory = viewModelFactory { initializer { ThreadViewModel(route, repo, settings, watched) } }
+    private fun viewModel(route: ThreadRoute, saved: SavedStateHandle = SavedStateHandle()): ThreadViewModel {
+        val factory = viewModelFactory { initializer { ThreadViewModel(route, repo, settings, watched, saved) } }
         return ViewModelProvider.create(viewModels, factory)["vm${viewModelCount++}", ThreadViewModel::class]
     }
 
@@ -237,7 +240,7 @@ class ThreadViewModelTest {
         // Two minutes later the cached page is stale, so the view model fetches, and the fetch fails.
         val later = Clock.offset(clock, Duration.ofMinutes(2))
         val staleRepo = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, later)
-        val vm = ThreadViewModel(ThreadRoute("3pxj858k", 2), staleRepo, settings, watched)
+        val vm = ThreadViewModel(ThreadRoute("3pxj858k", 2), staleRepo, settings, watched, SavedStateHandle())
         assertEquals(2, await { vm.startPage.filterNotNull().first() })
         assertEquals("Simple, ad-free NBN plan comparison tool I built", await { vm.title.filterNotNull().first() })
         await { vm.error.filterNotNull().first() }
@@ -311,7 +314,7 @@ class ThreadViewModelTest {
         val keyed = WatchedRepository(WhirlpoolApi(client, { "k" }, api.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, clock, appScope)
         val pages = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(api.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock)
         settings.update { it.copy(watchedAutoMarkAsRead = true) }
-        ThreadViewModel(ThreadRoute("9yvx1663", 1), pages, settings, keyed)
+        ThreadViewModel(ThreadRoute("9yvx1663", 1), pages, settings, keyed, SavedStateHandle())
         val marked = await {
             generateSequence { api.takeRequest(5, TimeUnit.SECONDS) }.first { it.url.queryParameter("watchedread") != null }
         }
@@ -344,4 +347,30 @@ class ThreadViewModelTest {
     }
 
     private fun json(name: String) = MockResponse.Builder().body(File(System.getProperty("whirl.fixtures"), "api/$name").readText()).build()
+
+    @Test
+    fun `find on page matches the posts with every word, and the query is saved`() = runTest {
+        enqueueHtml("thread_9244p8v1_whirlcode.html")
+        val saved = SavedStateHandle()
+        val vm = viewModel(ThreadRoute("9244p8v1", 2), saved)
+        await { vm.startPage.filterNotNull().first() }
+        val page = await { vm.page(2).filterNotNull().first() }
+        backgroundScope.launch { vm.findMatches.collect {} }
+
+        vm.setFindQuery("formatting WHIRLCODE")
+        val test = page.posts.single { it.post.number == 37 }.post.replyId
+        assertEquals(listOf(test), await { vm.findMatches.filterNotNull().first { it.query.matches("whirlcode formatting") } }.replyIds)
+        assertEquals("formatting WHIRLCODE", saved.get<String>("findOnPage"), "kept for process death")
+
+        // The poster's name counts too, as well as posts quoting "d@llin writes...".
+        vm.setFindQuery("d@llin")
+        val mine = page.posts.filter { it.post.author.name == "d@llin" }.map { it.post.replyId }
+        val found = await { vm.findMatches.filterNotNull().first { it.query.matches("d@llin") } }.replyIds
+        assertTrue(mine.isNotEmpty() && found.containsAll(mine), "$mine in $found")
+
+        vm.showMatch(2, test)
+        assertEquals(ScrollTarget(2, replyId = test), vm.scrollTarget.value)
+        vm.setFindQuery(null)
+        assertEquals(null, await { vm.findMatches.first { it == null } })
+    }
 }

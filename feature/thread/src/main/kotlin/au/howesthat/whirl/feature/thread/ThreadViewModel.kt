@@ -1,5 +1,6 @@
 package au.howesthat.whirl.feature.thread
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation3.runtime.NavKey
@@ -17,7 +18,9 @@ import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.Post
 import au.howesthat.whirl.core.model.PostBody
 import au.howesthat.whirl.core.model.PostFilter
+import au.howesthat.whirl.core.model.TextQuery
 import au.howesthat.whirl.core.model.ThreadId
+import au.howesthat.whirl.core.model.searchText
 import au.howesthat.whirl.core.model.ThreadPage
 import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.scraper.PostBodyParser
@@ -33,7 +36,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -85,6 +90,7 @@ class ThreadViewModel @AssistedInject constructor(
     private val repo: ThreadPageRepository,
     private val settingsRepo: SettingsRepository,
     private val watchedRepo: WatchedRepository,
+    private val savedState: SavedStateHandle,
 ) : ViewModel() {
     @AssistedFactory
     interface Factory {
@@ -162,6 +168,35 @@ class ThreadViewModel @AssistedInject constructor(
             if (_firstUnread.value == null) _firstUnread.value = watchedRepo.lastReadPost(threadId)?.let { it + 1 }
             autoMarkRead()
         }
+    }
+
+    /** Find on page: null while the bar is closed, else what is typed. Saved, so it survives process death. */
+    val findQuery: StateFlow<String?> = savedState.getStateFlow(FIND_KEY, null)
+
+    fun setFindQuery(query: String?) {
+        savedState[FIND_KEY] = query
+    }
+
+    /**
+     * The posts on the page on screen that match the find query, by reply id in page order: those with every word in
+     * their text or the poster's name. Empty with no query.
+     */
+    val findMatches: StateFlow<FindMatches?> = combine(currentPage, findQuery) { page, query -> page to query }
+        .flatMapLatest { (page, query) ->
+            val words = TextQuery(query)
+            if (page == null || words.isBlank) {
+                flowOf(null)
+            } else {
+                page(page).map { ui ->
+                    FindMatches(page, words, ui?.posts.orEmpty().filter { matchesFind(it, words) }.map { it.post.replyId })
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Scrolls to a find match on [page]. */
+    fun showMatch(page: Int, replyId: Long) {
+        _scrollTarget.value = ScrollTarget(page, replyId = replyId)
     }
 
     /** The page holding the first unread post, in the unfiltered thread. */
@@ -432,6 +467,14 @@ class ThreadViewModel @AssistedInject constructor(
     fun reportPostUrl(post: Post): String =
         urls.reportPost(post.replyId, threadId, pageOfPost(post.number), post.number).toString()
 }
+
+/** Find on page's matches: the reply ids of the matching posts on [page], for [query]. */
+data class FindMatches(val page: Int, val query: TextQuery, val replyIds: List<Long>)
+
+/** A post matches when every word is in its text (as find can mark it) or the poster's name. */
+internal fun matchesFind(post: UiPost, query: TextQuery): Boolean = query.matches(post.post.author.name, post.body.searchText())
+
+private const val FIND_KEY = "findOnPage"
 
 /** Whirlpool shows 20 posts per thread page. */
 private const val POSTS_PER_PAGE = 20

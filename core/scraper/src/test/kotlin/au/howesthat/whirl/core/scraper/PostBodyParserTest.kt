@@ -1,6 +1,10 @@
 package au.howesthat.whirl.core.scraper
 
 import au.howesthat.whirl.core.model.Block
+import kotlin.test.assertFalse
+import au.howesthat.whirl.core.model.searchText
+import au.howesthat.whirl.core.model.TextQuery
+import au.howesthat.whirl.core.model.PostBody
 import au.howesthat.whirl.core.model.CellAlign
 import au.howesthat.whirl.core.model.TableCell
 import au.howesthat.whirl.core.model.Inline
@@ -189,5 +193,19 @@ class PostBodyParserTest {
     fun `images become placeholders`() {
         val blocks = PostBodyParser.parse("""<p>see</p><img src="//i.imgur.com/a.png" alt="pic">""").blocks
         assertEquals(Block.Image("https://i.imgur.com/a.png", "pic"), blocks.last())
+    }
+
+    @Test
+    fun `find on page searches the text a post shows, but not its spoilers`() {
+        val text = PostBody(whirlcode).searchText()
+        val find = { q: String -> TextQuery(q).matches(text) }
+        assertTrue(find("Bullet three deep"), "nested list items")
+        assertTrue(find("fenced code block"), "code")
+        assertTrue(find("Reply quote, three deep"), "nested quotes")
+        assertTrue(find("Centre"), "table cells")
+        assertTrue(find("Google"), "link text")
+        assertTrue(find("bold italic"), "a word split across styles")
+        assertFalse(find("hidden text"), "spoilers are never searched")
+        assertTrue(find("Spoiler:"), "the text around a spoiler is")
     }
 }
