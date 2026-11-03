@@ -2,6 +2,14 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.6.0
+Asked for by testers in the Whirl thread.
+- Find on page: a thread's ⋮ › "Find on page" (or Ctrl+F or `/` with a keyboard) highlights every word you type in the page's posts and their posters' names. The arrows step through the matching posts ("Post 2 of 7"). Spoilers are not searched, so a highlight never gives one away.
+- Watched: ⋮ › "Mark all as read" marks every unread thread read at once, with Undo. While Find in list is filtering, it marks only the threads shown ("Mark 3 shown as read").
+- Undo after Watch, Unwatch and Mark as read now lasts 10 seconds, and an action is kept until Whirlpool has it: if the app is closed or offline, it is sent later in the background instead of being lost.
+- Settings › Watched threads › "Offer Undo": turn it off to send Watch, Unwatch and Mark as read straight away, so the browser and other devices see them at once. Mark all as read always offers Undo.
+- A thin scroll indicator shows where you are in a page of posts while scrolling, and fades when you stop.
+
 ## v1.5.2
 Posts now show every kind of Whirlpool formatting, checked against a test post using every code on the Whirlcode page.
 - Nested lists show under their item; they were missing, as a tester noticed.
