@@ -1,0 +1,6 @@
+Whirl 1.6.0
+- Find on page in threads, with highlights
+- Mark all watched threads as read, with Undo
+- Undo lasts 10 s, and actions are kept until sent
+- Setting to send watch actions straight away without Undo
+- Scroll indicator on posts
