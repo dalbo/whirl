@@ -80,7 +80,12 @@
     <string name="settings_auto_mark_read">Mark as read when opened</string>
     <string name="settings_back_to_list">Return to the list after marking read</string>
     <string name="settings_watch_undo">Offer Undo</string>
-    <string name="settings_watch_undo_summary">Watch, Unwatch and Mark as read wait 10 seconds for Undo before Whirlpool hears of them. Off, they are sent straight away. Mark all as read always offers Undo.</string>
+    <string name="settings_watch_undo_summary">Watch, Unwatch and Mark as read wait for Undo before Whirlpool hears of them. Off, they are sent straight away. Mark all as read always offers Undo.</string>
+    <string name="settings_undo_time">Undo time</string>
+    <plurals name="settings_seconds">
+        <item quantity="one">%d second</item>
+        <item quantity="other">%d seconds</item>
+    </plurals>
     <string name="home_news">Industry news</string>
     <string name="home_recent">Recent threads</string>
     <string name="home_latest">Latest activity</string>

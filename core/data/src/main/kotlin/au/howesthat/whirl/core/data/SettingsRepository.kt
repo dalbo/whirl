@@ -63,6 +63,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
         val watchedAutoMarkRead = booleanPreferencesKey("watched_auto_mark_read")
         val watchedBackToList = booleanPreferencesKey("watched_back_to_list")
         val watchUndo = booleanPreferencesKey("watch_undo")
+        val undoSeconds = intPreferencesKey("undo_seconds")
     }
 
     val settings: Flow<Settings> = store.data.map { p ->
@@ -95,6 +96,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
             watchedAutoMarkAsRead = p[Keys.watchedAutoMarkRead] ?: d.watchedAutoMarkAsRead,
             watchedBackToList = p[Keys.watchedBackToList] ?: d.watchedBackToList,
             watchUndo = p[Keys.watchUndo] ?: d.watchUndo,
+            undoSeconds = p[Keys.undoSeconds] ?: d.undoSeconds,
         )
     }
 
@@ -161,6 +163,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
             p[Keys.watchedAutoMarkRead] = s.watchedAutoMarkAsRead
             p[Keys.watchedBackToList] = s.watchedBackToList
             p[Keys.watchUndo] = s.watchUndo
+            p[Keys.undoSeconds] = s.undoSeconds
         }
     }
 

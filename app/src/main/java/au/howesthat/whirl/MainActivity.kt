@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
                             twoPane = loaded.settings.twoPane,
                             twoPaneLandscapeOnly = loaded.settings.twoPaneLandscapeOnly,
                         ) { host ->
-                            WatchSnackbars(host, viewModel.watchEvents, viewModel::undo, viewModel::commit)
+                            WatchSnackbars(host, viewModel.watchEvents, loaded.settings.undoSeconds, viewModel::undo, viewModel::commit)
                         }
                     }
                 }

@@ -47,11 +47,14 @@ data class Settings(
     val watchedBackToList: Boolean = false,
     /** Watch, Unwatch and Mark as read wait for an Undo snackbar before they are sent; off, they are sent at once. */
     val watchUndo: Boolean = true,
+    /** How long the Undo snackbar stays up, in seconds; one of [UNDO_SECONDS]. Also used by Mark all as read. */
+    val undoSeconds: Int = 5,
 ) {
     companion object {
         val NOTIFY_INTERVALS = listOf(15, 30, 60, 240, 720, 1440)
         /** The API refuses `recentdays` above 366. */
         val RECENT_DAYS = listOf(1, 3, 7, 14, 30, 60, 120, 180, 365)
+        val UNDO_SECONDS = listOf(3, 5, 7, 10)
     }
 }
 
