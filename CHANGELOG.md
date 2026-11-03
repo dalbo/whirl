@@ -2,6 +2,9 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.6.1
+- Undo now lasts 5 seconds instead of 10. Settings › Watched threads › "Undo time" sets it to 3, 5, 7 or 10 seconds.
+
 ## v1.6.0
 Asked for by testers in the Whirl thread.
 - Find on page: a thread's ⋮ › "Find on page" (or Ctrl+F or `/` with a keyboard) highlights every word you type in the page's posts and their posters' names. The arrows step through the matching posts ("Post 2 of 7"). Spoilers are not searched, so a highlight never gives one away.
