@@ -1,0 +1,3 @@
+Whirl 1.6.1
+- Undo lasts 5 s instead of 10
+- Setting for how long Undo is offered: 3, 5, 7 or 10 s
