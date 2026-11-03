@@ -322,6 +322,30 @@ class ThreadViewModelTest {
         api.close()
     }
 
+    @Test
+    fun `with undo turned off, mark as read is sent straight away`() = runTest {
+        val api = MockWebServer().apply {
+            dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse = when {
+                    request.url.queryParameter("watchedread") != null -> json("api_cmd_watchedread.json")
+                    request.url.encodedPath.startsWith("/api/") -> json("api_watched_mode1.json")
+                    else -> MockResponse.Builder().code(404).build()
+                }
+            }
+            start()
+        }
+        val keyed = WatchedRepository(WhirlpoolApi(client, { "k" }, api.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, clock, appScope)
+        val pages = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(api.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock)
+        settings.update { it.copy(watchUndo = false) }
+        // Nothing commits it: with Undo on it would wait out the window instead.
+        ThreadViewModel(ThreadRoute("9yvx1663", 1, fromWatched = true), pages, settings, keyed, SavedStateHandle()).perform(WatchAction.MARK_READ)
+        val marked = await {
+            generateSequence { api.takeRequest(5, TimeUnit.SECONDS) }.first { it.url.queryParameter("watchedread") != null }
+        }
+        assertEquals("9yvx1663", marked.url.queryParameter("watchedread"))
+        api.close()
+    }
+
     private fun json(name: String) = MockResponse.Builder().body(File(System.getProperty("whirl.fixtures"), "api/$name").readText()).build()
 
     @Test

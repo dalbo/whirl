@@ -21,7 +21,8 @@ import kotlinx.coroutines.flow.collectLatest
 
 /**
  * Snackbars for watch actions, app-wide so they survive "back to list". An action is sent when its snackbar goes away
- * (timeout, a newer action replacing it, or the screen going away) unless Undo was pressed.
+ * (timeout, a newer action replacing it, or the screen going away) unless Undo was pressed. With Undo turned off in
+ * settings it has been sent already, and the snackbar only says it was done.
  */
 @Composable
 fun WatchSnackbars(
@@ -51,6 +52,11 @@ fun WatchSnackbars(
                             resources.getQuantityString(R.plurals.mark_read_done_threads, p.ids.size, p.ids.size)
                         } else {
                             applied.getValue(p.action)
+                        }
+                        // Undo turned off: it is already on its way, so only say so.
+                        if (!event.undoable) {
+                            host.showSnackbar(text, duration = SnackbarDuration.Short)
+                            return@collectLatest
                         }
                         val result = host.showSnackbar(text, actionLabel = undo, duration = SnackbarDuration.Long)
                         if (result == SnackbarResult.ActionPerformed) {

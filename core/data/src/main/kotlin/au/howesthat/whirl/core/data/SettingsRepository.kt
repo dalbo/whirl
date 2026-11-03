@@ -62,6 +62,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
         val ignoreOwnWatched = booleanPreferencesKey("ignore_own_replies_watched")
         val watchedAutoMarkRead = booleanPreferencesKey("watched_auto_mark_read")
         val watchedBackToList = booleanPreferencesKey("watched_back_to_list")
+        val watchUndo = booleanPreferencesKey("watch_undo")
     }
 
     val settings: Flow<Settings> = store.data.map { p ->
@@ -93,6 +94,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
             ignoreOwnRepliesWatched = p[Keys.ignoreOwnWatched] ?: d.ignoreOwnRepliesWatched,
             watchedAutoMarkAsRead = p[Keys.watchedAutoMarkRead] ?: d.watchedAutoMarkAsRead,
             watchedBackToList = p[Keys.watchedBackToList] ?: d.watchedBackToList,
+            watchUndo = p[Keys.watchUndo] ?: d.watchUndo,
         )
     }
 
@@ -158,6 +160,7 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
             p[Keys.ignoreOwnWatched] = s.ignoreOwnRepliesWatched
             p[Keys.watchedAutoMarkRead] = s.watchedAutoMarkAsRead
             p[Keys.watchedBackToList] = s.watchedBackToList
+            p[Keys.watchUndo] = s.watchUndo
         }
     }
 
