@@ -338,7 +338,7 @@ class ThreadViewModelTest {
         val pages = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(api.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock)
         settings.update { it.copy(watchUndo = false) }
         // Nothing commits it: with Undo on it would wait out the window instead.
-        ThreadViewModel(ThreadRoute("9yvx1663", 1, fromWatched = true), pages, settings, keyed).perform(WatchAction.MARK_READ)
+        ThreadViewModel(ThreadRoute("9yvx1663", 1, fromWatched = true), pages, settings, keyed, SavedStateHandle()).perform(WatchAction.MARK_READ)
         val marked = await {
             generateSequence { api.takeRequest(5, TimeUnit.SECONDS) }.first { it.url.queryParameter("watchedread") != null }
         }
