@@ -34,4 +34,13 @@
     <string name="filters_in_browser">In your browser</string>
     <string name="filter_user">One user\'s posts</string>
     <string name="new_posts">New posts</string>
+    <string name="find_on_page">Find on page</string>
+    <string name="find_previous">Previous match</string>
+    <string name="find_next">Next match</string>
+    <string name="find_none_on_page">No matches on this page</string>
+    <string name="find_post_of">Post %1$d of %2$d</string>
+    <plurals name="find_posts">
+        <item quantity="one">%1$d post</item>
+        <item quantity="other">%1$d posts</item>
+    </plurals>
 </resources>
