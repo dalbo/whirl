@@ -147,6 +147,9 @@ Open ideas, roughly by value:
 - Small: display-cutout insets, TalkBack `paneTitle`, tablet screenshots for the store, F-Droid reproducibility re-check, app widget, linked images.
 - The Windows emulator's network is broken (hung on install); the phone is the test device.
 
+## Next: v1.7 tidy-up, then v1.8 archive reader (agreed 2026-11-05)
+**`docs/plan-v1.7.md`** is the plan: no new features in v1.7 (fixes from the 2026-11-05 review, dead code including the in-app post filter, build/CI, a shorter HANDOFF); the archive reader with search within a thread and posts by a user is v1.8 (§8 there).
+
 ## Known unknowns to resolve as you go
 - Shape of `get=recent` when non-empty (assumed to match `THREADS`; the Recent screen must cope with it failing as Drift).
 - Markup of a deleted post and of a post with an image (capture when found: add the URL to `tools/capture/public.json`, run `npm run public`).
