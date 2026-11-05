@@ -11,6 +11,8 @@ import au.howesthat.whirl.core.network.WhirlpoolHttp
 import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.network.WhirlpoolWeb
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -27,6 +29,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class ThreadListRepositoryTest {
 
@@ -50,7 +53,7 @@ class ThreadListRepositoryTest {
 
     @Test
     fun `scraped forum pages are cached in memory per page and group`() = runTest {
-        val repo = ScrapedListRepository(web, forums, clock)
+        val repo = ScrapedListRepository(web, forums, clock, UnconfinedTestDispatcher())
         val p1 = ScrapedList.ForumPage(92, 1)
         assertNull(repo.observe(p1).first())
         enqueue("html/forum92_p1.html")
@@ -72,7 +75,7 @@ class ThreadListRepositoryTest {
 
     @Test
     fun `popular and search list view parse as thread tables`() = runTest {
-        val repo = ScrapedListRepository(web, forums, clock)
+        val repo = ScrapedListRepository(web, forums, clock, UnconfinedTestDispatcher())
         enqueue("html/popular.html")
         repo.refresh(ScrapedList.Popular)
         assertEquals("/forum/?action=popular_views", server.takeRequest().target)
@@ -91,7 +94,7 @@ class ThreadListRepositoryTest {
     fun `a forum page that needs a login marks the forum private`() = runTest {
         db.forumDao().replaceAll(listOf(ForumEntity(200, "Secret", "Whirlpool", 0)))
         assertFalse(200 in forums.privateIds.first())
-        val repo = ScrapedListRepository(web, forums, clock)
+        val repo = ScrapedListRepository(web, forums, clock, UnconfinedTestDispatcher())
         enqueue("html/forum1_pm_html.html")
         assertFailsWith<WhirlpoolError.NotSignedIn> { repo.refresh(ScrapedList.ForumPage(200, 1)) }
         assertTrue(200 in forums.privateIds.first())
@@ -142,7 +145,7 @@ class ThreadListRepositoryTest {
 
     @Test
     fun `user profiles are scraped and cached`() = runTest {
-        val repo = UserRepository(web, clock)
+        val repo = UserRepository(web, clock, UnconfinedTestDispatcher())
         enqueue("html/user_30703.html")
         assertTrue(repo.refresh(30703))
         assertEquals("/user/30703", server.takeRequest().target)

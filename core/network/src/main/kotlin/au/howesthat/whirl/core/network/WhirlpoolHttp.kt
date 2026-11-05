@@ -2,6 +2,7 @@ package au.howesthat.whirl.core.network
 
 import au.howesthat.whirl.core.model.WhirlpoolError
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -9,6 +10,7 @@ import okhttp3.Response
 import okhttp3.coroutines.executeAsync
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -40,12 +42,14 @@ internal class HttpBody(val code: Int, val body: String, val finalUrl: HttpUrl)
 /**
  * Executes [request], retrying transient failures per [retry], and returns the body of any response that is not a
  * Cloudflare challenge, rate limit or server error. 4xx bodies are returned for the caller to interpret.
+ *
+ * Main-safe: `executeAsync` suspends only until the headers arrive, so the body is read (a blocking socket read) on [io].
  */
-internal suspend fun OkHttpClient.fetch(request: Request, retry: RetryPolicy): HttpBody {
+internal suspend fun OkHttpClient.fetch(request: Request, retry: RetryPolicy, io: CoroutineContext): HttpBody {
     var attempt = 0
     while (true) {
         val error = try {
-            newCall(request).executeAsync().use { response -> return classify(response) }
+            return withContext(io) { newCall(request).executeAsync().use(::classify) }
         } catch (e: WhirlpoolError) {
             e
         } catch (e: IOException) {

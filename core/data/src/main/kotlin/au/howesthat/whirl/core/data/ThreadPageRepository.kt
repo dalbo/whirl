@@ -14,7 +14,9 @@ import au.howesthat.whirl.core.model.WhirlpoolError
 import au.howesthat.whirl.core.network.WhirlpoolWeb
 import au.howesthat.whirl.core.scraper.ThreadPageParser
 import au.howesthat.whirl.core.scraper.WhirlpoolTime
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.map
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.time.Clock
@@ -34,17 +36,25 @@ class ThreadPageRepository @Inject constructor(
     private val dao: ThreadPageDao,
     private val forums: ForumRepository,
     private val clock: Clock,
+    @DefaultDispatcher private val parsing: CoroutineDispatcher,
 ) {
     // Pages carry their own fetched_at, so no shared fetch log.
     private val refresher = Refresher(log = null, clock = clock)
 
-    /** The cached page, or null until it has been loaded once. */
+    /**
+     * The cached page, or null until it has been loaded once. Emits again only when the page is stored again: Room
+     * re-runs the query on every write to `thread_pages` (opening any page touches it, storing one evicts others), and
+     * the screen would re-read and re-parse every page on screen each time.
+     */
     fun page(id: ThreadId, page: Int, filter: PostFilter = PostFilter.All): Flow<Cached<ThreadPage>?> =
-        // The page row is rewritten in the same transaction as its posts, so reading the posts when it changes never
-        // sees a half-stored page (combining two flows did, briefly showing an empty page).
-        dao.observePage(id.value, filter.key, page).map { meta ->
-            meta?.let { Cached(it.toModel(dao.posts(id.value, filter.key, page)), Instant.ofEpochMilli(it.fetchedAt)) }
-        }
+        dao.observePage(id.value, filter.key, page)
+            // Only the access time changes when a page is touched.
+            .distinctUntilChangedBy { it?.copy(accessedAt = 0) }
+            // The page row is rewritten in the same transaction as its posts, so reading the posts when it changes
+            // never sees a half-stored page (combining two flows did, briefly showing an empty page).
+            .map { meta ->
+                meta?.let { Cached(it.toModel(dao.posts(id.value, filter.key, page)), Instant.ofEpochMilli(it.fetchedAt)) }
+            }
 
     /** The thread's page count as last seen, to show its last page from the cache before `?p=-1` returns. */
     suspend fun lastKnownPage(id: ThreadId, filter: PostFilter = PostFilter.All): Int? = dao.lastKnownPageCount(id.value, filter.key)
@@ -82,7 +92,8 @@ class ThreadPageRepository @Inject constructor(
      * redirects to the thread page), caches that page and returns where the post is.
      */
     suspend fun locate(replyId: Long): Located {
-        val page = parseOrDrift { ThreadPageParser.parse(web.get(web.urls.locateReply(replyId))) }
+        val html = web.get(web.urls.locateReply(replyId))
+        val page = parseOrDrift(parsing) { ThreadPageParser.parse(html) }
         store(page.threadId, PostFilter.All, page)
         val post = page.posts.firstOrNull { it.replyId == replyId }
             ?: throw WhirlpoolError.Drift("Reply $replyId is not on the page it redirected to")
@@ -108,7 +119,7 @@ class ThreadPageRepository @Inject constructor(
         )
         val html = web.get(url)
         return try {
-            parseOrDrift { ThreadPageParser.parse(html) }
+            parseOrDrift(parsing) { ThreadPageParser.parse(html) }
         } catch (e: WhirlpoolError.NotSignedIn) {
             // Only the plain thread says the forum is private: filtered views need a login in every forum.
             if (filter == PostFilter.All) forumId?.let { forums.markPrivate(it) }

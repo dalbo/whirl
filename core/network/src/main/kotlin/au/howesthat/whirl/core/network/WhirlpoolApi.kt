@@ -8,9 +8,11 @@ import au.howesthat.whirl.core.model.ThreadSummary
 import au.howesthat.whirl.core.model.UserRef
 import au.howesthat.whirl.core.model.WatchedThread
 import au.howesthat.whirl.core.model.WhirlpoolError
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl
@@ -21,6 +23,7 @@ import org.jsoup.parser.Parser
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
+import kotlin.coroutines.CoroutineContext
 
 /**
  * The Whirlpool JSON API (`https://whirlpool.net.au/api/?key=K&output=json&get=a+b`).
@@ -28,12 +31,15 @@ import java.time.format.DateTimeParseException
  * Every response carries an envelope: `ALERT` (site notice, published on [alert]), `AUTH` (the key's user), `ERROR`.
  * A bad key is HTTP 403 with `ERROR` set. Unknown or removed `get=` values (whims) return the bare envelope, so a
  * requested key that is missing from the response is treated as [WhirlpoolError.Drift].
+ *
+ * Main-safe: requests, body reads and JSON decoding run on [io].
  */
 class WhirlpoolApi(
     private val client: OkHttpClient,
     private val apiKey: suspend () -> String?,
     private val baseUrl: HttpUrl = "https://whirlpool.net.au/api/".toHttpUrl(),
     private val retry: RetryPolicy = RetryPolicy(),
+    private val io: CoroutineContext = Dispatchers.IO,
 ) {
     private val _alert = MutableStateFlow("")
 
@@ -125,14 +131,8 @@ class WhirlpoolApi(
             .apply { if (gets.isNotEmpty()) addEncodedQueryParameter("get", gets.joinToString("+")) }
             .apply { params.forEach { (k, v) -> addQueryParameter(k, v) } }
             .build()
-        val response = client.fetch(Request.Builder().url(url).build(), retry)
-        val env = try {
-            json.decodeFromString(ApiEnvelope.serializer(), response.body)
-        } catch (e: SerializationException) {
-            throw if (response.code == 403) WhirlpoolError.Api("HTTP 403", 403) else WhirlpoolError.Drift("Unexpected API response", e)
-        } catch (e: IllegalArgumentException) {
-            throw WhirlpoolError.Drift("Unexpected API response", e)
-        }
+        val response = client.fetch(Request.Builder().url(url).build(), retry, io)
+        val env = withContext(io) { decode(response) }
         when {
             response.code == 403 || (env.auth?.id == 0L && env.error.isNotEmpty()) ->
                 throw WhirlpoolError.BadKey(env.error.ifEmpty { "Not authenticated. Bad API key?" })
@@ -141,6 +141,14 @@ class WhirlpoolApi(
         }
         _alert.value = env.alert
         return env
+    }
+
+    private fun decode(response: HttpBody): ApiEnvelope = try {
+        json.decodeFromString(ApiEnvelope.serializer(), response.body)
+    } catch (e: SerializationException) {
+        throw if (response.code == 403) WhirlpoolError.Api("HTTP 403", 403) else WhirlpoolError.Drift("Unexpected API response", e)
+    } catch (e: IllegalArgumentException) {
+        throw WhirlpoolError.Drift("Unexpected API response", e)
     }
 
     private fun toSummary(it: ThreadDto) = ThreadSummary(

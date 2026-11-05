@@ -7,6 +7,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineDispatcher
 import okhttp3.OkHttpClient
 import java.time.Clock
 import javax.inject.Singleton
@@ -25,11 +26,12 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun api(client: OkHttpClient, settings: SettingsRepository): WhirlpoolApi = WhirlpoolApi(client, settings::apiKey)
+    fun api(client: OkHttpClient, settings: SettingsRepository, @IoDispatcher io: CoroutineDispatcher): WhirlpoolApi =
+        WhirlpoolApi(client, settings::apiKey, io = io)
 
     @Provides
     @Singleton
-    fun web(client: OkHttpClient): WhirlpoolWeb = WhirlpoolWeb(client)
+    fun web(client: OkHttpClient, @IoDispatcher io: CoroutineDispatcher): WhirlpoolWeb = WhirlpoolWeb(client, io = io)
 
     @Provides
     fun clock(): Clock = Clock.systemDefaultZone()

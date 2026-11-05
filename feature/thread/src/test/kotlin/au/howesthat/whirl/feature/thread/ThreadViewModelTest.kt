@@ -56,6 +56,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -71,7 +72,7 @@ class ThreadViewModelTest {
         .build()
     private val clock = Clock.fixed(Instant.parse("2026-11-05T00:00:00Z"), ZoneOffset.UTC)
     private val forums = ForumRepository(WhirlpoolApi(client, { null }, server.url("/api/"), RetryPolicy.NONE), db.forumDao(), db.fetchLogDao(), clock)
-    private val repo = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock)
+    private val repo = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock, Dispatchers.Default)
     private val settings = SettingsRepository(ApplicationProvider.getApplicationContext())
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     // No key: watch actions apply locally and their sends fail without a request.
@@ -97,7 +98,7 @@ class ThreadViewModelTest {
         server.enqueue(MockResponse.Builder().body(File(System.getProperty("whirl.fixtures"), "html/$name").readText()).build())
 
     private fun viewModel(route: ThreadRoute, saved: SavedStateHandle = SavedStateHandle()): ThreadViewModel {
-        val factory = viewModelFactory { initializer { ThreadViewModel(route, repo, settings, watched, saved) } }
+        val factory = viewModelFactory { initializer { ThreadViewModel(route, repo, settings, watched, saved, Dispatchers.Default) } }
         return ViewModelProvider.create(viewModels, factory)["vm${viewModelCount++}", ThreadViewModel::class]
     }
 
@@ -106,6 +107,21 @@ class ThreadViewModelTest {
     // Room and MockWebServer do real I/O, so wait in wall-clock time, not runTest's virtual time.
     private suspend fun <T> await(block: suspend () -> T): T =
         withContext(Dispatchers.Default.limitedParallelism(1)) { withTimeout(10_000) { block() } }
+
+    @Test
+    fun `the pager and find on page share one parsed page`() = runTest {
+        enqueueHtml("thread_3pxj858k_p2.html")
+        val vm = viewModel(ThreadRoute("3pxj858k", 2))
+        assertSame(vm.page(2), vm.page(2), "one flow per page")
+        // Find on page subscribes to the page on screen, as the pager does.
+        vm.setFindQuery("nbn")
+        val find = launch(Dispatchers.Default) { vm.findMatches.collect {} }
+        await { vm.findMatches.filterNotNull().first() }
+        val shown = await { vm.page(2).filterNotNull().first() }
+        val again = await { vm.page(2).filterNotNull().first() }
+        assertSame(shown, again, "parsed once while the page is on screen")
+        find.cancel()
+    }
 
     @Test
     fun `the last page resolves through the server`() = runTest {
@@ -239,8 +255,8 @@ class ThreadViewModelTest {
         server.close()
         // Two minutes later the cached page is stale, so the view model fetches, and the fetch fails.
         val later = Clock.offset(clock, Duration.ofMinutes(2))
-        val staleRepo = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, later)
-        val vm = ThreadViewModel(ThreadRoute("3pxj858k", 2), staleRepo, settings, watched, SavedStateHandle())
+        val staleRepo = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, later, Dispatchers.Default)
+        val vm = ThreadViewModel(ThreadRoute("3pxj858k", 2), staleRepo, settings, watched, SavedStateHandle(), Dispatchers.Default)
         assertEquals(2, await { vm.startPage.filterNotNull().first() })
         assertEquals("Simple, ad-free NBN plan comparison tool I built", await { vm.title.filterNotNull().first() })
         await { vm.error.filterNotNull().first() }
@@ -312,9 +328,9 @@ class ThreadViewModelTest {
             start()
         }
         val keyed = WatchedRepository(WhirlpoolApi(client, { "k" }, api.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, clock, appScope)
-        val pages = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(api.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock)
+        val pages = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(api.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock, Dispatchers.Default)
         settings.update { it.copy(watchedAutoMarkAsRead = true) }
-        ThreadViewModel(ThreadRoute("9yvx1663", 1), pages, settings, keyed, SavedStateHandle())
+        ThreadViewModel(ThreadRoute("9yvx1663", 1), pages, settings, keyed, SavedStateHandle(), Dispatchers.Default)
         val marked = await {
             generateSequence { api.takeRequest(5, TimeUnit.SECONDS) }.first { it.url.queryParameter("watchedread") != null }
         }
@@ -335,10 +351,10 @@ class ThreadViewModelTest {
             start()
         }
         val keyed = WatchedRepository(WhirlpoolApi(client, { "k" }, api.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, clock, appScope)
-        val pages = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(api.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock)
+        val pages = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(api.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock, Dispatchers.Default)
         settings.update { it.copy(watchUndo = false) }
         // Nothing commits it: with Undo on it would wait out the window instead.
-        ThreadViewModel(ThreadRoute("9yvx1663", 1, fromWatched = true), pages, settings, keyed, SavedStateHandle()).perform(WatchAction.MARK_READ)
+        ThreadViewModel(ThreadRoute("9yvx1663", 1, fromWatched = true), pages, settings, keyed, SavedStateHandle(), Dispatchers.Default).perform(WatchAction.MARK_READ)
         val marked = await {
             generateSequence { api.takeRequest(5, TimeUnit.SECONDS) }.first { it.url.queryParameter("watchedread") != null }
         }

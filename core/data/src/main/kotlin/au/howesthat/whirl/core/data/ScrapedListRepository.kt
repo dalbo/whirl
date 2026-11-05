@@ -5,10 +5,12 @@ import au.howesthat.whirl.core.model.WhirlpoolError
 import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.network.WhirlpoolWeb
 import au.howesthat.whirl.core.scraper.ThreadListParser
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import java.time.Clock
 import java.time.Instant
@@ -47,6 +49,7 @@ class ScrapedListRepository @Inject constructor(
     private val web: WhirlpoolWeb,
     private val forums: ForumRepository,
     private val clock: Clock,
+    @DefaultDispatcher private val parsing: CoroutineDispatcher,
 ) {
     private val refresher = Refresher(log = null, clock = clock)
     private val cache = MutableStateFlow<Map<ScrapedList, Cached<ThreadListPage>>>(emptyMap())
@@ -60,7 +63,8 @@ class ScrapedListRepository @Inject constructor(
     suspend fun refresh(list: ScrapedList, force: Boolean = false): Boolean =
         refresher.refresh(list.toString(), MaxAge.THREAD_LISTS, force, lastFetched = { cache.value[list]?.updatedAt?.toEpochMilli() }) {
             val page = try {
-                parseOrDrift { ThreadListParser.parse(web.get(list.url(web.urls))) }
+                val html = web.get(list.url(web.urls))
+                parseOrDrift(parsing) { ThreadListParser.parse(html) }
             } catch (e: WhirlpoolError.NotSignedIn) {
                 if (list is ScrapedList.ForumPage) forums.markPrivate(list.forumId)
                 throw e
@@ -74,11 +78,16 @@ class ScrapedListRepository @Inject constructor(
     }
 }
 
-/** Runs a parser; failures other than [WhirlpoolError] mean the markup moved and become [WhirlpoolError.Drift]. */
-internal inline fun <T> parseOrDrift(parse: () -> T): T = try {
-    parse()
-} catch (e: WhirlpoolError) {
-    throw e
-} catch (e: RuntimeException) {
-    throw WhirlpoolError.Drift("Could not read the page", e)
+/**
+ * Runs a parser on [dispatcher] (off the main thread); failures other than [WhirlpoolError] mean the markup moved and
+ * become [WhirlpoolError.Drift].
+ */
+internal suspend fun <T> parseOrDrift(dispatcher: CoroutineDispatcher, parse: () -> T): T = withContext(dispatcher) {
+    try {
+        parse()
+    } catch (e: WhirlpoolError) {
+        throw e
+    } catch (e: RuntimeException) {
+        throw WhirlpoolError.Drift("Could not read the page", e)
+    }
 }
