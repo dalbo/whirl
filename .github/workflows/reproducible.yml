@@ -108,7 +108,9 @@ jobs:
           BT=$(ls -d "$ANDROID_HOME"/build-tools/[0-9]* | sort -V | tail -1)
           keytool -genkeypair -keystore throwaway.jks -storepass throwaway -keypass throwaway -alias t \
             -keyalg RSA -keysize 2048 -validity 1 -dname CN=throwaway -noprompt
-          "$BT/apksigner" sign --ks throwaway.jks --ks-pass pass:throwaway --out signed.apk apk-0/app-release-unsigned.apk
+          # Keep the zip as Gradle wrote it, as AGP's own signing in release.yml does; apksigner's default re-aligns
+          # it, and a signature over a re-aligned zip cannot fit the other, unaligned build.
+          "$BT/apksigner" sign --alignment-preserved --ks throwaway.jks --ks-pass pass:throwaway --out signed.apk apk-0/app-release-unsigned.apk
           pipx run "$APKSIGCOPIER" copy signed.apk apk-1/app-release-unsigned.apk transplanted.apk
           "$BT/apksigner" verify --verbose transplanted.apk
 
