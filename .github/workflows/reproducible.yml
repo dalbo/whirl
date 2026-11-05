@@ -137,7 +137,7 @@ jobs:
           "$BT/apksigner" verify --verbose transplanted.apk
 
   signature:
-    name: Signature of ${{ needs.resolve.outputs.release || 'the latest release' }} transplants
+    name: Release signature transplants
     needs: resolve
     # A pull request changes the next build, not a published one.
     if: github.event_name != 'pull_request'
