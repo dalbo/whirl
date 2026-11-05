@@ -120,12 +120,18 @@ interface ThreadDao {
         insertSource(ids.mapIndexed { i, id -> ThreadSourceEntity(source.name, key, id, i) })
     }
 
+    /** Replaces one list; threads that dropped off every list go too. */
     @Transaction
     suspend fun replaceApiList(source: ThreadSource, key: String, threads: List<ApiThreadColumns>) {
         upsertApi(threads)
         replaceSource(source, key, threads.map { it.id })
+        deleteOrphans()
     }
 
+    /**
+     * Replaces one watched list. Orphans are left for the caller, which may still re-add pending actions to it in the
+     * same transaction ([deleteOrphans] after).
+     */
     @Transaction
     suspend fun replaceWatchedList(key: String, threads: List<WatchedThreadColumns>) {
         upsertWatched(threads)

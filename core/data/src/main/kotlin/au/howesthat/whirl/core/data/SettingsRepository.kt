@@ -2,6 +2,7 @@ package au.howesthat.whirl.core.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -66,9 +67,12 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
         val undoSeconds = intPreferencesKey("undo_seconds")
     }
 
-    val settings: Flow<Settings> = store.data.map { p ->
+    val settings: Flow<Settings> = store.data.map { it.toSettings() }
+
+    private fun Preferences.toSettings(): Settings {
+        val p = this
         val d = Settings()
-        Settings(
+        return Settings(
             homepage = p[Keys.homepage].toEnum(d.homepage),
             theme = p[Keys.theme].toEnum(d.theme),
             palette = p[Keys.palette] ?: if (p[Keys.dynamicColor] == false) "whirl" else d.palette,
@@ -132,39 +136,50 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
         store.edit { it[Keys.setupDone] = true }
     }
 
-    /** Applies [change] to the current settings and stores the result. */
+    /**
+     * Applies [change] to the current settings and stores the result, as one read-modify-write: two updates at once
+     * both take effect. Only settings that differ from the default are stored, so a default changed in a later version
+     * reaches everyone who never changed that setting.
+     */
     suspend fun update(change: (Settings) -> Settings) {
-        val s = change(settings.first())
         store.edit { p ->
-            p[Keys.homepage] = s.homepage.name
-            p[Keys.theme] = s.theme.name
-            p[Keys.palette] = s.palette
-            p[Keys.layout] = s.layout
-            p[Keys.screenAnimations] = s.screenAnimations
-            p[Keys.twoPane] = s.twoPane
-            p[Keys.twoPaneLandscapeOnly] = s.twoPaneLandscapeOnly
-            p[Keys.browserApp] = s.browserApp
-            p[Keys.nightStart] = s.nightStart.toString()
-            p[Keys.nightEnd] = s.nightEnd.toString()
-            p[Keys.postFontSize] = s.postFontSize.name
-            p[Keys.textScale] = s.textScale.name
-            p[Keys.watchedNotify] = s.watchedNotify
-            p[Keys.notifyInterval] = s.notifyIntervalMinutes
-            p[Keys.notifyStyle] = s.notifyStyle.name
-            p[Keys.notifyKeepUntilRead] = s.notifyKeepUntilRead
-            p[Keys.openThreadsInBrowser] = s.openThreadsInBrowser
-            p[Keys.loadPublicAtBottom] = s.loadPublicAtBottom
-            p[Keys.loadPrivateAtBottom] = s.loadPrivateAtBottom
-            p[Keys.recentDays] = s.recentHistoryDays
-            p[Keys.loadRecentAtTop] = s.loadRecentAtTop
-            p[Keys.ignoreOwnRecent] = s.ignoreOwnRepliesRecent
-            p[Keys.loadWatchedAtTop] = s.loadWatchedAtTop
-            p[Keys.ignoreOwnWatched] = s.ignoreOwnRepliesWatched
-            p[Keys.watchedAutoMarkRead] = s.watchedAutoMarkAsRead
-            p[Keys.watchedBackToList] = s.watchedBackToList
-            p[Keys.watchUndo] = s.watchUndo
-            p[Keys.undoSeconds] = s.undoSeconds
+            val s = change(p.toSettings())
+            val d = Settings()
+            p.put(Keys.homepage, s.homepage.name, d.homepage.name)
+            p.put(Keys.theme, s.theme.name, d.theme.name)
+            p.put(Keys.palette, s.palette, d.palette)
+            p.put(Keys.layout, s.layout, d.layout)
+            p.put(Keys.screenAnimations, s.screenAnimations, d.screenAnimations)
+            p.put(Keys.twoPane, s.twoPane, d.twoPane)
+            p.put(Keys.twoPaneLandscapeOnly, s.twoPaneLandscapeOnly, d.twoPaneLandscapeOnly)
+            p.put(Keys.browserApp, s.browserApp, d.browserApp)
+            p.put(Keys.nightStart, s.nightStart.toString(), d.nightStart.toString())
+            p.put(Keys.nightEnd, s.nightEnd.toString(), d.nightEnd.toString())
+            p.put(Keys.postFontSize, s.postFontSize.name, d.postFontSize.name)
+            p.put(Keys.textScale, s.textScale.name, d.textScale.name)
+            p.put(Keys.watchedNotify, s.watchedNotify, d.watchedNotify)
+            p.put(Keys.notifyInterval, s.notifyIntervalMinutes, d.notifyIntervalMinutes)
+            p.put(Keys.notifyStyle, s.notifyStyle.name, d.notifyStyle.name)
+            p.put(Keys.notifyKeepUntilRead, s.notifyKeepUntilRead, d.notifyKeepUntilRead)
+            p.put(Keys.openThreadsInBrowser, s.openThreadsInBrowser, d.openThreadsInBrowser)
+            p.put(Keys.loadPublicAtBottom, s.loadPublicAtBottom, d.loadPublicAtBottom)
+            p.put(Keys.loadPrivateAtBottom, s.loadPrivateAtBottom, d.loadPrivateAtBottom)
+            p.put(Keys.recentDays, s.recentHistoryDays, d.recentHistoryDays)
+            p.put(Keys.loadRecentAtTop, s.loadRecentAtTop, d.loadRecentAtTop)
+            p.put(Keys.ignoreOwnRecent, s.ignoreOwnRepliesRecent, d.ignoreOwnRepliesRecent)
+            p.put(Keys.loadWatchedAtTop, s.loadWatchedAtTop, d.loadWatchedAtTop)
+            p.put(Keys.ignoreOwnWatched, s.ignoreOwnRepliesWatched, d.ignoreOwnRepliesWatched)
+            p.put(Keys.watchedAutoMarkRead, s.watchedAutoMarkAsRead, d.watchedAutoMarkAsRead)
+            p.put(Keys.watchedBackToList, s.watchedBackToList, d.watchedBackToList)
+            p.put(Keys.watchUndo, s.watchUndo, d.watchUndo)
+            p.put(Keys.undoSeconds, s.undoSeconds, d.undoSeconds)
+            // v1.0's switch only chose the first palette; from now on the palette key (or its absence) says.
+            p.remove(Keys.dynamicColor)
         }
+    }
+
+    private fun <T> MutablePreferences.put(key: Preferences.Key<T>, value: T, default: T) {
+        if (value == default) remove(key) else this[key] = value
     }
 
     private inline fun <reified E : Enum<E>> String?.toEnum(default: E): E =

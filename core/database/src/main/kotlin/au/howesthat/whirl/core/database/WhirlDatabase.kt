@@ -5,6 +5,8 @@ import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.withTransaction
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -47,8 +49,8 @@ abstract class WhirlDatabase : RoomDatabase() {
     abstract fun checkLogDao(): CheckLogDao
     abstract fun pendingWatchDao(): PendingWatchDao
 
-    /** Clears everything tied to the signed-in account (on log out or key change). Favourites are kept. */
-    suspend fun clearAccountData() {
+    /** Clears everything tied to the signed-in account (on log out or key change), in one transaction. Favourites are kept. */
+    suspend fun clearAccountData() = withTransaction {
         threadDao().clearSource(ThreadSource.WATCHED.name, "unread")
         threadDao().clearSource(ThreadSource.WATCHED.name, "all")
         threadDao().clearSource(ThreadSource.RECENT.name, "")
@@ -75,4 +77,10 @@ object DatabaseModule {
     @Provides fun threadPageDao(db: WhirlDatabase) = db.threadPageDao()
     @Provides fun checkLogDao(db: WhirlDatabase) = db.checkLogDao()
     @Provides fun pendingWatchDao(db: WhirlDatabase) = db.pendingWatchDao()
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+internal abstract class TransactorModule {
+    @Binds abstract fun transactor(impl: RoomTransactor): Transactor
 }

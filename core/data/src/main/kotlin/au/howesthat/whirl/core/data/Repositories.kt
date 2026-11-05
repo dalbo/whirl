@@ -11,6 +11,7 @@ import au.howesthat.whirl.core.database.NewsEntity
 import au.howesthat.whirl.core.database.ThreadDao
 import au.howesthat.whirl.core.database.ThreadEntity
 import au.howesthat.whirl.core.database.ThreadSource
+import au.howesthat.whirl.core.database.Transactor
 import au.howesthat.whirl.core.model.Forum
 import au.howesthat.whirl.core.model.NewsItem
 import au.howesthat.whirl.core.model.ThreadId
@@ -162,17 +163,31 @@ class RecentRepository @Inject constructor(
     private val api: WhirlpoolApi,
     private val dao: ThreadDao,
     private val log: FetchLogDao,
-    clock: Clock,
+    private val transactor: Transactor,
+    private val account: AccountGeneration,
+    private val clock: Clock,
 ) {
     private val refresher = Refresher(log, clock)
 
     fun threads(days: Int): Flow<Cached<List<ThreadSummary>>> = observeApiList(dao, log, ThreadSource.RECENT, KEY, logKey(days))
 
-    /** A changed history length is a different list, so it fetches at once. */
-    suspend fun refresh(days: Int, force: Boolean = false) = refresher.refresh(logKey(days), MaxAge.THREAD_LISTS, force) {
-        dao.replaceApiList(ThreadSource.RECENT, KEY, api.recent(days).map { it.toColumns() })
-        // Only the latest history length's list is stored, so older lengths must refetch.
-        log.deleteMatching("recent:%")
+    /**
+     * A changed history length is a different list, so it fetches at once. The answer is dropped if the account
+     * changed while it was being fetched ([AccountGeneration]).
+     */
+    suspend fun refresh(days: Int, force: Boolean = false): Boolean {
+        val logKey = logKey(days)
+        return refresher.refresh(logKey, MaxAge.THREAD_LISTS, force, lastFetched = { log.fetchedAt(logKey) }) {
+            val gen = account.current
+            val list = api.recent(days).map { it.toColumns() }
+            transactor.run {
+                if (account.current != gen) return@run
+                dao.replaceApiList(ThreadSource.RECENT, KEY, list)
+                // Only the latest history length's list is stored, so older lengths must refetch.
+                log.deleteMatching("recent:%")
+                log.put(FetchLogEntity(logKey, clock.millis()))
+            }
+        }
     }
 
     private fun logKey(days: Int) = "recent:$days"

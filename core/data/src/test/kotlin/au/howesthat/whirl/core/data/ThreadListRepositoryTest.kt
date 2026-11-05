@@ -3,6 +3,7 @@ package au.howesthat.whirl.core.data
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import au.howesthat.whirl.core.database.ForumEntity
+import au.howesthat.whirl.core.database.RoomTransactor
 import au.howesthat.whirl.core.database.WhirlDatabase
 import au.howesthat.whirl.core.model.WhirlpoolError
 import au.howesthat.whirl.core.network.RetryPolicy
@@ -122,7 +123,7 @@ class ThreadListRepositoryTest {
 
     @Test
     fun `recent uses the history length and refetches when it changes`() = runTest {
-        val repo = RecentRepository(api, db.threadDao(), db.fetchLogDao(), clock)
+        val repo = RecentRepository(api, db.threadDao(), db.fetchLogDao(), RoomTransactor(db), AccountGeneration(), clock)
         // get=recent has only been seen empty; this assumes the THREADS shape (HANDOFF "known unknowns").
         server.enqueue(MockResponse.Builder().body(fixture("api/api_threads_forum92.json").replace("\"THREADS\"", "\"RECENT\"")).build())
         assertTrue(repo.refresh(7))
@@ -138,7 +139,7 @@ class ThreadListRepositoryTest {
 
     @Test
     fun `recent without a RECENT key is drift`() = runTest {
-        val repo = RecentRepository(api, db.threadDao(), db.fetchLogDao(), clock)
+        val repo = RecentRepository(api, db.threadDao(), db.fetchLogDao(), RoomTransactor(db), AccountGeneration(), clock)
         enqueue("api/api_whims.json")
         assertFailsWith<WhirlpoolError.Drift> { repo.refresh(7) }
     }

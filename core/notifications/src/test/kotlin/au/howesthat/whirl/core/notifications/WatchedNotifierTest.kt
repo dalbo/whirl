@@ -13,12 +13,14 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import au.howesthat.whirl.core.data.Account
+import au.howesthat.whirl.core.data.AccountGeneration
 import au.howesthat.whirl.core.data.NotifyStyle
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.data.WatchSendScheduler
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.database.NotifiedEntity
+import au.howesthat.whirl.core.database.RoomTransactor
 import au.howesthat.whirl.core.database.WhirlDatabase
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.network.RetryPolicy
@@ -58,7 +60,7 @@ class WatchedNotifierTest {
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val settings = SettingsRepository(context)
     private val api = WhirlpoolApi(WhirlpoolHttp.client("Whirl/test"), settings::apiKey, server.url("/api/"), RetryPolicy.NONE)
-    private val watched = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, Clock.systemUTC(), appScope)
+    private val watched = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, Clock.systemUTC(), appScope)
     private val notifier = WatchedNotifier(context, settings, watched, db.notifiedDao())
     private val manager = context.getSystemService(NotificationManager::class.java)
 

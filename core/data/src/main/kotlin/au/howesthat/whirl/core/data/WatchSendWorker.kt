@@ -25,7 +25,8 @@ import kotlin.time.Duration
 interface WatchSendScheduler {
     /**
      * Makes sure a send runs after [delay] once there is a network. Work already waiting or running is kept, never
-     * replaced: replacing cancels a running send part way, which could send an action twice.
+     * replaced (replacing cancels a running send part way, which could send an action twice); the new run is queued
+     * after it, so an action queued while a run is finishing (having found nothing to send) still gets one.
      */
     fun schedule(delay: Duration)
 
@@ -44,7 +45,7 @@ internal class WorkWatchSendScheduler @Inject constructor(@ApplicationContext pr
             .setInitialDelay(delay.inWholeMilliseconds, TimeUnit.MILLISECONDS)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
+        WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
     }
 
     override fun cancel() {
