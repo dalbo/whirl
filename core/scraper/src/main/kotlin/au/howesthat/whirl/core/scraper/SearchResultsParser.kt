@@ -7,7 +7,7 @@ import au.howesthat.whirl.core.model.WhirlpoolError
  * The relevance view of `/search?q=&f=&fg=&w=&p=N`: 50 results per page and no pagination markup, so callers step
  * `p` until a page comes back empty. The list view is a thread table; use [ThreadListParser] for it.
  *
- * Not used by the app yet (search shows the list view): kept for v1.8 (docs/plan-v1.7.md §8).
+ * Not used by the app yet (search shows the list view): kept for v1.8 (docs/plans/v1.7.md §8).
  */
 object SearchResultsParser {
 

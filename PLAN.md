@@ -4,7 +4,7 @@ Version 2 of this plan, 2026-10-20. Supersedes the first draft after an independ
 
 **Working name** "Whirl", package `au.howesthat.whirl`, MIT licence (see Decisions). The original app, Whirldroid by Greg Smith (gregdev), is abandoned: Bitbucket source stops at 1.8.12 (Jan 2016); the Play Store build reached 2.14.12 (Apr 2021). Both are in `reference/` (git-ignored, unknown licence) and are used only as a behavioural spec.
 
-Companion documents: `HANDOFF.md` (brief for the engineer or AI session that builds this), `fixtures/README.md` (what every captured file is), `tools/capture/README.md` (how to re-capture).
+Companion documents: `HANDOFF.md` (what is current, for the engineer or AI session working on it; the build history is in `docs/history.md`), `fixtures/README.md` (what every captured file is), `tools/capture/README.md` (how to re-capture).
 
 ---
 
@@ -178,6 +178,9 @@ From 1.8.12 and 2.14.12 code:
 ---
 
 ## 9. Phases
+*Historical:* the phases up to v1.0 as planned, with what became of each. Releases since are planned in `docs/plans/`
+(the current one is the newest), and `docs/history.md` records how each phase went.
+
 **Phase 0 — done** (2026-10-20): fixtures, API behaviour, 2.14.12 inventory, this plan.
 
 **Phase 1 — foundation (≈1.5 weeks)**
@@ -186,22 +189,22 @@ From 1.8.12 and 2.14.12 code:
 3. `:core:network` with typed errors; `:core:scraper` parsers + tests against fixtures; `:core:database`; `:core:data` for forums, latest, watched, news.
 4. Setup wizard (API key → `get=user`), settings scaffold, theme.
 
-**Phase 2 — done** (2026-10-21, v0.1.0 on GitHub Releases): read-only parity (HANDOFF.md "Phase 2" lists what was built and decided). Was: **read-only parity (≈2.5 weeks)** → **milestone v0.1 on GitHub Releases**
+**Phase 2 — done** (2026-10-21, v0.1.0 on GitHub Releases): read-only parity (`docs/history.md` "Phase 2" lists what was built and decided). Was: **read-only parity (≈2.5 weeks)** → **milestone v0.1 on GitHub Releases**
 Drawer + homepage; Forums with favourites and private-forum handling; Thread lists for forum/watched/recent/popular/latest/search with groups, paging, sticky/closed/moved/deleted styling, Unread/All tabs; Thread view with inline-var paging, block renderer, notebars (public/parts), quote navigation, post filters, user's posts; search (list view); News; User profile; deep links; opening-position rules; all read-side settings.
 
-**Phase 3 — done** (2026-10-21, v0.2.0, then v0.2.1 with a link fix): actions and notifications (HANDOFF.md "Phase 3"). Was: **actions and notifications (≈1.5 weeks)** → **v0.2**
+**Phase 3 — done** (2026-10-21, v0.2.0, then v0.2.1 with a link fix): actions and notifications (`docs/history.md` "Phase 3"). Was: **actions and notifications (≈1.5 weeks)** → **v0.2**
 Watch/unwatch/mark read with Undo; WorkManager polling, channel, actions, permission prompt, boot re-arm (WorkManager handles it); New thread via Custom Tabs (Reply and Edit landed in Phase 2); night-mode schedule; back-to-list and auto-mark-read options. (Post font size landed in Phase 2.)
 
-**Phase 4 — done** (2026-10-21/22, v1.0.0 and v1.0.1 on GitHub; Play closed test in review; F-Droid and community posts wait for Whirlpool's moderators): HANDOFF.md "Phase 4 tasks" and "Where Phase 4 left things". Was: **polish and release (≈1 week)** → **v1.0**.
+**Phase 4 — done** (2026-10-21/22, v1.0.0 and v1.0.1 on GitHub; Play closed test in review; F-Droid and community posts wait for Whirlpool's moderators): `docs/history.md` "Phase 4 tasks" and "Where Phase 4 left things". Was: **polish and release (≈1 week)** → **v1.0**.
 Accessibility (TalkBack, font scaling), landscape, Material You, store listing text/screenshots in `fastlane/`, Play internal track, F-Droid submission, post in the Whirlpool API thread and ask to be listed on the third-party clients wiki page.
 
 **Parked until Whirlpool's moderators approve** (see Decisions, "Web session in the app"): any in-app web login, and everything it would unlock (private forums, PMs, mark-read-to-here, native posting). Ask in the API thread or of the moderators before any work on it.
 
-**Next (agreed 2026-10-31, `docs/plan-v1.3.md`)**: v1.3 find in list (filter the rows a list shows, with a "Search Whirlpool" chip); v1.4 tablet two-pane on Navigation 3, experimental and off by default until tried on a real tablet.
+**Next (agreed 2026-10-31, `docs/plans/v1.3.md`)**: v1.3 find in list (filter the rows a list shows, with a "Search Whirlpool" chip); v1.4 tablet two-pane on Navigation 3, experimental and off by default until tried on a real tablet.
 
 **Backlog**: app widget, loading linked images (Whirlpool has no inline images; a later idea), and the archive idea below.
 
-**Archive reader and in-app post filters (idea 2026-10-23; decided 2026-11-05 for v1.8, see `docs/plan-v1.7.md` §8).** `/archive/<id>` is the thread 800 posts at a time (`/archive/<id>-N` for later pages), public (no login), every post with `data-userid`, name and `.usergroup`. Two uses of one download:
+**Archive reader and in-app post filters (idea 2026-10-23; decided 2026-11-05 for v1.8: `docs/plans/v1.7.md` §8 is what the v1.8 plan must cover; the measurements below are its starting point).** `/archive/<id>` is the thread 800 posts at a time (`/archive/<id>-N` for later pages), public (no login), every post with `data-userid`, name and `.usergroup`. Two uses of one download:
 - *Archive reader*: read a thread a few hundred posts at a time by scrolling instead of paging; offline once cached.
 - *Filters in the app*: since v1.1.2, "Posts by me / OP / moderators / reps" and "user's posts" open the browser, because Whirlpool's `ux=`, `um=`, `ur=` views need a login (checked 2026-10-23). From the archive pages, Whirl could filter by user id itself.
 
