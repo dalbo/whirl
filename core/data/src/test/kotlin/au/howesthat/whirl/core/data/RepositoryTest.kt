@@ -2,6 +2,8 @@ package au.howesthat.whirl.core.data
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -18,6 +20,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -41,6 +45,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -277,12 +282,34 @@ class RepositoryTest {
                 return MockResponse.Builder().body(body).build()
             }
         }
-        val refresh = async(Dispatchers.IO) { recent.refresh(7) }
+        val refresh = async(Dispatchers.IO) { runCatching { recent.refresh(7) } }
         server.takeRequest(5, TimeUnit.SECONDS)!!
         account.signOut()
         release.countDown()
-        refresh.await()
+        // Dropped, and fetched again for the next account: there is none.
+        assertIs<WhirlpoolError.BadKey>(refresh.await().exceptionOrNull())
+        assertEquals(1, server.requestCount)
         assertEquals(emptyList(), recent.threads(7).first().value)
         assertNull(db.fetchLogDao().fetchedAt("recent:7"))
+    }
+
+    @Test
+    fun `settings stored at their defaults before v1_7 are dropped once`() = runTest {
+        // What v1.6 stored after a change of theme: every setting, the rest at their defaults.
+        val oldScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        val file = File(tmp.root, "old.preferences_pb")
+        val old = PreferenceDataStoreFactory.create(scope = oldScope) { file }
+        SettingsRepository(old).update { it.copy(theme = ThemeMode.DARK) }
+        old.edit { p ->
+            p[stringPreferencesKey("homepage")] = Settings().homepage.name
+            p[intPreferencesKey("undo_seconds")] = Settings().undoSeconds
+            p[booleanPreferencesKey("watch_undo")] = Settings().watchUndo
+        }
+        oldScope.coroutineContext.job.cancelAndJoin() // one DataStore per file at a time
+
+        val migrated = PreferenceDataStoreFactory.create(scope = dataStoreScope, migrations = listOf(DropStoredDefaults)) { file }
+        val settings = SettingsRepository(migrated)
+        assertEquals(Settings(theme = ThemeMode.DARK), settings.settings.first())
+        assertEquals(setOf("theme", "stored_defaults_dropped"), migrated.data.first().asMap().keys.map { it.name }.toSet())
     }
 }

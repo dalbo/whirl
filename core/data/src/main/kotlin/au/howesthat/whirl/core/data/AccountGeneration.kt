@@ -19,4 +19,18 @@ class AccountGeneration @Inject constructor() {
     internal fun next() {
         value.incrementAndGet()
     }
+
+    /**
+     * [fetch]es an account's data and [store]s it. [store] gets the generation read before the fetch and returns null,
+     * writing nothing, if it has changed (checked in the transaction that writes). An answer dropped that way may have
+     * used the old key, or the new one read while the switch was still finishing, so it is fetched once more: the new
+     * account's first lists are not lost. Null if that answer is dropped too.
+     */
+    suspend fun <T, R : Any> fetchAndStore(fetch: suspend () -> T, store: suspend (gen: Int, T) -> R?): R? {
+        repeat(2) {
+            val gen = current
+            store(gen, fetch())?.let { return it }
+        }
+        return null
+    }
 }

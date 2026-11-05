@@ -172,20 +172,20 @@ class RecentRepository @Inject constructor(
     fun threads(days: Int): Flow<Cached<List<ThreadSummary>>> = observeApiList(dao, log, ThreadSource.RECENT, KEY, logKey(days))
 
     /**
-     * A changed history length is a different list, so it fetches at once. The answer is dropped if the account
-     * changed while it was being fetched ([AccountGeneration]).
+     * A changed history length is a different list, so it fetches at once. An answer from before an account switch is
+     * dropped and fetched again ([AccountGeneration.fetchAndStore]).
      */
     suspend fun refresh(days: Int, force: Boolean = false): Boolean {
         val logKey = logKey(days)
         return refresher.refresh(logKey, MaxAge.THREAD_LISTS, force, lastFetched = { log.fetchedAt(logKey) }) {
-            val gen = account.current
-            val list = api.recent(days).map { it.toColumns() }
-            transactor.run {
-                if (account.current != gen) return@run
-                dao.replaceApiList(ThreadSource.RECENT, KEY, list)
-                // Only the latest history length's list is stored, so older lengths must refetch.
-                log.deleteMatching("recent:%")
-                log.put(FetchLogEntity(logKey, clock.millis()))
+            account.fetchAndStore({ api.recent(days).map { it.toColumns() } }) { gen, list ->
+                transactor.run {
+                    if (account.current != gen) return@run null
+                    dao.replaceApiList(ThreadSource.RECENT, KEY, list)
+                    // Only the latest history length's list is stored, so older lengths must refetch.
+                    log.deleteMatching("recent:%")
+                    log.put(FetchLogEntity(logKey, clock.millis()))
+                }
             }
         }
     }
