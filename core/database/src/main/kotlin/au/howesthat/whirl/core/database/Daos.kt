@@ -97,7 +97,7 @@ interface ThreadDao {
         """SELECT t.* FROM thread_source s JOIN threads t ON t.id = s.thread_id
            WHERE s.source = :source AND s.`key` = :key ORDER BY s.position""",
     )
-    fun observeSource(source: String, key: String): Flow<List<ThreadEntity>>
+    fun observeSource(source: ThreadSource, key: String): Flow<List<ThreadEntity>>
 
     @Query("SELECT * FROM threads WHERE id = :id")
     suspend fun get(id: String): ThreadEntity?
@@ -109,15 +109,15 @@ interface ThreadDao {
     suspend fun upsertWatched(threads: List<WatchedThreadColumns>)
 
     @Query("DELETE FROM thread_source WHERE source = :source AND `key` = :key")
-    suspend fun clearSource(source: String, key: String)
+    suspend fun clearSource(source: ThreadSource, key: String)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSource(rows: List<ThreadSourceEntity>)
 
     @Transaction
     suspend fun replaceSource(source: ThreadSource, key: String, ids: List<String>) {
-        clearSource(source.name, key)
-        insertSource(ids.mapIndexed { i, id -> ThreadSourceEntity(source.name, key, id, i) })
+        clearSource(source, key)
+        insertSource(ids.mapIndexed { i, id -> ThreadSourceEntity(source, key, id, i) })
     }
 
     /** Replaces one list; threads that dropped off every list go too. */
@@ -143,10 +143,10 @@ interface ThreadDao {
     suspend fun markRead(ids: List<String>)
 
     @Query("DELETE FROM thread_source WHERE source = :source AND thread_id IN (:ids)")
-    suspend fun removeFromSource(source: String, ids: List<String>)
+    suspend fun removeFromSource(source: ThreadSource, ids: List<String>)
 
     @Query("DELETE FROM thread_source WHERE source = :source AND `key` = :key AND thread_id IN (:ids)")
-    suspend fun removeFromSourceKey(source: String, key: String, ids: List<String>)
+    suspend fun removeFromSourceKey(source: ThreadSource, key: String, ids: List<String>)
 
     @Query("SELECT * FROM threads WHERE id IN (:ids)")
     suspend fun getAll(ids: List<String>): List<ThreadEntity>
@@ -155,10 +155,10 @@ interface ThreadDao {
     suspend fun upsert(threads: List<ThreadEntity>)
 
     @Query("SELECT * FROM thread_source WHERE source = :source AND thread_id IN (:ids)")
-    suspend fun sourceRows(source: String, ids: List<String>): List<ThreadSourceEntity>
+    suspend fun sourceRows(source: ThreadSource, ids: List<String>): List<ThreadSourceEntity>
 
     @Query("SELECT MAX(position) FROM thread_source WHERE source = :source AND `key` = :key")
-    suspend fun maxPosition(source: String, key: String): Int?
+    suspend fun maxPosition(source: ThreadSource, key: String): Int?
 
     /** Ids on any watched list (Unread or All). */
     @Query("SELECT DISTINCT thread_id FROM thread_source WHERE source = 'WATCHED'")
@@ -323,9 +323,11 @@ interface PendingWatchDao {
     @Query("UPDATE pending_watch SET send_after = MIN(send_after, :now) WHERE id = :id")
     suspend fun makeDue(id: Long, now: Long)
 
-    /** A send that did not get through: back to waiting, one attempt more, with [threadIds] still to send. */
+    /** A send that did not get through: back to waiting, one attempt more, with [ids] still to send. */
+    suspend fun release(id: Long, ids: List<String>) = releaseJoined(id, ThreadIdsConverter.join(ids))
+
     @Query("UPDATE pending_watch SET state = 'WAITING', attempts = attempts + 1, thread_ids = :threadIds WHERE id = :id")
-    suspend fun release(id: Long, threadIds: String)
+    suspend fun releaseJoined(id: Long, threadIds: String)
 
     /** Sends cut off by the process ending; called only when nothing is being sent. */
     @Query("UPDATE pending_watch SET state = 'WAITING' WHERE state = 'SENDING'")

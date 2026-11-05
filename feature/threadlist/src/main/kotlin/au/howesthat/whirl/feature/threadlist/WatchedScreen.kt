@@ -39,8 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import au.howesthat.whirl.core.data.AppVisits
 import au.howesthat.whirl.core.data.OpenedFrom
-import au.howesthat.whirl.core.data.WatchAction
-import au.howesthat.whirl.core.data.WatchedRepository
+import au.howesthat.whirl.core.model.WatchAction
 import au.howesthat.whirl.core.model.TextQuery
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.ui.LocalAppStyle
@@ -64,7 +63,7 @@ data class AllMatches(val count: Int?)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class WatchedViewModel @Inject constructor(deps: ListDeps, private val repo: WatchedRepository, private val visits: AppVisits) :
+class WatchedViewModel @Inject constructor(deps: ListDeps, private val visits: AppVisits) :
     ListViewModel(deps, OpenedFrom.WATCHED) {
 
     private val _unreadOnly = MutableStateFlow(true)
@@ -80,7 +79,7 @@ class WatchedViewModel @Inject constructor(deps: ListDeps, private val repo: Wat
 
     val state = stateOf(
         _unreadOnly.flatMapLatest { unread ->
-            val sections = repo.watched(unread).toListState { list -> groupByForum(list.map { it.toItem() }) }
+            val sections = deps.watched.watched(unread).toListState { list -> groupByForum(list.map { it.toItem() }) }
             if (!unread) {
                 sections
             } else {
@@ -99,7 +98,7 @@ class WatchedViewModel @Inject constructor(deps: ListDeps, private val repo: Wat
      * Finding in Unread: how many threads in All match too, offered when Unread has none. The count is null when All
      * was never fetched (Watched opens on Unread), so the hint only says to look there.
      */
-    val allMatches: StateFlow<AllMatches?> = combine(_unreadOnly, query, repo.watched(unreadOnly = false)) { unread, query, all ->
+    val allMatches: StateFlow<AllMatches?> = combine(_unreadOnly, query, deps.watched.watched(unreadOnly = false)) { unread, query, all ->
         val words = TextQuery(query)
         when {
             !unread || words.isBlank -> null
@@ -112,18 +111,18 @@ class WatchedViewModel @Inject constructor(deps: ListDeps, private val repo: Wat
      * Mark all as read: the unread threads the list shows, so only the matching ones while finding. Checked against
      * the Unread list, since the thread kept open beside the list there is already read.
      */
-    val markAllIds: StateFlow<List<ThreadId>> = combine(state, repo.watched(unreadOnly = true)) { shown, unread ->
+    val markAllIds: StateFlow<List<ThreadId>> = combine(state, deps.watched.watched(unreadOnly = true)) { shown, unread ->
         val unreadIds = unread.value.filter { it.unreadCount > 0 }.mapTo(mutableSetOf()) { it.id }
         shown.sections.orEmpty().flatMap { it.items }.mapNotNull { it.openId }.filter { it in unreadIds }.distinct()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun markAllRead() {
         val ids = markAllIds.value
-        if (ids.isNotEmpty()) viewModelScope.launch { repo.perform(WatchAction.MARK_READ, ids) }
+        if (ids.isNotEmpty()) viewModelScope.launch { deps.watchQueue.perform(WatchAction.MARK_READ, ids) }
     }
 
     /** Threads with unread posts, for "N unread" in the title. */
-    val unreadThreads: StateFlow<Int> = repo.watched(unreadOnly = true)
+    val unreadThreads: StateFlow<Int> = deps.watched.watched(unreadOnly = true)
         .map { cached -> cached.value.count { it.unreadCount > 0 } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
@@ -146,7 +145,7 @@ class WatchedViewModel @Inject constructor(deps: ListDeps, private val repo: Wat
     }
 
     override suspend fun fetch(force: Boolean) {
-        repo.refresh(_unreadOnly.value, force)
+        deps.watched.refresh(_unreadOnly.value, force)
     }
 }
 

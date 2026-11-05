@@ -5,11 +5,7 @@ import au.howesthat.whirl.core.network.WhirlpoolWeb
 import au.howesthat.whirl.core.scraper.UserProfileParser
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
 import java.time.Clock
-import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,17 +16,14 @@ class UserRepository @Inject constructor(
     private val clock: Clock,
     @DefaultDispatcher private val parsing: CoroutineDispatcher,
 ) {
-    private val refresher = Refresher(log = null, clock = clock)
-    private val cache = MutableStateFlow<Map<Long, Cached<UserProfile>>>(emptyMap())
+    private val cache = MemoryCache<Long, UserProfile>(KEEP, clock)
 
-    fun profile(userId: Long): Flow<Cached<UserProfile>?> = cache.map { it[userId] }
+    fun profile(userId: Long): Flow<Cached<UserProfile>?> = cache.observe(userId)
 
     suspend fun refresh(userId: Long, force: Boolean = false): Boolean =
-        refresher.refresh("user:$userId", MaxAge.THREAD_LISTS, force, lastFetched = { cache.value[userId]?.updatedAt?.toEpochMilli() }) {
+        cache.refresh(userId, MaxAge.THREAD_LISTS, force) {
             val html = web.get(web.urls.user(userId))
-            val profile = parseOrDrift(parsing) { UserProfileParser.parse(html) }
-            val entry = Cached(profile, Instant.ofEpochMilli(clock.millis()))
-            cache.update { old -> (old - userId).entries.sortedByDescending { it.value.updatedAt }.take(KEEP - 1).associate { it.toPair() } + (userId to entry) }
+            parseOrDrift(parsing) { UserProfileParser.parse(html) }
         }
 
     private companion object {

@@ -73,8 +73,7 @@ class SetupViewModel @Inject constructor(
 
     fun setTheme(mode: ThemeMode) = viewModelScope.launch { settingsRepository.update { it.copy(theme = mode) } }
 
-    fun finish(onDone: () -> Unit) = viewModelScope.launch {
-        settingsRepository.setSetupDone()
-        onDone()
+    fun finish() {
+        viewModelScope.launch { settingsRepository.setSetupDone() }
     }
 }

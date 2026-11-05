@@ -25,76 +25,91 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
     produceMigrations = { listOf(DropStoredDefaults) },
 )
 
+/** What the store holds besides [Settings]: the account, and v1.0's colour switch. */
 private object Keys {
     val apiKey = stringPreferencesKey("api_key")
     val userId = longPreferencesKey("user_id")
     val userName = stringPreferencesKey("user_name")
     val setupDone = booleanPreferencesKey("setup_done")
-    val homepage = stringPreferencesKey("homepage")
-    val theme = stringPreferencesKey("theme")
-    /** v1.0's "Use wallpaper colours"; read only, to choose the first [palette]. */
+    /** v1.0's "Use wallpaper colours"; read only, to choose the first palette. */
     val dynamicColor = booleanPreferencesKey("dynamic_color")
-    val palette = stringPreferencesKey("palette")
-    val layout = stringPreferencesKey("layout")
-    val nightStart = stringPreferencesKey("night_start")
-    val nightEnd = stringPreferencesKey("night_end")
-    val postFontSize = stringPreferencesKey("post_font_size")
-    val textScale = stringPreferencesKey("text_scale")
-    val screenAnimations = booleanPreferencesKey("screen_animations")
-    val twoPane = booleanPreferencesKey("two_pane")
-    val twoPaneLandscapeOnly = booleanPreferencesKey("two_pane_landscape_only")
-    val browserApp = booleanPreferencesKey("browser_app")
-    val watchedNotify = booleanPreferencesKey("watched_notify")
-    val notifyInterval = intPreferencesKey("notify_interval")
-    val notifyStyle = stringPreferencesKey("notify_style")
-    val notifyKeepUntilRead = booleanPreferencesKey("notify_keep_until_read")
-    val openThreadsInBrowser = booleanPreferencesKey("open_threads_in_browser")
-    val loadPublicAtBottom = booleanPreferencesKey("load_public_at_bottom")
-    val loadPrivateAtBottom = booleanPreferencesKey("load_private_at_bottom")
-    val recentDays = intPreferencesKey("recent_days")
-    val loadRecentAtTop = booleanPreferencesKey("load_recent_at_top")
-    val ignoreOwnRecent = booleanPreferencesKey("ignore_own_replies_recent")
-    val loadWatchedAtTop = booleanPreferencesKey("load_watched_at_top")
-    val ignoreOwnWatched = booleanPreferencesKey("ignore_own_replies_watched")
-    val watchedAutoMarkRead = booleanPreferencesKey("watched_auto_mark_read")
-    val watchedBackToList = booleanPreferencesKey("watched_back_to_list")
-    val watchUndo = booleanPreferencesKey("watch_undo")
-    val undoSeconds = intPreferencesKey("undo_seconds")
 }
 
+/**
+ * One setting in the store: its key, its [Settings] field, and how it is stored. Its default is the field's value in
+ * `Settings()`; a value equal to the default is not stored.
+ */
+internal class SettingField<T, S : Any>(
+    val key: Preferences.Key<S>,
+    private val get: (Settings) -> T,
+    private val set: Settings.(T) -> Settings,
+    private val encode: (T) -> S,
+    /** Null for a value this version does not know (an enum constant since removed): the default is used. */
+    private val decode: (S) -> T?,
+) {
+    fun read(p: Preferences, s: Settings): Settings = p[key]?.let(decode)?.let { s.set(it) } ?: s
+
+    fun write(p: MutablePreferences, s: Settings) {
+        val value = get(s)
+        if (value == get(DEFAULTS)) p.remove(key) else p[key] = encode(value)
+    }
+}
+
+private val DEFAULTS = Settings()
+
+private fun bool(name: String, get: (Settings) -> Boolean, set: Settings.(Boolean) -> Settings) =
+    SettingField(booleanPreferencesKey(name), get, set, { it }, { it })
+
+private fun int(name: String, get: (Settings) -> Int, set: Settings.(Int) -> Settings) =
+    SettingField(intPreferencesKey(name), get, set, { it }, { it })
+
+private fun string(name: String, get: (Settings) -> String, set: Settings.(String) -> Settings) =
+    SettingField(stringPreferencesKey(name), get, set, { it }, { it })
+
+private fun time(name: String, get: (Settings) -> LocalTime, set: Settings.(LocalTime) -> Settings) =
+    SettingField(stringPreferencesKey(name), get, set, LocalTime::toString) { runCatching { LocalTime.parse(it) }.getOrNull() }
+
+private inline fun <reified E : Enum<E>> enum(name: String, noinline get: (Settings) -> E, noinline set: Settings.(E) -> Settings) =
+    SettingField(stringPreferencesKey(name), get, set, { it.name }, { stored -> enumValues<E>().firstOrNull { it.name == stored } })
+
+/** Every setting, once: the stored names are fixed, since they are in users' stores. */
+internal val SETTING_FIELDS: List<SettingField<*, *>> = listOf(
+    enum("homepage", Settings::homepage) { copy(homepage = it) },
+    enum("theme", Settings::theme) { copy(theme = it) },
+    // With no palette stored, v1.0's switch (if it was turned off) chooses the first one: see toSettings().
+    string("palette", Settings::palette) { copy(palette = it) },
+    string("layout", Settings::layout) { copy(layout = it) },
+    time("night_start", Settings::nightStart) { copy(nightStart = it) },
+    time("night_end", Settings::nightEnd) { copy(nightEnd = it) },
+    enum("post_font_size", Settings::postFontSize) { copy(postFontSize = it) },
+    enum("text_scale", Settings::textScale) { copy(textScale = it) },
+    bool("screen_animations", Settings::screenAnimations) { copy(screenAnimations = it) },
+    bool("two_pane", Settings::twoPane) { copy(twoPane = it) },
+    bool("two_pane_landscape_only", Settings::twoPaneLandscapeOnly) { copy(twoPaneLandscapeOnly = it) },
+    bool("browser_app", Settings::browserApp) { copy(browserApp = it) },
+    bool("watched_notify", Settings::watchedNotify) { copy(watchedNotify = it) },
+    int("notify_interval", Settings::notifyIntervalMinutes) { copy(notifyIntervalMinutes = it) },
+    enum("notify_style", Settings::notifyStyle) { copy(notifyStyle = it) },
+    bool("notify_keep_until_read", Settings::notifyKeepUntilRead) { copy(notifyKeepUntilRead = it) },
+    bool("open_threads_in_browser", Settings::openThreadsInBrowser) { copy(openThreadsInBrowser = it) },
+    bool("load_public_at_bottom", Settings::loadPublicAtBottom) { copy(loadPublicAtBottom = it) },
+    bool("load_private_at_bottom", Settings::loadPrivateAtBottom) { copy(loadPrivateAtBottom = it) },
+    int("recent_days", Settings::recentHistoryDays) { copy(recentHistoryDays = it) },
+    bool("load_recent_at_top", Settings::loadRecentAtTop) { copy(loadRecentAtTop = it) },
+    bool("ignore_own_replies_recent", Settings::ignoreOwnRepliesRecent) { copy(ignoreOwnRepliesRecent = it) },
+    bool("load_watched_at_top", Settings::loadWatchedAtTop) { copy(loadWatchedAtTop = it) },
+    bool("ignore_own_replies_watched", Settings::ignoreOwnRepliesWatched) { copy(ignoreOwnRepliesWatched = it) },
+    bool("watched_auto_mark_read", Settings::watchedAutoMarkAsRead) { copy(watchedAutoMarkAsRead = it) },
+    bool("watched_back_to_list", Settings::watchedBackToList) { copy(watchedBackToList = it) },
+    bool("watch_undo", Settings::watchUndo) { copy(watchUndo = it) },
+    int("undo_seconds", Settings::undoSeconds) { copy(undoSeconds = it) },
+)
+
+private val PALETTE = SETTING_FIELDS.single { it.key.name == "palette" }.key
+
 private fun Preferences.toSettings(): Settings {
-    val p = this
-    val d = Settings()
-    return Settings(
-        homepage = p[Keys.homepage].toEnum(d.homepage),
-        theme = p[Keys.theme].toEnum(d.theme),
-        palette = p[Keys.palette] ?: if (p[Keys.dynamicColor] == false) "whirl" else d.palette,
-        layout = p[Keys.layout] ?: d.layout,
-        screenAnimations = p[Keys.screenAnimations] ?: d.screenAnimations,
-        twoPane = p[Keys.twoPane] ?: d.twoPane,
-        twoPaneLandscapeOnly = p[Keys.twoPaneLandscapeOnly] ?: d.twoPaneLandscapeOnly,
-        browserApp = p[Keys.browserApp] ?: d.browserApp,
-        nightStart = p[Keys.nightStart]?.let(LocalTime::parse) ?: d.nightStart,
-        nightEnd = p[Keys.nightEnd]?.let(LocalTime::parse) ?: d.nightEnd,
-        postFontSize = p[Keys.postFontSize].toEnum(d.postFontSize),
-        textScale = p[Keys.textScale].toEnum(d.textScale),
-        watchedNotify = p[Keys.watchedNotify] ?: d.watchedNotify,
-        notifyIntervalMinutes = p[Keys.notifyInterval] ?: d.notifyIntervalMinutes,
-        notifyStyle = p[Keys.notifyStyle].toEnum(d.notifyStyle),
-        notifyKeepUntilRead = p[Keys.notifyKeepUntilRead] ?: d.notifyKeepUntilRead,
-        openThreadsInBrowser = p[Keys.openThreadsInBrowser] ?: d.openThreadsInBrowser,
-        loadPublicAtBottom = p[Keys.loadPublicAtBottom] ?: d.loadPublicAtBottom,
-        loadPrivateAtBottom = p[Keys.loadPrivateAtBottom] ?: d.loadPrivateAtBottom,
-        recentHistoryDays = p[Keys.recentDays] ?: d.recentHistoryDays,
-        loadRecentAtTop = p[Keys.loadRecentAtTop] ?: d.loadRecentAtTop,
-        ignoreOwnRepliesRecent = p[Keys.ignoreOwnRecent] ?: d.ignoreOwnRepliesRecent,
-        loadWatchedAtTop = p[Keys.loadWatchedAtTop] ?: d.loadWatchedAtTop,
-        ignoreOwnRepliesWatched = p[Keys.ignoreOwnWatched] ?: d.ignoreOwnRepliesWatched,
-        watchedAutoMarkAsRead = p[Keys.watchedAutoMarkRead] ?: d.watchedAutoMarkAsRead,
-        watchedBackToList = p[Keys.watchedBackToList] ?: d.watchedBackToList,
-        watchUndo = p[Keys.watchUndo] ?: d.watchUndo,
-        undoSeconds = p[Keys.undoSeconds] ?: d.undoSeconds,
-    )
+    val first = if (this[PALETTE] == null && this[Keys.dynamicColor] == false) DEFAULTS.copy(palette = "whirl") else DEFAULTS
+    return SETTING_FIELDS.fold(first) { s, field -> field.read(this, s) }
 }
 
 /**
@@ -102,46 +117,10 @@ private fun Preferences.toSettings(): Settings {
  * changed that setting.
  */
 private fun MutablePreferences.writeSettings(s: Settings) {
-    val p = this
-    val d = Settings()
-    p.put(Keys.homepage, s.homepage.name, d.homepage.name)
-    p.put(Keys.theme, s.theme.name, d.theme.name)
-    p.put(Keys.palette, s.palette, d.palette)
-    p.put(Keys.layout, s.layout, d.layout)
-    p.put(Keys.screenAnimations, s.screenAnimations, d.screenAnimations)
-    p.put(Keys.twoPane, s.twoPane, d.twoPane)
-    p.put(Keys.twoPaneLandscapeOnly, s.twoPaneLandscapeOnly, d.twoPaneLandscapeOnly)
-    p.put(Keys.browserApp, s.browserApp, d.browserApp)
-    p.put(Keys.nightStart, s.nightStart.toString(), d.nightStart.toString())
-    p.put(Keys.nightEnd, s.nightEnd.toString(), d.nightEnd.toString())
-    p.put(Keys.postFontSize, s.postFontSize.name, d.postFontSize.name)
-    p.put(Keys.textScale, s.textScale.name, d.textScale.name)
-    p.put(Keys.watchedNotify, s.watchedNotify, d.watchedNotify)
-    p.put(Keys.notifyInterval, s.notifyIntervalMinutes, d.notifyIntervalMinutes)
-    p.put(Keys.notifyStyle, s.notifyStyle.name, d.notifyStyle.name)
-    p.put(Keys.notifyKeepUntilRead, s.notifyKeepUntilRead, d.notifyKeepUntilRead)
-    p.put(Keys.openThreadsInBrowser, s.openThreadsInBrowser, d.openThreadsInBrowser)
-    p.put(Keys.loadPublicAtBottom, s.loadPublicAtBottom, d.loadPublicAtBottom)
-    p.put(Keys.loadPrivateAtBottom, s.loadPrivateAtBottom, d.loadPrivateAtBottom)
-    p.put(Keys.recentDays, s.recentHistoryDays, d.recentHistoryDays)
-    p.put(Keys.loadRecentAtTop, s.loadRecentAtTop, d.loadRecentAtTop)
-    p.put(Keys.ignoreOwnRecent, s.ignoreOwnRepliesRecent, d.ignoreOwnRepliesRecent)
-    p.put(Keys.loadWatchedAtTop, s.loadWatchedAtTop, d.loadWatchedAtTop)
-    p.put(Keys.ignoreOwnWatched, s.ignoreOwnRepliesWatched, d.ignoreOwnRepliesWatched)
-    p.put(Keys.watchedAutoMarkRead, s.watchedAutoMarkAsRead, d.watchedAutoMarkAsRead)
-    p.put(Keys.watchedBackToList, s.watchedBackToList, d.watchedBackToList)
-    p.put(Keys.watchUndo, s.watchUndo, d.watchUndo)
-    p.put(Keys.undoSeconds, s.undoSeconds, d.undoSeconds)
+    SETTING_FIELDS.forEach { it.write(this, s) }
     // v1.0's switch only chose the first palette; from now on the palette key (or its absence) says.
-    p.remove(Keys.dynamicColor)
+    remove(Keys.dynamicColor)
 }
-
-private fun <T> MutablePreferences.put(key: Preferences.Key<T>, value: T, default: T) {
-    if (value == default) remove(key) else this[key] = value
-}
-
-private inline fun <reified E : Enum<E>> String?.toEnum(default: E): E =
-    this?.let { name -> enumValues<E>().firstOrNull { it.name == name } } ?: default
 
 /**
  * Once (v1.7): up to v1.6 every settings change stored every setting, pinning the defaults of the time. Drops the

@@ -15,6 +15,7 @@ import au.howesthat.whirl.core.network.RetryPolicy
 import au.howesthat.whirl.core.network.WhirlpoolApi
 import au.howesthat.whirl.core.network.WhirlpoolHttp
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -80,13 +81,18 @@ class RepositoryTest {
         dataStoreScope.cancel()
     }
 
+    private fun watchQueue(generation: AccountGeneration, clock: Clock, scope: CoroutineScope): WatchQueue {
+        val store = WatchedStore(db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), generation, clock)
+        return WatchQueue(api, store, WatchedRepository(api, store), WatchSendScheduler.None, Dispatchers.Default, scope)
+    }
+
     private fun enqueue(name: String, code: Int = 200) = server.enqueue(
         MockResponse.Builder().code(code).body(File(System.getProperty("whirl.fixtures"), "api/$name").readText()).build(),
     )
 
     @Test
     fun `sign in stores the key and account, bad key stores nothing`() = runTest {
-        val account = AccountRepository(api, settings, db, WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, Clock.systemUTC(), backgroundScope))
+        val account = AccountRepository(api, settings, db, watchQueue(AccountGeneration(), Clock.systemUTC(), backgroundScope))
         enqueue("api_badkey.json", 403)
         assertFailsWith<WhirlpoolError.BadKey> { account.signIn("bad") }
         assertNull(settings.apiKey())
@@ -171,7 +177,7 @@ class RepositoryTest {
     @Test
     fun `watched list refreshes and respects max age`() = runTest {
         settings.signIn("k", Account(216903, "d@llin"))
-        val repo = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, clock, backgroundScope)
+        val repo = WatchedRepository(api, WatchedStore(db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), clock))
         enqueue("api_watched_mode0.json")
         assertTrue(repo.refresh(unreadOnly = true))
         val cached = repo.watched(unreadOnly = true).first()
@@ -242,6 +248,68 @@ class RepositoryTest {
     }
 
     @Test
+    fun `refresher keeps a key's lock only while it is used`() = runTest {
+        val refresher = Refresher(db.fetchLogDao(), clock)
+        repeat(3) { i -> refresher.refresh("user:$i", MaxAge.THREAD_LISTS, force = false) {} }
+        assertEquals(0, refresher.lockCount, "users and searches are keys: a lock per key ever seen would only grow")
+        val release = CompletableDeferred<Unit>()
+        val held = async { refresher.refresh("k", MaxAge.THREAD_LISTS, force = false) { release.await() } }
+        val waiting = async { refresher.refresh("k", MaxAge.THREAD_LISTS, force = false) {} }
+        testScheduler.runCurrent()
+        assertEquals(1, refresher.lockCount)
+        release.complete(Unit)
+        assertTrue(held.await())
+        assertFalse(waiting.await(), "the second caller waited for the first, then found it fresh")
+        assertEquals(0, refresher.lockCount)
+    }
+
+    @Test
+    fun `a memory cache keeps the most recently fetched`() = runTest {
+        val cache = MemoryCache<Int, String>(keep = 2, clock)
+        for (key in 1..3) {
+            cache.refresh(key, MaxAge.THREAD_LISTS, force = false) { "v$key" }
+            clock.now = clock.now.plusSeconds(1)
+        }
+        assertNull(cache.observe(1).first(), "the oldest went")
+        assertEquals("v3", cache.observe(3).first()?.value)
+        assertFalse(cache.refresh(2, MaxAge.THREAD_LISTS, force = false) { "again" }, "still fresh")
+        assertEquals("v2", cache.observe(2).first()?.value)
+    }
+
+    @Test
+    fun `every setting is in the table of keys and reads back as stored`() = runTest {
+        val properties = Settings::class.java.declaredFields.count { !java.lang.reflect.Modifier.isStatic(it.modifiers) }
+        assertEquals(properties, SETTING_FIELDS.size, "a setting missing from SETTING_FIELDS would never be stored")
+        assertEquals(SETTING_FIELDS.size, SETTING_FIELDS.map { it.key.name }.toSet().size)
+        val changed = Settings(
+            homepage = Homepage.WATCHED, theme = ThemeMode.DARK, palette = "whirl", layout = "compact",
+            nightStart = LocalTime.of(21, 30), nightEnd = LocalTime.of(6, 15), postFontSize = PostFontSize.LARGE,
+            textScale = TextScale.LARGER, screenAnimations = false, twoPane = true, twoPaneLandscapeOnly = true,
+            browserApp = true, watchedNotify = true, notifyIntervalMinutes = 15, notifyStyle = NotifyStyle.PER_THREAD,
+            notifyKeepUntilRead = true, openThreadsInBrowser = true, loadPublicAtBottom = true, loadPrivateAtBottom = true,
+            recentHistoryDays = 30, loadRecentAtTop = true, ignoreOwnRepliesRecent = true, loadWatchedAtTop = true,
+            ignoreOwnRepliesWatched = true, watchedAutoMarkAsRead = true, watchedBackToList = true, watchUndo = false,
+            undoSeconds = 10,
+        )
+        settings.update { changed }
+        assertEquals(changed, settings.settings.first())
+        assertEquals(SETTING_FIELDS.size, store.data.first().asMap().size, "every one differs from its default, so every one is stored")
+    }
+
+    @Test
+    fun `a stored value this version cannot read falls back to the default`() = runTest {
+        store.edit {
+            it[stringPreferencesKey("night_start")] = "25:99"
+            it[stringPreferencesKey("theme")] = "SEPIA"
+            it[stringPreferencesKey("homepage")] = Homepage.NEWS.name
+        }
+        val s = settings.settings.first()
+        assertEquals(Settings().nightStart, s.nightStart)
+        assertEquals(Settings().theme, s.theme)
+        assertEquals(Homepage.NEWS, s.homepage, "the rest still read")
+    }
+
+    @Test
     fun `settings changed at the same time all take effect`() = runTest {
         withContext(Dispatchers.Default) {
             repeat(20) { launch { settings.update { it.copy(undoSeconds = it.undoSeconds + 1) } } }
@@ -267,10 +335,7 @@ class RepositoryTest {
     @Test
     fun `signing out while Recent is being fetched stores nothing`() = runTest {
         val generation = AccountGeneration()
-        val watched = WatchedRepository(
-            api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), generation, WatchSendScheduler.None, clock, backgroundScope,
-        )
-        val account = AccountRepository(api, settings, db, watched)
+        val account = AccountRepository(api, settings, db, watchQueue(generation, clock, backgroundScope))
         val recent = RecentRepository(api, db.threadDao(), db.fetchLogDao(), RoomTransactor(db), generation, clock)
         settings.signIn("k", Account(216903, "d@llin"))
         val release = CountDownLatch(1)

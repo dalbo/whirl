@@ -11,7 +11,7 @@ class AccountRepository @Inject constructor(
     private val api: WhirlpoolApi,
     private val settings: SettingsRepository,
     private val db: WhirlDatabase,
-    private val watched: WatchedRepository,
+    private val watchQueue: WatchQueue,
 ) {
     val account = settings.account
 
@@ -25,12 +25,12 @@ class AccountRepository @Inject constructor(
         val account = Account(user.id, user.name)
         val previous = settings.account.first()
         if (previous != null && previous.userId != account.userId) {
-            watched.switchAccount(change = { settings.signIn(trimmed, account) }, clear = db::clearAccountData)
+            watchQueue.switchAccount(change = { settings.signIn(trimmed, account) }, clear = db::clearAccountData)
         } else {
             settings.signIn(trimmed, account)
         }
         return account
     }
 
-    suspend fun signOut() = watched.switchAccount(change = settings::signOut, clear = db::clearAccountData)
+    suspend fun signOut() = watchQueue.switchAccount(change = settings::signOut, clear = db::clearAccountData)
 }

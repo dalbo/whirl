@@ -9,9 +9,7 @@ data class AlertPlan(
     val threads: List<WatchedThread>,
     /** Threads with a reply newer than the one last notified for them, so the notification should alert. */
     val newIds: Set<ThreadId>,
-) {
-    val hasNew: Boolean get() = newIds.isNotEmpty()
-}
+)
 
 /**
  * Decides what to notify from the unread watched threads and what was notified before ([notified]: thread id →

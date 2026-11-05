@@ -12,7 +12,8 @@ import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository.Companion.LAST_PAGE
-import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.model.WatchAction
+import au.howesthat.whirl.core.data.WatchQueue
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.data.WhirlpoolLink
 import au.howesthat.whirl.core.model.ForumRef
@@ -104,6 +105,7 @@ class ThreadViewModel @AssistedInject constructor(
     private val repo: ThreadPageRepository,
     private val settingsRepo: SettingsRepository,
     private val watchedRepo: WatchedRepository,
+    private val watchQueue: WatchQueue,
     private val savedState: SavedStateHandle,
     @DefaultDispatcher private val parsing: CoroutineDispatcher,
 ) : ViewModel() {
@@ -214,7 +216,7 @@ class ThreadViewModel @AssistedInject constructor(
      */
     private suspend fun autoMarkRead() {
         if (route.fromWatched || !settingsRepo.settings.first().watchedAutoMarkAsRead) return
-        if (watchedRepo.isWatched(threadId).first()) watchedRepo.perform(WatchAction.MARK_READ, listOf(threadId), undoable = false)
+        if (watchedRepo.isWatched(threadId).first()) watchQueue.perform(WatchAction.MARK_READ, listOf(threadId), undoable = false)
     }
 
     /**
@@ -224,7 +226,7 @@ class ThreadViewModel @AssistedInject constructor(
     fun perform(action: WatchAction) {
         viewModelScope.launch {
             val current = settingsRepo.settings.first()
-            watchedRepo.perform(action, listOf(threadId), undoable = current.watchUndo, announce = true)
+            watchQueue.perform(action, listOf(threadId), undoable = current.watchUndo, announce = true)
             if (action == WatchAction.MARK_READ && route.fromWatched && current.watchedBackToList) events.send(ThreadEvent.Back)
         }
     }

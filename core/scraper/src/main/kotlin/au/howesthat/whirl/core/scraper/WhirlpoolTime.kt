@@ -35,6 +35,7 @@ object WhirlpoolTime {
     private val DAY_AT = Regex("""^(Today|Yesterday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) at (\d{1,2}:\d{2}\s*[ap]m)$""", RegexOption.IGNORE_CASE)
     private val AGO = Regex("""^(\d+)\s*(second|minute|min|hour|day|week|month|year)s?\s+ago$""", RegexOption.IGNORE_CASE)
     private val SHORT = Regex("""^(\d+)\s*([smhdwy])$""")
+    private val AM_PM = Regex("""\s*([ap]m)$""", RegexOption.IGNORE_CASE)
 
     /** Parses the absolute forms (`2025-Jun-23, 11:11 am`, `2017-Dec-1`, optional trailing zone name). */
     fun parseAbsolute(text: String): LocalDateTime? {
@@ -84,5 +85,5 @@ object WhirlpoolTime {
     }
 
     // "9:39 pm" → "9:39 PM"; tolerate a missing space.
-    private fun normaliseAmPm(s: String): String = s.replace(Regex("""\s*([ap]m)$""", RegexOption.IGNORE_CASE), " $1")
+    private fun normaliseAmPm(s: String): String = s.replace(AM_PM, " $1")
 }

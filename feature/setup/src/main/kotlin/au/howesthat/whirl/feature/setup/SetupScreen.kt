@@ -57,12 +57,14 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.ThemeMode
+import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.ui.errorMessage
 
-private const val PROFILE_URL = "https://whirlpool.net.au/profile/"
+private val PROFILE_URL = WhirlpoolUrls().profile().toString()
 
+/** The first-run wizard. Finishing it sets `setupDone`, and MainActivity swaps it for the app. */
 @Composable
-fun SetupScreen(onFinished: () -> Unit, viewModel: SetupViewModel = hiltViewModel()) {
+fun SetupScreen(viewModel: SetupViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
 
@@ -90,7 +92,7 @@ fun SetupScreen(onFinished: () -> Unit, viewModel: SetupViewModel = hiltViewMode
                 }
                 SetupStep.DONE -> Page(stringResource(R.string.setup_done_title)) {
                     Text(stringResource(R.string.setup_done_body))
-                    Button(onClick = { viewModel.finish(onFinished) }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.setup_start)) }
+                    Button(onClick = viewModel::finish, Modifier.fillMaxWidth()) { Text(stringResource(R.string.setup_start)) }
                 }
             }
         }

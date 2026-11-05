@@ -23,20 +23,19 @@ object ThreadPageParser {
         val doc = parseDocument(html)
         doc.requireSignedIn()
         val scripts = doc.scripts()
-        fun intVar(name: String) = Regex("""\bvar\s+$name\s*=\s*(\d+)\s*;""").find(scripts)?.groupValues?.get(1)?.toInt()
-        fun pagesField(name: String) = Regex("""\bvar\s+pages\s*=\s*\{[^}]*\b$name\s*:\s*(\d+)""").find(scripts)?.groupValues?.get(1)?.toInt()
+        fun Regex.int() = find(scripts)?.groupValues?.get(1)?.toInt()
 
         val crumbs = doc.breadcrumb()
         val threadId = crumbs.lastOrNull()?.second?.let(::threadIdFromHref)
-            ?: Regex("""\bvar\s+thread_id\s*=\s*"([A-Za-z0-9]+)"""").find(scripts)?.groupValues?.get(1)?.let(::ThreadId)
+            ?: THREAD_ID_VAR.find(scripts)?.groupValues?.get(1)?.let(::ThreadId)
             ?: threadIdFromHref(doc.selectFirst("link[rel=canonical]")?.attr("href")?.substringAfter(FORUMS_BASE))
             ?: throw WhirlpoolError.Drift("Cannot find the thread id on '${doc.title()}'")
 
         val posts = doc.select("div.replyblock[data-replyid]").map(::parsePost)
         if (posts.isEmpty()) throw WhirlpoolError.Drift("No posts found in thread ${threadId.value}")
 
-        val page = intVar("thread_page") ?: pagesField("current") ?: 1
-        val pageCount = intVar("thread_pages") ?: pagesField("total") ?: 1
+        val page = THREAD_PAGE_VAR.int() ?: PAGES_CURRENT.int() ?: 1
+        val pageCount = THREAD_PAGES_VAR.int() ?: PAGES_TOTAL.int() ?: 1
 
         return ThreadPage(
             threadId = threadId,
@@ -58,6 +57,18 @@ object ThreadPageParser {
         }.orEmpty()
 
     private val HIDDEN_REASON = Regex("""\(([^)]*)\)""")
+    private val SHORT_URL = Regex("""https?://whrl\.pl/\w+""")
+    private val THREAD_ID_VAR = Regex("""\bvar\s+thread_id\s*=\s*"([A-Za-z0-9]+)"""")
+    private val THREAD_PAGE_VAR = intVar("thread_page")
+    private val THREAD_PAGES_VAR = intVar("thread_pages")
+    private val PAGES_CURRENT = pagesField("current")
+    private val PAGES_TOTAL = pagesField("total")
+
+    /** `var thread_page = 2;` */
+    private fun intVar(name: String) = Regex("""\bvar\s+$name\s*=\s*(\d+)\s*;""")
+
+    /** `var pages = { current: 2, total: 13 }`, the form some pages use instead. */
+    private fun pagesField(name: String) = Regex("""\bvar\s+pages\s*=\s*\{[^}]*\b$name\s*:\s*(\d+)""")
 
     private fun parsePost(block: Element): Post {
         val replyId = block.attr("data-replyid").toLong()
@@ -92,7 +103,7 @@ object ThreadPageParser {
         val isOp = body.selectFirst("div.op") != null
         val bodyHtml = body.clone().apply { select("div.op, div.edited").remove() }.html().trim()
         val shortUrl = block.selectFirst(".shortcode a[href*=whrl.pl]")?.attr("href")
-            ?: block.selectFirst(".shortcode")?.text()?.let { Regex("""https?://whrl\.pl/\w+""").find(it)?.value }
+            ?: block.selectFirst(".shortcode")?.text()?.let { SHORT_URL.find(it)?.value }
 
         return Post(
             replyId = replyId,

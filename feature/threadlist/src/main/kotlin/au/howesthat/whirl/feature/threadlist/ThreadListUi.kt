@@ -46,7 +46,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.howesthat.whirl.core.data.OpenThread
-import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.model.WatchAction
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.RowKind
 import au.howesthat.whirl.core.model.ThreadId

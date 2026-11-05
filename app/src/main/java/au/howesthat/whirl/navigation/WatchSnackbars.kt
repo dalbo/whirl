@@ -15,7 +15,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import au.howesthat.whirl.R
 import au.howesthat.whirl.core.data.PendingWatch
-import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.model.WatchAction
 import au.howesthat.whirl.core.data.WatchEvent
 import au.howesthat.whirl.core.ui.errorMessage
 import kotlinx.coroutines.flow.Flow

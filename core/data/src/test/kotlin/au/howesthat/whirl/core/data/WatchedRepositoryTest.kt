@@ -2,12 +2,15 @@ package au.howesthat.whirl.core.data
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import au.howesthat.whirl.core.database.PendingState
 import au.howesthat.whirl.core.database.RoomTransactor
 import au.howesthat.whirl.core.database.ThreadDao
 import au.howesthat.whirl.core.database.ThreadEntity
+import au.howesthat.whirl.core.database.ThreadSource
 import au.howesthat.whirl.core.database.ThreadSourceEntity
 import au.howesthat.whirl.core.database.WhirlDatabase
 import au.howesthat.whirl.core.model.ThreadId
+import au.howesthat.whirl.core.model.WatchAction
 import au.howesthat.whirl.core.model.WhirlpoolError
 import au.howesthat.whirl.core.network.RetryPolicy
 import au.howesthat.whirl.core.network.WhirlpoolApi
@@ -54,11 +57,19 @@ class WatchedRepositoryTest {
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val api = WhirlpoolApi(WhirlpoolHttp.client("Whirl/test"), { "k" }, server.url("/api/"), RetryPolicy.NONE)
     private val scheduler = RecordingScheduler()
-    private val repo = newRepository()
+    /** The lists and the send queue over one store, as Hilt wires them. */
+    private class Watched(val lists: WatchedRepository, val queue: WatchQueue)
 
-    /** Another repository over the same database: what the app has after its process was ended and restarted. */
-    private fun newRepository() =
-        WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), scheduler, clock, appScope).apply { undoWindow = 10.minutes }
+    /** Another pair over the same database: what the app has after its process was ended and restarted. */
+    private fun newRepository(dao: ThreadDao = db.threadDao()): Watched {
+        val store = WatchedStore(dao, db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), clock)
+        val lists = WatchedRepository(api, store)
+        return Watched(lists, WatchQueue(api, store, lists, scheduler, Dispatchers.Default, appScope).apply { undoWindow = 10.minutes })
+    }
+
+    private val watched = newRepository()
+    private val repo = watched.queue
+    private val lists = watched.lists
 
     class RecordingScheduler : WatchSendScheduler {
         val delays = mutableListOf<Duration>()
@@ -82,7 +93,7 @@ class WatchedRepositoryTest {
 
     private fun enqueue(body: String, code: Int = 200) = server.enqueue(MockResponse.Builder().code(code).body(body).build())
 
-    private suspend fun ids(unreadOnly: Boolean) = repo.watched(unreadOnly).first().value.map { it.id.value }
+    private suspend fun ids(unreadOnly: Boolean) = lists.watched(unreadOnly).first().value.map { it.id.value }
 
     /** The All and Unread lists, as a refresh of both asks for them. */
     private fun enqueueBothLists() {
@@ -92,8 +103,8 @@ class WatchedRepositoryTest {
 
     private suspend fun loadBothLists() {
         enqueueBothLists()
-        repo.refresh(unreadOnly = false)
-        repo.refresh(unreadOnly = true)
+        lists.refresh(unreadOnly = false)
+        lists.refresh(unreadOnly = true)
         repeat(2) { server.takeRequest() }
     }
 
@@ -104,7 +115,7 @@ class WatchedRepositoryTest {
         loadBothLists()
         val p = repo.perform(WatchAction.MARK_READ, listOf(bike))
         assertEquals(listOf("9q684xp3"), ids(unreadOnly = true))
-        assertEquals(0, repo.watched(unreadOnly = false).first().value.single { it.id == bike }.unreadCount)
+        assertEquals(0, lists.watched(unreadOnly = false).first().value.single { it.id == bike }.unreadCount)
         assertNull(server.takeRequest(200, TimeUnit.MILLISECONDS), "nothing is sent during the undo window")
 
         enqueue(fixture("api_watched_mode1.json").replace("\"UNREAD\":683", "\"UNREAD\":0"))
@@ -114,7 +125,7 @@ class WatchedRepositoryTest {
         assertEquals("watched", url.queryParameter("get"))
         assertEquals("1", url.queryParameter("watchedmode"))
         // Both lists come from the one answer.
-        repo.watched(unreadOnly = true).first { it.value.map { t -> t.id.value } == listOf("9q684xp3") }
+        lists.watched(unreadOnly = true).first { it.value.map { t -> t.id.value } == listOf("9q684xp3") }
         assertEquals(19, ids(unreadOnly = false).size)
         assertFalse(repo.undo(p), "too late to undo once sent")
     }
@@ -124,11 +135,11 @@ class WatchedRepositoryTest {
         loadBothLists()
         val p = repo.perform(WatchAction.UNWATCH, listOf(bike))
         assertFalse(bike.value in ids(unreadOnly = false))
-        assertFalse(bike in repo.watchedIds.first())
+        assertFalse(bike in lists.watchedIds.first())
         assertTrue(repo.undo(p))
         assertEquals(listOf("9yvx1663", "9q684xp3"), ids(unreadOnly = true), "back in its place")
         assertEquals(19, ids(unreadOnly = false).size)
-        assertEquals(683, repo.watched(unreadOnly = true).first().value.first().unreadCount)
+        assertEquals(683, lists.watched(unreadOnly = true).first().value.first().unreadCount)
         repo.commit(p)
         assertNull(server.takeRequest(300, TimeUnit.MILLISECONDS))
         assertEquals(2, server.requestCount)
@@ -149,7 +160,7 @@ class WatchedRepositoryTest {
         assertEquals(WatchAction.MARK_READ, event.action)
         assertIs<WhirlpoolError.Maintenance>(event.error)
         assertEquals(listOf("9yvx1663", "9q684xp3"), ids(unreadOnly = true))
-        assertEquals(683, repo.watched(unreadOnly = true).first().value.first().unreadCount)
+        assertEquals(683, lists.watched(unreadOnly = true).first().value.first().unreadCount)
     }
 
     @Test
@@ -159,13 +170,13 @@ class WatchedRepositoryTest {
         val applied = async(start = CoroutineStart.UNDISPATCHED) { repo.events.filterIsInstance<WatchEvent.Applied>().first() }
         val p = repo.perform(WatchAction.WATCH, listOf(nbn))
         assertEquals(p, applied.await().pending)
-        assertTrue(repo.isWatched(nbn).first())
+        assertTrue(lists.isWatched(nbn).first())
 
         enqueue(fixture("api_cmd_watchedadd_with_get.json"))
         repo.commit(p)
         assertEquals("3pxj858k", server.takeRequest(5, TimeUnit.SECONDS)!!.url.queryParameter("watchedadd"))
-        repo.watched(unreadOnly = false).first { it.value.size == 20 }
-        val added = repo.watched(unreadOnly = false).first().value.single { it.id == nbn }
+        lists.watched(unreadOnly = false).first { it.value.size == 20 }
+        val added = lists.watched(unreadOnly = false).first().value.single { it.id == nbn }
         assertEquals("Simple, ad-free NBN plan comparison tool I built", added.title)
         assertEquals(listOf("9yvx1663", "9q684xp3"), ids(unreadOnly = true), "a new watch comes back read")
     }
@@ -186,7 +197,7 @@ class WatchedRepositoryTest {
         repo.perform(WatchAction.UNWATCH, listOf(bike))
         enqueue(fixture("api_watched_mode1.json"))
         clock.now = clock.now.plusSeconds(11)
-        assertTrue(repo.refresh(unreadOnly = false, force = true))
+        assertTrue(lists.refresh(unreadOnly = false, force = true))
         assertFalse(bike.value in ids(unreadOnly = false))
     }
 
@@ -209,12 +220,12 @@ class WatchedRepositoryTest {
     fun `an action is stored until it is sent and the backstop is scheduled`() = runTest {
         loadBothLists()
         val p = repo.perform(WatchAction.MARK_READ, listOf(bike))
-        assertEquals(listOf("MARK_READ"), queue.all().map { it.action })
+        assertEquals(listOf(WatchAction.MARK_READ), queue.all().map { it.action })
         assertEquals(listOf(10.minutes), scheduler.delays)
         enqueue(fixture("api_watched_mode1.json").replace("\"UNREAD\":683", "\"UNREAD\":0"))
         repo.commit(p)
         server.takeRequest(5, TimeUnit.SECONDS)!!
-        assertTrue(repo.awaitSend(p, 5.seconds))
+        assertEquals(SendResult.SentOrQueued, repo.awaitSend(p, 5.seconds))
         assertEquals(emptyList(), queue.all())
     }
 
@@ -227,15 +238,15 @@ class WatchedRepositoryTest {
         val restarted = newRepository()
         enqueue(fixture("api_watched_mode1.json"))
         clock.now = clock.now.plusSeconds(3600)
-        restarted.refresh(unreadOnly = false, force = true)
+        restarted.lists.refresh(unreadOnly = false, force = true)
         server.takeRequest()
         assertFalse(bike.value in ids(unreadOnly = false), "a refresh does not bring the thread back")
 
         scheduler.delays.clear()
-        restarted.resume()
+        restarted.queue.resume()
         assertEquals(listOf(Duration.ZERO), scheduler.delays)
         enqueue(fixture("api_watched_mode1.json"))
-        assertEquals(Drain.Empty, restarted.drain())
+        assertEquals(Drain.Empty, restarted.queue.drain())
         assertEquals("9yvx1663", server.takeRequest().url.queryParameter("watchedremove"))
         assertEquals(emptyList(), queue.all())
     }
@@ -248,7 +259,7 @@ class WatchedRepositoryTest {
         assertFalse(repo.undo(p), "too late once it is being sent")
         queue.makeDue(queue.all().single().id, clock.millis())
         enqueue(fixture("api_watched_mode1.json"))
-        assertEquals(Drain.Empty, newRepository().drain())
+        assertEquals(Drain.Empty, newRepository().queue.drain())
         assertEquals("9yvx1663", server.takeRequest().url.queryParameter("watchedread"))
     }
 
@@ -264,7 +275,7 @@ class WatchedRepositoryTest {
         assertEquals("9yvx1663", server.takeRequest(5, TimeUnit.SECONDS)!!.url.queryParameter("watchedremove"))
         val waiting = assertIs<Drain.Waiting>(repo.drain())
         assertEquals(10.minutes, waiting.wait)
-        assertEquals(listOf("WATCH", "MARK_READ"), queue.all().map { it.action })
+        assertEquals(listOf(WatchAction.WATCH, WatchAction.MARK_READ), queue.all().map { it.action })
         assertNull(server.takeRequest(200, TimeUnit.MILLISECONDS))
     }
 
@@ -274,10 +285,10 @@ class WatchedRepositoryTest {
         enqueue("", code = 429)
         val p = repo.perform(WatchAction.MARK_READ, listOf(bike), undoable = false)
         server.takeRequest(5, TimeUnit.SECONDS)!!
-        assertTrue(repo.awaitSend(p, 200.milliseconds), "still queued counts as sent for a notification button")
+        assertEquals(SendResult.SentOrQueued, repo.awaitSend(p, 200.milliseconds), "still queued counts as sent for a notification button")
         val row = queue.all().single()
         assertEquals(1, row.attempts)
-        assertEquals("WAITING", row.state)
+        assertEquals(PendingState.WAITING, row.state)
         assertEquals(Duration.ZERO, scheduler.delays.last())
         assertEquals(listOf("9q684xp3"), ids(unreadOnly = true), "still shown as read")
 
@@ -296,7 +307,7 @@ class WatchedRepositoryTest {
         assertEquals(Drain.Empty, repo.drain())
         assertIs<WhirlpoolError.RateLimited>(failed.await().error)
         assertEquals(listOf("9yvx1663", "9q684xp3"), ids(unreadOnly = true))
-        assertEquals(683, repo.watched(unreadOnly = true).first().value.first().unreadCount, "unread again, as it was")
+        assertEquals(683, lists.watched(unreadOnly = true).first().value.first().unreadCount, "unread again, as it was")
         assertEquals(3, server.requestCount, "the lists are not refreshed after giving up on a send that did not get through")
     }
 
@@ -304,7 +315,7 @@ class WatchedRepositoryTest {
     fun `mark read of a thread deleted since the list was fetched is sent again without it`() = runTest {
         loadBothLists()
         val gone = ThreadId("zzzz9999")
-        db.threadDao().insertSource(listOf(ThreadSourceEntity("WATCHED", "unread", gone.value, 99)))
+        db.threadDao().insertSource(listOf(ThreadSourceEntity(ThreadSource.WATCHED, "unread", gone.value, 99)))
         val p = repo.perform(WatchAction.MARK_READ, listOf(bike, gone))
         enqueue(fixture("api_cmd_bogus_id_500.html"), code = 500)
         enqueue(fixture("api_watched_mode1.json"))
@@ -313,7 +324,7 @@ class WatchedRepositoryTest {
         assertEquals("9yvx1663,zzzz9999", server.takeRequest(5, TimeUnit.SECONDS)!!.url.queryParameter("watchedread"))
         assertEquals("1", server.takeRequest(5, TimeUnit.SECONDS)!!.url.queryParameter("watchedmode"))
         assertEquals("9yvx1663", server.takeRequest(5, TimeUnit.SECONDS)!!.url.queryParameter("watchedread"))
-        assertTrue(repo.awaitSend(p, 5.seconds))
+        assertEquals(SendResult.SentOrQueued, repo.awaitSend(p, 5.seconds))
         assertEquals(emptyList(), queue.all())
     }
 
@@ -322,7 +333,7 @@ class WatchedRepositoryTest {
         loadBothLists()
         repo.perform(WatchAction.MARK_READ, listOf(bike))
         enqueue(fixture("api_watched_mode0.json"))
-        assertEquals(listOf("9q684xp3"), repo.fetchUnread().map { it.id.value })
+        assertEquals(listOf("9q684xp3"), lists.fetchUnread().map { it.id.value })
     }
 
     @Test
@@ -346,27 +357,26 @@ class WatchedRepositoryTest {
                 if (!db.inTransaction()) outside += name
             }
             override suspend fun markRead(ids: List<String>) = check("markRead").also { real.markRead(ids) }
-            override suspend fun removeFromSource(source: String, ids: List<String>) =
+            override suspend fun removeFromSource(source: ThreadSource, ids: List<String>) =
                 check("removeFromSource").also { real.removeFromSource(source, ids) }
-            override suspend fun removeFromSourceKey(source: String, key: String, ids: List<String>) =
+            override suspend fun removeFromSourceKey(source: ThreadSource, key: String, ids: List<String>) =
                 check("removeFromSourceKey").also { real.removeFromSourceKey(source, key, ids) }
             override suspend fun insertSource(rows: List<ThreadSourceEntity>) = check("insertSource").also { real.insertSource(rows) }
             override suspend fun upsert(threads: List<ThreadEntity>) = check("upsert").also { real.upsert(threads) }
             override suspend fun deleteOrphans() = check("deleteOrphans").also { real.deleteOrphans() }
         }
-        val repo = WatchedRepository(api, dao, db.fetchLogDao(), queue, RoomTransactor(db), AccountGeneration(), scheduler, clock, appScope)
-            .apply { undoWindow = 10.minutes }
+        val (lists, repo) = newRepository(dao).let { it.lists to it.queue }
         enqueueBothLists()
-        repo.refresh(unreadOnly = false)
-        repo.refresh(unreadOnly = true)
+        lists.refresh(unreadOnly = false)
+        lists.refresh(unreadOnly = true)
         val unwatch = repo.perform(WatchAction.UNWATCH, listOf(bike))
         repo.perform(WatchAction.MARK_READ, listOf(ThreadId("9q684xp3")))
         repo.perform(WatchAction.WATCH, listOf(ThreadId("3pxj858k")))
         clock.now = clock.now.plusSeconds(11)
         enqueue(fixture("api_watched_mode1.json"))
-        repo.refresh(unreadOnly = false, force = true)
+        lists.refresh(unreadOnly = false, force = true)
         enqueue(fixture("api_watched_mode0.json"))
-        repo.fetchUnread()
+        lists.fetchUnread()
         assertTrue(repo.undo(unwatch))
         assertEquals(emptyList(), outside)
     }
@@ -388,8 +398,8 @@ class WatchedRepositoryTest {
             }
         }
         clock.now = clock.now.plusSeconds(11)
-        val refresh = async(Dispatchers.IO) { repo.refresh(unreadOnly = false, force = true) }
-        val unread = async(Dispatchers.IO) { repo.fetchUnread() }
+        val refresh = async(Dispatchers.IO) { lists.refresh(unreadOnly = false, force = true) }
+        val unread = async(Dispatchers.IO) { lists.fetchUnread() }
         repeat(2) { server.takeRequest(5, TimeUnit.SECONDS)!! }
         repo.switchAccount(change = {}, clear = db::clearAccountData)
         release.countDown()
@@ -426,7 +436,18 @@ class WatchedRepositoryTest {
         val p = repo.perform(WatchAction.MARK_READ, listOf(bike))
         val sent = async(Dispatchers.IO) { repo.awaitSend(p, 5.seconds) }
         repo.switchAccount(change = {}, clear = {})
-        assertFalse(sent.await(), "a notification's Mark read stays, rather than going as if it were sent")
+        assertEquals(SendResult.Dropped, sent.await(), "a notification's Mark read stays, rather than going as if it were sent")
+    }
+
+    @Test
+    fun `an action waited on that Whirlpool refuses is reported as rejected`() = runTest {
+        loadBothLists()
+        enqueue(fixture("api_cmd_bogus_id_500.html"), code = 500) // refused
+        enqueue(fixture("api_watched_mode1.json")) // Whirlpool is up and still lists it: give up
+        enqueueBothLists() // the refresh after the failure
+        val p = repo.perform(WatchAction.MARK_READ, listOf(bike), undoable = false)
+        val rejected = assertIs<SendResult.Rejected>(repo.awaitSend(p, 5.seconds))
+        assertIs<WhirlpoolError.Maintenance>(rejected.error)
     }
 
     /** Sends [action] on [bike] after a refresh that renamed it, and has Whirlpool refuse it. */
@@ -437,7 +458,7 @@ class WatchedRepositoryTest {
         clock.now = clock.now.plusSeconds(3600)
         val renamed = fixture("api_watched_mode1.json").replace("\"Bike Riding\"", "\"Bike Riding II\"")
         enqueue(renamed)
-        repo.refresh(unreadOnly = false, force = true)
+        lists.refresh(unreadOnly = false, force = true)
         assertFalse(bike.value in ids(unreadOnly = true), "still applied while it waits")
 
         enqueue(fixture("api_cmd_bogus_id_500.html"), code = 500) // refused
@@ -453,16 +474,16 @@ class WatchedRepositoryTest {
     @Test
     fun `a late failure puts the thread back on its lists without undoing a refresh made since`() = runTest {
         assertIs<WhirlpoolError.Maintenance>(failLate(WatchAction.MARK_READ).error)
-        assertEquals("Bike Riding II", repo.watched(unreadOnly = false).first().value.single { it.id == bike }.title, "the details fetched since are kept")
+        assertEquals("Bike Riding II", lists.watched(unreadOnly = false).first().value.single { it.id == bike }.title, "the details fetched since are kept")
         assertTrue(bike.value in ids(unreadOnly = true), "back on Unread, where it was")
-        assertEquals(683, repo.watched(unreadOnly = true).first().value.single { it.id == bike }.unreadCount, "and unread again")
+        assertEquals(683, lists.watched(unreadOnly = true).first().value.single { it.id == bike }.unreadCount, "and unread again")
     }
 
     @Test
     fun `a late failure of an unwatch brings back the thread with what was fetched since`() = runTest {
         failLate(WatchAction.UNWATCH)
         // Unwatched, the thread was on no list; the queued action kept its row through the refresh.
-        assertEquals("Bike Riding II", repo.watched(unreadOnly = false).first().value.single { it.id == bike }.title)
+        assertEquals("Bike Riding II", lists.watched(unreadOnly = false).first().value.single { it.id == bike }.title)
         assertTrue(bike.value in ids(unreadOnly = true))
     }
 }

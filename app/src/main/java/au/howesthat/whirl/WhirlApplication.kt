@@ -9,7 +9,7 @@ import androidx.work.Configuration
 import au.howesthat.whirl.core.data.AppVisits
 import au.howesthat.whirl.core.data.ApplicationScope
 import au.howesthat.whirl.core.data.ForumRepository
-import au.howesthat.whirl.core.data.WatchedRepository
+import au.howesthat.whirl.core.data.WatchQueue
 import au.howesthat.whirl.core.notifications.NotificationScheduler
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -22,7 +22,7 @@ class WhirlApplication : Application(), Configuration.Provider {
     @Inject lateinit var notificationScheduler: NotificationScheduler
     @Inject lateinit var appVisits: AppVisits
     @Inject lateinit var forums: ForumRepository
-    @Inject lateinit var watched: WatchedRepository
+    @Inject lateinit var watchQueue: WatchQueue
     @Inject @ApplicationScope lateinit var appScope: CoroutineScope
 
     // WorkManager starts on demand with Hilt's worker factory (its startup initializer is removed in the manifest).
@@ -34,7 +34,7 @@ class WhirlApplication : Application(), Configuration.Provider {
         notificationScheduler.start()
         appScope.launch { forums.forgetLearnedPrivateOnce() }
         // Watch actions an earlier run of the app left unsent.
-        appScope.launch { watched.resume() }
+        appScope.launch { watchQueue.resume() }
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) = appVisits.onForeground()
         })

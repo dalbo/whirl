@@ -51,6 +51,7 @@ import au.howesthat.whirl.core.model.ForumGroup
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.ui.FindButton
+import au.howesthat.whirl.core.ui.ListPaneRoute
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.PagePickerDialog
@@ -75,7 +76,7 @@ import kotlinx.serialization.Serializable
 
 /** A forum's thread list, optionally narrowed to a group. */
 @Serializable
-data class ForumRoute(val forumId: Int, val title: String, val groupId: Int? = null) : NavKey
+data class ForumRoute(val forumId: Int, val title: String, val groupId: Int? = null) : NavKey, ListPaneRoute
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel(assistedFactory = ForumViewModel.Factory::class)

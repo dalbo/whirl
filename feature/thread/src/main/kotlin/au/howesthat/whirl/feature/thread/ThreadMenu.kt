@@ -18,7 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.model.WatchAction
 import au.howesthat.whirl.core.ui.style
 
 @Composable

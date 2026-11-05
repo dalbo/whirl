@@ -35,6 +35,8 @@ import java.time.ZoneOffset
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import au.howesthat.whirl.core.data.WatchedStore
+import au.howesthat.whirl.core.data.WatchQueue
 
 @RunWith(RobolectricTestRunner::class)
 class NotificationSchedulerTest {
@@ -44,8 +46,10 @@ class NotificationSchedulerTest {
     private val db = Room.inMemoryDatabaseBuilder(context, WhirlDatabase::class.java).allowMainThreadQueries().build()
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val settings = SettingsRepository(context)
-    private val watched = WatchedRepository(WhirlpoolApi(WhirlpoolHttp.client("t"), { null }), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, clock, appScope)
-    private val notifier = WatchedNotifier(context, settings, watched, db.notifiedDao())
+    private val api = WhirlpoolApi(WhirlpoolHttp.client("t"), { null })
+    private val store = WatchedStore(db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), clock)
+    private val watched = WatchedRepository(api, store)
+    private val notifier = WatchedNotifier(context, settings, watched, WatchQueue(api, store, watched, WatchSendScheduler.None, Dispatchers.Default, appScope), db.notifiedDao())
     private val scheduler = NotificationScheduler(context, settings, notifier, appScope)
 
     @Before

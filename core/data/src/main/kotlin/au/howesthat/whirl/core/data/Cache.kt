@@ -2,6 +2,11 @@ package au.howesthat.whirl.core.data
 
 import au.howesthat.whirl.core.database.FetchLogDao
 import au.howesthat.whirl.core.database.FetchLogEntity
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Clock
@@ -13,6 +18,25 @@ import kotlin.time.Duration.Companion.seconds
 
 /** A cached value and when it was fetched; screens always render the cache with "Updated N ago". */
 data class Cached<T>(val value: T, val updatedAt: Instant?)
+
+/**
+ * Values kept in memory only, each with when it was fetched; the [keep] most recently fetched are kept. Also a
+ * [Refresher] for them, which needs no fetch log.
+ */
+class MemoryCache<K : Any, V>(private val keep: Int, private val clock: Clock) {
+    private val entries = MutableStateFlow<Map<K, Cached<V>>>(emptyMap())
+    private val refresher = Refresher(log = null, clock = clock)
+
+    /** [key]'s value; a refresh of another key does not emit it again. */
+    fun observe(key: K): Flow<Cached<V>?> = entries.map { it[key] }.distinctUntilChanged()
+
+    /** Runs [fetch] if [key] is older than [maxAge] (or forced, past the throttle) and keeps what it returns. */
+    suspend fun refresh(key: K, maxAge: Duration, force: Boolean, fetch: suspend () -> V): Boolean =
+        refresher.refresh(key.toString(), maxAge, force, lastFetched = { entries.value[key]?.updatedAt?.toEpochMilli() }) {
+            val entry = Cached(fetch(), Instant.ofEpochMilli(clock.millis()))
+            entries.update { old -> (old - key).entries.sortedByDescending { it.value.updatedAt }.take(keep - 1).associate { it.toPair() } + (key to entry) }
+        }
+}
 
 /** Max ages from Whirldroid 2.14.12 (PLAN.md §1.4). */
 object MaxAge {
@@ -30,9 +54,25 @@ object MaxAge {
  * One fetch per key at a time; concurrent callers wait and then see it as fresh.
  */
 class Refresher(private val log: FetchLogDao?, private val clock: Clock) {
-    private val locks = mutableMapOf<String, Mutex>()
+    /** A key's lock and how many callers hold or wait for it; dropped when the last one is done. */
+    private class Lock {
+        val mutex = Mutex()
+        var users = 0
+    }
 
-    private fun lock(key: String) = synchronized(locks) { locks.getOrPut(key) { Mutex() } }
+    /** Only the keys being refreshed now: users and searches are keys too, so a map of every key seen would only grow. */
+    private val locks = mutableMapOf<String, Lock>()
+
+    internal val lockCount: Int get() = synchronized(locks) { locks.size }
+
+    private suspend fun <T> withKey(key: String, block: suspend () -> T): T {
+        val lock = synchronized(locks) { locks.getOrPut(key, ::Lock).also { it.users++ } }
+        try {
+            return lock.mutex.withLock { block() }
+        } finally {
+            synchronized(locks) { if (--lock.users == 0) locks.remove(key) }
+        }
+    }
 
     /**
      * Runs [fetch] if [key] is older than [maxAge], or if [force] and older than [MaxAge.MANUAL_THROTTLE].
@@ -53,8 +93,8 @@ class Refresher(private val log: FetchLogDao?, private val clock: Clock) {
         force: Boolean,
         lastFetched: suspend () -> Long?,
         fetch: suspend () -> Unit,
-    ): Boolean = lock(key).withLock {
-        if (isFresh(lastFetched(), maxAge, force)) return@withLock false
+    ): Boolean = withKey(key) {
+        if (isFresh(lastFetched(), maxAge, force)) return@withKey false
         fetch()
         true
     }

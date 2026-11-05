@@ -3,8 +3,10 @@ package au.howesthat.whirl.core.database
 import android.content.Context
 import androidx.room.AutoMigration
 import androidx.room.Database
+import androidx.room.DeleteColumn
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.AutoMigrationSpec
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.room.withTransaction
@@ -30,7 +32,7 @@ import javax.inject.Singleton
         CheckLogEntity::class,
         PendingWatchEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
     autoMigrations = [
         // v2: thread page cache (thread_pages, posts).
@@ -40,6 +42,8 @@ import javax.inject.Singleton
         // v4: watch actions waiting to be sent (pending_watch).
         AutoMigration(from = 3, to = 4),
         // v5 (MIGRATION_4_5): the thread page cache loses its post filter.
+        // v6: threads lose three columns nothing ever wrote.
+        AutoMigration(from = 5, to = 6, spec = DropUnusedThreadColumns::class),
     ],
 )
 abstract class WhirlDatabase : RoomDatabase() {
@@ -54,9 +58,9 @@ abstract class WhirlDatabase : RoomDatabase() {
 
     /** Clears everything tied to the signed-in account (on log out or key change), in one transaction. Favourites are kept. */
     suspend fun clearAccountData() = withTransaction {
-        threadDao().clearSource(ThreadSource.WATCHED.name, "unread")
-        threadDao().clearSource(ThreadSource.WATCHED.name, "all")
-        threadDao().clearSource(ThreadSource.RECENT.name, "")
+        threadDao().clearSource(ThreadSource.WATCHED, "unread")
+        threadDao().clearSource(ThreadSource.WATCHED, "all")
+        threadDao().clearSource(ThreadSource.RECENT, "")
         threadDao().deleteOrphans()
         notifiedDao().keepOnly(emptyList())
         fetchLogDao().clear()
@@ -103,6 +107,12 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         db.execSQL("DROP TABLE thread_pages_v4")
     }
 }
+
+/** v6 (v1.7): `page_count`, `is_sticky` and `is_closed` were in `threads` from v1 but never written. */
+@DeleteColumn(tableName = "threads", columnName = "page_count")
+@DeleteColumn(tableName = "threads", columnName = "is_sticky")
+@DeleteColumn(tableName = "threads", columnName = "is_closed")
+class DropUnusedThreadColumns : AutoMigrationSpec
 
 @Module
 @InstallIn(SingletonComponent::class)

@@ -2,6 +2,7 @@ package au.howesthat.whirl.core.network
 
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.model.WhirlpoolError
+import au.howesthat.whirl.core.model.WhirlpoolSite
 import kotlinx.coroutines.Dispatchers
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -36,9 +37,12 @@ class WhirlpoolWeb(
 
 /** URL forms verified against the live site (PLAN.md §2.3). */
 class WhirlpoolUrls(
-    val forums: HttpUrl = "https://forums.whirlpool.net.au/".toHttpUrl(),
-    val site: HttpUrl = "https://whirlpool.net.au/".toHttpUrl(),
+    val forums: HttpUrl = "${WhirlpoolSite.FORUMS}/".toHttpUrl(),
+    val site: HttpUrl = "${WhirlpoolSite.MAIN}/".toHttpUrl(),
 ) {
+    /** The profile page, where a signed-in user finds their API key. */
+    fun profile(): HttpUrl = site.newBuilder().addPathSegment("profile").addPathSegment("").build()
+
     /** The news page; its articles open through [newsArticle], which redirects to the story. */
     fun news(): HttpUrl = site.newBuilder().addPathSegment("news").addPathSegment("").build()
 
@@ -63,7 +67,7 @@ class WhirlpoolUrls(
             .apply { if (repsOnly) addQueryParameter("ur", "1") }
             .build()
 
-    /** The whole thread on one page. */
+    /** The whole thread on one page (800 posts per request). Not used yet: kept for v1.8's archive reader. */
     fun archive(id: ThreadId): HttpUrl = forums.newBuilder().addPathSegments("archive/${id.value}").build()
 
     fun popular(): HttpUrl = forums.newBuilder().addPathSegment("forum").addPathSegment("")

@@ -2,6 +2,7 @@ package au.howesthat.whirl.core.database
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import au.howesthat.whirl.core.model.WatchAction
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -35,9 +36,9 @@ class DaoTest {
     @Test
     fun `lists keep their own order`() = runTest {
         threads.replaceApiList(ThreadSource.LATEST, "", listOf(api("3rvvvlwj"), api("988lwp10"), api("1000422")))
-        assertEquals(listOf("3rvvvlwj", "988lwp10", "1000422"), threads.observeSource("LATEST", "").first().map { it.id })
+        assertEquals(listOf("3rvvvlwj", "988lwp10", "1000422"), threads.observeSource(ThreadSource.LATEST, "").first().map { it.id })
         threads.replaceApiList(ThreadSource.LATEST, "", listOf(api("1000422"), api("3rvvvlwj")))
-        assertEquals(listOf("1000422", "3rvvvlwj"), threads.observeSource("LATEST", "").first().map { it.id })
+        assertEquals(listOf("1000422", "3rvvvlwj"), threads.observeSource(ThreadSource.LATEST, "").first().map { it.id })
     }
 
     @Test
@@ -54,7 +55,7 @@ class DaoTest {
     fun `a thread named by a queued action is kept while it is on no list`() = runTest {
         // An Unwatch queued by an earlier run of the app: its thread is on no list until it is sent or fails.
         threads.replaceApiList(ThreadSource.LATEST, "", listOf(api("3rvvvlwj"), api("988lwp10")))
-        db.pendingWatchDao().insert(PendingWatchEntity(action = "UNWATCH", threadIds = "x1,988lwp10", sendAfter = 0, createdAt = 0))
+        db.pendingWatchDao().insert(PendingWatchEntity(action = WatchAction.UNWATCH, ids = listOf("x1", "988lwp10"), sendAfter = 0, createdAt = 0))
         threads.replaceApiList(ThreadSource.LATEST, "", listOf(api("1000422")))
         assertEquals("Thread 988lwp10", threads.get("988lwp10")?.title)
         assertNull(threads.get("3rvvvlwj"))
@@ -69,7 +70,7 @@ class DaoTest {
         assertEquals(3, row.lastPage)
         assertEquals(true, row.isUnread)
         assertEquals(2000L, row.lastDate, "the newer upsert wins for shared columns")
-        assertEquals(1, threads.observeSource("WATCHED", "all").first().size)
+        assertEquals(1, threads.observeSource(ThreadSource.WATCHED, "all").first().size)
     }
 
     @Test
@@ -77,12 +78,12 @@ class DaoTest {
         threads.replaceWatchedList("unread", listOf(watched("a", 5), watched("b", 2)))
         threads.replaceWatchedList("all", listOf(watched("a", 5), watched("b", 2)))
         threads.markRead(listOf("a"))
-        threads.removeFromSourceKey("WATCHED", "unread", listOf("a"))
+        threads.removeFromSourceKey(ThreadSource.WATCHED, "unread", listOf("a"))
         val a = threads.get("a")!!
         assertEquals(0, a.unreadCount)
         assertEquals(41, a.lastReadPost)
-        assertEquals(listOf("b"), threads.observeSource("WATCHED", "unread").first().map { it.id })
-        assertEquals(2, threads.observeSource("WATCHED", "all").first().size)
+        assertEquals(listOf("b"), threads.observeSource(ThreadSource.WATCHED, "unread").first().map { it.id })
+        assertEquals(2, threads.observeSource(ThreadSource.WATCHED, "all").first().size)
     }
 
     @Test
@@ -90,9 +91,9 @@ class DaoTest {
         threads.replaceWatchedList("unread", listOf(watched("a", 5)))
         threads.replaceWatchedList("all", listOf(watched("a", 5), watched("b", 0)))
         assertEquals(setOf("a", "b"), threads.observeWatchedIds().first().toSet())
-        assertEquals(1, threads.maxPosition("WATCHED", "all"))
-        assertNull(threads.maxPosition("WATCHED", "nothing"))
-        val rows = threads.sourceRows("WATCHED", listOf("a"))
+        assertEquals(1, threads.maxPosition(ThreadSource.WATCHED, "all"))
+        assertNull(threads.maxPosition(ThreadSource.WATCHED, "nothing"))
+        val rows = threads.sourceRows(ThreadSource.WATCHED, listOf("a"))
         assertEquals(setOf("unread" to 0, "all" to 0), rows.map { it.key to it.position }.toSet())
 
         val before = threads.getAll(listOf("a", "missing"))
@@ -133,17 +134,17 @@ class DaoTest {
         threads.replaceApiList(ThreadSource.LATEST, "", listOf(api("l")))
         db.fetchLogDao().put(FetchLogEntity("watched:all", 1))
         db.clearAccountData()
-        assertEquals(emptyList(), threads.observeSource("WATCHED", "all").first())
+        assertEquals(emptyList(), threads.observeSource(ThreadSource.WATCHED, "all").first())
         assertNull(threads.get("w"))
-        assertEquals(1, threads.observeSource("LATEST", "").first().size)
+        assertEquals(1, threads.observeSource(ThreadSource.LATEST, "").first().size)
         assertNull(db.fetchLogDao().fetchedAt("watched:all"))
     }
 
     @Test
     fun `a queued action can be undone only until it is claimed for sending`() = runTest {
         val queue = db.pendingWatchDao()
-        val a = queue.insert(PendingWatchEntity(action = "MARK_READ", threadIds = "a,b", sendAfter = 500, createdAt = 0))
-        val b = queue.insert(PendingWatchEntity(action = "UNWATCH", threadIds = "c", sendAfter = 500, createdAt = 0))
+        val a = queue.insert(PendingWatchEntity(action = WatchAction.MARK_READ, ids = listOf("a", "b"), sendAfter = 500, createdAt = 0))
+        val b = queue.insert(PendingWatchEntity(action = WatchAction.UNWATCH, ids = listOf("c"), sendAfter = 500, createdAt = 0))
         assertEquals(listOf(listOf("a", "b"), listOf("c")), queue.all().map { it.ids })
 
         assertEquals(1, queue.claim(a))
@@ -151,10 +152,10 @@ class DaoTest {
         assertEquals(0, queue.deleteWaiting(a), "too late to undo")
         assertEquals(1, queue.deleteWaiting(b))
 
-        queue.release(a, "b")
+        queue.release(a, listOf("b"))
         val row = queue.all().single()
         assertEquals(listOf("b"), row.ids)
-        assertEquals("WAITING", row.state)
+        assertEquals(PendingState.WAITING, row.state)
         assertEquals(1, row.attempts)
 
         queue.makeDue(a, now = 100)
@@ -162,6 +163,6 @@ class DaoTest {
         assertEquals(100, queue.all().single().sendAfter, "never later than it was")
         queue.claim(a)
         queue.resetSending()
-        assertEquals("WAITING", queue.all().single().state)
+        assertEquals(PendingState.WAITING, queue.all().single().state)
     }
 }

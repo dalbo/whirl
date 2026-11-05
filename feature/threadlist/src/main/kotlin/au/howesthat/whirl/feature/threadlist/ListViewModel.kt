@@ -9,7 +9,8 @@ import au.howesthat.whirl.core.data.OpenedFrom
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadOpener
-import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.model.WatchAction
+import au.howesthat.whirl.core.data.WatchQueue
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.model.TextQuery
 import au.howesthat.whirl.core.model.ThreadId
@@ -31,11 +32,12 @@ class ListDeps @Inject constructor(
     val settings: SettingsRepository,
     val forums: ForumRepository,
     val watched: WatchedRepository,
+    val watchQueue: WatchQueue,
     val savedState: SavedStateHandle,
 )
 
 /** Refresh state, errors and thread opening shared by every thread list screen. */
-abstract class ListViewModel(private val deps: ListDeps, private val from: OpenedFrom) : ViewModel() {
+abstract class ListViewModel(protected val deps: ListDeps, private val from: OpenedFrom) : ViewModel() {
     private val opener = ThreadOpener()
     protected val settings: StateFlow<Settings> = deps.settings.settings.stateIn(viewModelScope, SharingStarted.Eagerly, Settings())
     protected val privateIds: StateFlow<Set<Int>> = deps.forums.privateIds.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
@@ -74,7 +76,7 @@ abstract class ListViewModel(private val deps: ListDeps, private val from: Opene
         // Whirlpool's read position (no web session), so a thread opened on a stale "0" stayed unread on the site.
         // Threads opened from other lists or links are marked by the thread screen.
         if (from == OpenedFrom.WATCHED && current.watchedAutoMarkAsRead) {
-            viewModelScope.launch { deps.watched.perform(WatchAction.MARK_READ, listOf(id), undoable = false) }
+            viewModelScope.launch { deps.watchQueue.perform(WatchAction.MARK_READ, listOf(id), undoable = false) }
         }
         return opener.open(id, forumId, forumId in privateIds.value, from, current, item.watched)
     }
@@ -92,7 +94,7 @@ abstract class ListViewModel(private val deps: ListDeps, private val from: Opene
 
     fun perform(action: WatchAction, item: ThreadItem) {
         val id = item.openId ?: return
-        viewModelScope.launch { deps.watched.perform(action, listOf(id), undoable = deps.settings.settings.first().watchUndo, announce = true) }
+        viewModelScope.launch { deps.watchQueue.perform(action, listOf(id), undoable = deps.settings.settings.first().watchUndo, announce = true) }
     }
 
     suspend fun lastPost(item: ThreadItem): OpenThread? {

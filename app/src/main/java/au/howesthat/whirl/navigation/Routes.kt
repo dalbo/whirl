@@ -2,6 +2,7 @@ package au.howesthat.whirl.navigation
 
 import androidx.navigation3.runtime.NavKey
 import au.howesthat.whirl.core.data.Homepage
+import au.howesthat.whirl.core.ui.ListPaneRoute
 import au.howesthat.whirl.feature.thread.ThreadRoute
 import au.howesthat.whirl.feature.threadlist.ForumRoute
 import au.howesthat.whirl.feature.threadlist.SearchRoute
@@ -17,10 +18,10 @@ import kotlinx.serialization.modules.subclass
 
 // Drawer destinations.
 @Serializable object NewsRoute : NavKey
-@Serializable object RecentRoute : NavKey
-@Serializable object LatestRoute : NavKey
-@Serializable object WatchedRoute : NavKey
-@Serializable object PopularRoute : NavKey
+@Serializable object RecentRoute : NavKey, ListPaneRoute
+@Serializable object LatestRoute : NavKey, ListPaneRoute
+@Serializable object WatchedRoute : NavKey, ListPaneRoute
+@Serializable object PopularRoute : NavKey, ListPaneRoute
 @Serializable object ForumsRoute : NavKey
 
 fun Homepage.route(): NavKey = when (this) {

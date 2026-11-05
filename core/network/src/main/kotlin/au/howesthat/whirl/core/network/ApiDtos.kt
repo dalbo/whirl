@@ -16,7 +16,6 @@ internal data class ApiEnvelope(
     @SerialName("ALERT") val alert: String = "",
     @SerialName("AUTH") val auth: AuthDto? = null,
     @SerialName("ERROR") val error: String = "",
-    @SerialName("USER") val user: AuthDto? = null,
     @SerialName("FORUM") val forums: List<ForumDto>? = null,
     @SerialName("NEWS") val news: List<NewsDto>? = null,
     @SerialName("THREADS") val threads: List<ThreadDto>? = null,
