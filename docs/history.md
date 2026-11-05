@@ -1,6 +1,6 @@
 # History: how Whirl was built
 
-The phase-by-phase notes that HANDOFF.md carried until v1.7, moved here unchanged (2026-11-05). They record what
+The phase-by-phase notes that HANDOFF.md carried until v1.7, moved here (2026-11-05) as they were, except that links to the plans now use their `docs/plans/` paths. They record what
 each phase built and decided, so they describe the code as it was then: the in-app post filters, Room v2 and the
 840 dp two-pane threshold, for example, are long gone. HANDOFF.md is what is current; the plans since v1.3 are in
 `docs/plans/`.
@@ -120,5 +120,3 @@ Open ideas, roughly by value:
 
 ## Next: v1.7 tidy-up, then v1.8 archive reader (agreed 2026-11-05)
 **`docs/plans/v1.7.md`** is the plan: no new features in v1.7 (fixes from the 2026-11-05 review, dead code including the in-app post filter, build/CI, a shorter HANDOFF); the archive reader with search within a thread and posts by a user is v1.8 (§8 there).
-
-**Progress (2026-11-05):** PRs A–F are merged (#109–#114). **Next: G** (data-layer cleanup and dead code), then H (docs), then the v1.7.0 release. Read `docs/plans/v1.7.md` **§11** first: it records what each merged PR decided, how the watched/account code works now (§11.2), and the notes and phone checks for what is left. Parts of this file further up still describe the removed in-app post filter and Room v2; the database is v5, and H rewrites this file.

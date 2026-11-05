@@ -124,7 +124,7 @@ class ThreadListRepositoryTest {
     @Test
     fun `recent uses the history length and refetches when it changes`() = runTest {
         val repo = RecentRepository(api, db.threadDao(), db.fetchLogDao(), RoomTransactor(db), AccountGeneration(), clock)
-        // get=recent has only been seen empty; this assumes the THREADS shape (HANDOFF "known unknowns").
+        // get=recent has only been seen empty; this assumes the THREADS shape (HANDOFF.md, Open ideas › Unknowns).
         server.enqueue(MockResponse.Builder().body(fixture("api/api_threads_forum92.json").replace("\"THREADS\"", "\"RECENT\"")).build())
         assertTrue(repo.refresh(7))
         assertEquals("7", server.takeRequest().url.queryParameter("recentdays"))

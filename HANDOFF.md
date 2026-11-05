@@ -8,7 +8,8 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 | Path | What it is |
 |---|---|
 | `PLAN.md` | Target features (from Whirldroid 2.14.12), verified Whirlpool behaviour, architecture, decisions (§5) |
-| `docs/plans/` | One plan per release since v1.3; `docs/history.md` has the phases before them |
+| `docs/plans/` | The plans since v1.3 (`v1.3.md` also covers v1.4; v1.5 had none) |
+| `docs/history.md` | How each phase and release was built and what it decided, up to v1.7 |
 | `fixtures/api/`, `fixtures/html/` | Real API responses and **raw** pages (no key inside); `fixtures/README.md` |
 | `tools/capture/` | Headed Playwright captures, the only way past Cloudflare from this machine |
 | `docs/device-checklist.md` | The phone pass before each release |
@@ -39,7 +40,9 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 10. **No Whirlpool web session in the app** (no login, cookies, posting or site AJAX) until Whirlpool's moderators
     approve in writing; posting, private forums and PMs open in the browser. **Whirl stays free**: the API terms
     forbid revenue.
-11. **`reference/`** (git-ignored: Whirldroid 1.8.12 source, 2.14.12 decompiled) has an unknown licence: read it for
+11. **Ask Dallin** before changing a decision in PLAN.md §5 (package `au.howesthat.whirl`, MIT licence, the name
+    "Whirl") or anything else already decided there.
+12. **`reference/`** (git-ignored: Whirldroid 1.8.12 source, 2.14.12 decompiled) has an unknown licence: read it for
     behaviour, never copy from it.
 
 ## Commands
@@ -67,7 +70,7 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 ## Notes for the code
 - **Routes** are `NavKey`s and must be listed in `RouteSerializers` (`app/navigation/Routes.kt`). Thread lists
   implement `ListPaneRoute` to sit beside a thread in two panes, which need the setting and a window of at least
-  600 × 480 dp (`windowDirective` in `WhirlApp.kt`).
+  600 × 480 dp, wider than tall with "Only in landscape" (`windowDirective` in `WhirlApp.kt`).
 - **Dispatchers** are injected (`@IoDispatcher`, `@DefaultDispatcher`). Parsers run in `parseOrDrift` (off Main;
   unexpected exceptions become `WhirlpoolError.Drift`).
 - **Room:** a new version needs a migration and a `MigrationTest` case; build once so the schema JSON exists before
@@ -109,5 +112,11 @@ unit tests. Per-release checks: `docs/device-checklist.md`.
   the build changes (`docs/fdroid/README.md`).
 - Small: the poster's name is a tap target under 48 dp; draggable scroll thumb; find scrolls to the post, not the
   match; linked images; an app widget.
-- Unknowns: `get=recent` when not empty (assumed the `THREADS` shape); the markup of a deleted post or an image post;
-  where whrl.pl links lead; the reply and edit URLs (2.14.12's) logged in.
+- Unknowns:
+  - `get=recent` when not empty: assumed to have the `THREADS` shape; the Recent screen must cope with it failing as
+    `Drift`.
+  - The markup of a deleted post and of a post with an image: when one is found, add its URL to
+    `tools/capture/public.json` and run `npm run public` (the parser tolerates a `replyblock` without `.date`).
+  - Where whrl.pl short links lead (none seen in a post; the app falls back to the browser).
+  - Reply `?action=reply&t=` and edit `?action=edit&e=` are 2.14.12's URLs, never opened logged in (`reply&t=` exists).
+    New thread `?action=newthread&f=` is verified (2026-10-21).

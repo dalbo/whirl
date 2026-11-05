@@ -27,7 +27,7 @@ class ThreadPageParserTest {
         assertEquals(13, page.pageCount)
         assertEquals(20, page.posts.size)
         assertEquals((21..40).toList(), page.posts.map { it.number })
-        // HANDOFF's "8 edited" counts .edited markers; each edited post has two or three of them.
+        // Phase 1's "8 edited" (docs/history.md) counts .edited markers; each edited post has two or three of them.
         assertEquals(3, page.posts.count { it.isEdited })
         assertEquals(5, page.posts.count { it.isOp })
         assertTrue(page.posts.none { it.isDeleted || it.isHidden })

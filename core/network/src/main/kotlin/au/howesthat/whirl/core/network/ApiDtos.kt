@@ -19,7 +19,7 @@ internal data class ApiEnvelope(
     @SerialName("FORUM") val forums: List<ForumDto>? = null,
     @SerialName("NEWS") val news: List<NewsDto>? = null,
     @SerialName("THREADS") val threads: List<ThreadDto>? = null,
-    // Only ever seen empty; assumed to have the THREADS shape (HANDOFF "known unknowns").
+    // Only ever seen empty; assumed to have the THREADS shape (HANDOFF.md, Open ideas › Unknowns).
     @SerialName("RECENT") val recent: List<ThreadDto>? = null,
     @SerialName("WATCHED") val watched: List<WatchedDto>? = null,
 )
