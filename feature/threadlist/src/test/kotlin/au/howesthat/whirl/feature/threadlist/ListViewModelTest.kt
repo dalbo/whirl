@@ -1,6 +1,11 @@
 package au.howesthat.whirl.feature.threadlist
 
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import au.howesthat.whirl.core.data.OpenThread
@@ -32,6 +37,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -90,11 +96,27 @@ class ListViewModelTest {
         }
     }
 
+    /**
+     * The view models made here, cleared after each test. Settings live in one DataStore for the whole JVM: a view
+     * model left collecting them on a finished test's dispatcher could hold its first read open, and every later read
+     * then waited forever.
+     */
+    private val viewModels = ViewModelStore()
+    private var viewModelCount = 0
+
+    private inline fun <reified T : ViewModel> held(noinline create: () -> T): T =
+        ViewModelProvider.create(viewModels, viewModelFactory { initializer { create() } })["vm${viewModelCount++}", T::class]
+
     @Before
-    fun setUp() = Dispatchers.setMain(dispatcher)
+    fun setUp() {
+        // DataStore reads the file once; do it here in wall-clock time, not on a test dispatcher.
+        runBlocking { withTimeout(10_000) { deps.settings.settings.first() } }
+        Dispatchers.setMain(dispatcher)
+    }
 
     @After
     fun tearDown() {
+        viewModels.clear()
         Dispatchers.resetMain()
         appScope.cancel()
         db.close()
@@ -102,7 +124,7 @@ class ListViewModelTest {
 
     @Test
     fun `a refresh during a fetch replaces it instead of being dropped`() = TestScope(dispatcher).runTest {
-        val vm = Blocking(deps)
+        val vm = held { Blocking(deps) }
         vm.refresh(force = false)
         advanceUntilIdle()
         vm.refresh(force = false)
@@ -117,23 +139,28 @@ class ListViewModelTest {
         assertNull(vm.error.value)
     }
 
+    /**
+     * Not runTest: nothing drives Main here, so the ViewModel's settings state keeps the defaults, as in the moment
+     * after launch, while DataStore is waited for in wall-clock time.
+     */
     @Test
-    fun `a tap right after launch opens as the stored settings say, not as the defaults`() = TestScope(dispatcher).runTest {
-        deps.settings.update { it.copy(openThreadsInBrowser = true) }
+    fun `a tap right after launch opens as the stored settings say, not as the defaults`(): Unit = runBlocking {
+        withTimeout(10_000) { deps.settings.update { it.copy(openThreadsInBrowser = true) } }
         try {
-            // Nothing has run on Main yet, so the ViewModel's settings state still holds the defaults.
-            val vm = Blocking(deps)
+            val vm = held { Blocking(deps) }
             val row = ThreadItem(ThreadId("3pxj858k"), ThreadId("3pxj858k"), "NBN", forum = ForumRef(92, "Choosing an ISP"))
-            assertIs<OpenThread.Browser>(vm.open(row))
-            assertIs<OpenThread.Browser>(vm.lastPost(row))
+            withTimeout(10_000) {
+                assertIs<OpenThread.Browser>(vm.open(row))
+                assertIs<OpenThread.Browser>(vm.lastPost(row))
+            }
         } finally {
-            deps.settings.update { it.copy(openThreadsInBrowser = false) }
+            withTimeout(10_000) { deps.settings.update { it.copy(openThreadsInBrowser = false) } }
         }
     }
 
     @Test
     fun `rows offer Watch, or Mark as read and Unwatch once watched`() = TestScope(dispatcher).runTest {
-        val vm = Blocking(deps)
+        val vm = held { Blocking(deps) }
         val row = ThreadItem(ThreadId("3pxj858k"), ThreadId("3pxj858k"), "NBN", forum = ForumRef(92, "Choosing an ISP"))
         assertEquals(listOf(WatchAction.WATCH), vm.watchActions(row))
         assertEquals(emptyList(), vm.watchActions(row.copy(openId = null)), "deleted rows with nowhere to go")
@@ -146,7 +173,7 @@ class ListViewModelTest {
 
     @Test
     fun `the find query filters the list and is saved`() = TestScope(dispatcher).runTest {
-        val vm = Blocking(deps)
+        val vm = held { Blocking(deps) }
         val isp = ForumRef(92, "Choosing an ISP")
         val list = ListState(
             listOf(Section(isp, listOf(ThreadItem(ThreadId("a"), ThreadId("a"), "NBN plans", forum = isp), ThreadItem(ThreadId("b"), ThreadId("b"), "Optus", forum = isp)))),
@@ -158,7 +185,7 @@ class ListViewModelTest {
         vm.setQuery("nbn")
         assertEquals(listOf("NBN plans"), vm.filter(list).first().sections!!.single().items.map { it.title })
         assertEquals("nbn", deps.savedState.get<String>("findQuery"), "kept in the saved state, for process death")
-        assertEquals("nbn", Blocking(deps).query.value, "a new ViewModel over the same saved state")
+        assertEquals("nbn", held { Blocking(deps) }.query.value, "a new ViewModel over the same saved state")
 
         vm.setQuery(null)
         assertEquals(2, vm.filter(list).first().sections!!.single().items.size)
@@ -175,7 +202,7 @@ class ListViewModelTest {
         threads.replaceWatchedList("all", listOf(watchedRow("a", "NBN plans", 3), watchedRow("b", "Bike lights", 2), watchedRow("c", "Bike racks", 0)))
         db.fetchLogDao().put(FetchLogEntity("watched:unread", 1))
         db.fetchLogDao().put(FetchLogEntity("watched:all", 1))
-        val vm = WatchedViewModel(deps, watched, AppVisits())
+        val vm = held { WatchedViewModel(deps, watched, AppVisits()) }
         backgroundScope.launch { vm.markAllIds.collect {} }
 
         assertEquals(listOf(ThreadId("a"), ThreadId("b")), vm.markAllIds.first { it.isNotEmpty() })
