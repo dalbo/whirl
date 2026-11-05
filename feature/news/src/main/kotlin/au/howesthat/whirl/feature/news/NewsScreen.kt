@@ -99,7 +99,7 @@ class NewsViewModel @Inject constructor(private val repo: NewsRepository, savedS
         refresh(force = false)
     }
 
-    fun refresh(force: Boolean = true) = screen.refresh { repo.refresh(force) }
+    fun refresh(force: Boolean = true) = screen.refreshSame(force) { repo.refresh(force) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

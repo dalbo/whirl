@@ -3,10 +3,12 @@ package au.howesthat.whirl.core.ui
 import androidx.lifecycle.SavedStateHandle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 
 /**
@@ -30,25 +32,46 @@ class ListScreenState(private val scope: CoroutineScope, private val savedState:
 
     private var job: Job? = null
 
+    /** Whether [job] is a forced refresh, for [refreshSame]. */
+    private var jobForced = false
+
     /**
-     * Runs [fetch]. The latest call wins: one made during a fetch cancels it, so a pull to refresh, page swipe or tab
-     * change always loads (ignoring calls while busy dropped them). Only the newest call clears [refreshing].
+     * Runs [fetch]. The latest call wins: one made during a fetch cancels it, so a page swipe or tab change always
+     * loads what is now on screen (ignoring calls while busy left it blank). Only the newest call sets [refreshing]
+     * and [error].
      */
-    fun refresh(fetch: suspend () -> Unit) {
+    fun refresh(fetch: suspend () -> Unit) = start(forced = true, fetch)
+
+    /**
+     * For a screen that always fetches the same thing (News, Forums): a call during a fetch joins it, unless it is
+     * [force]d and the running one is not (a pull to refresh during the opening load), which it then replaces. Pulling
+     * again and again sends nothing more.
+     */
+    fun refreshSame(force: Boolean, fetch: suspend () -> Unit) {
+        if (job?.isActive == true && (jobForced || !force)) return
+        start(force, fetch)
+    }
+
+    private fun start(forced: Boolean, fetch: suspend () -> Unit) {
         job?.cancel()
+        jobForced = forced
         _refreshing.value = true
-        val next = scope.launch {
-            try {
+        // Started once it is [job], so even a fetch that finishes at once can tell whether it is still the newest.
+        val next = scope.launch(start = CoroutineStart.LAZY) {
+            val outcome = try {
                 fetch()
-                _error.value = null
+                null
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _error.value = e
+                e
             }
+            // A replaced fetch could still end in an error of its own (a cancelled call can surface as an IOException).
+            if (job === coroutineContext.job) _error.value = outcome
         }
         job = next
         next.invokeOnCompletion { if (job === next) _refreshing.value = false }
+        next.start()
     }
 
     private companion object {

@@ -168,8 +168,7 @@ fun ThreadListBody(
                     section.forum?.let { forum ->
                         item(key = "section-${section.key}") { SectionHeading(forum.title, onClick = { nav.openForum(forum) }) }
                     }
-                    val keys = rowKeys(section)
-                    itemsIndexed(section.items, key = { i, _ -> keys[i] }) { i, item ->
+                    itemsIndexed(section.items, key = { i, _ -> section.rowKeys[i] }) { i, item ->
                         SectionRow(RowPosition.of(i, section.items.size)) {
                             ThreadRowItem(
                                 item = item,

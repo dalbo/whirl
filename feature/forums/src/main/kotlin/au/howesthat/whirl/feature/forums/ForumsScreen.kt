@@ -103,7 +103,7 @@ class ForumsViewModel @Inject constructor(private val repo: ForumRepository, sav
         refresh(force = false)
     }
 
-    fun refresh(force: Boolean = true) = screen.refresh { repo.refresh(force) }
+    fun refresh(force: Boolean = true) = screen.refreshSame(force) { repo.refresh(force) }
 
     fun setFavourite(forumId: Int, favourite: Boolean) {
         viewModelScope.launch { repo.setFavourite(forumId, favourite) }

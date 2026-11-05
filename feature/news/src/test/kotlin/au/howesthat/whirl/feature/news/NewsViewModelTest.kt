@@ -40,19 +40,19 @@ class NewsViewModelTest {
         .allowMainThreadQueries().build()
     private val body = File(System.getProperty("whirl.fixtures"), "api/api_news.json").readText()
 
-    // The first API call is held until the test lets it go; later ones answer at once.
+    // The first [held] API calls wait until the test lets them go; later ones answer at once.
+    @Volatile private var held = 1
     private val calls = AtomicInteger()
     private val firstHeld = CountDownLatch(1)
     private val release = CountDownLatch(1)
     private val secondCall = CountDownLatch(1)
     private val client = OkHttpClient.Builder().addInterceptor { chain ->
-        when (calls.incrementAndGet()) {
-            1 -> {
-                firstHeld.countDown()
-                release.await(5, TimeUnit.SECONDS)
-            }
+        val n = calls.incrementAndGet()
+        when (n) {
+            1 -> firstHeld.countDown()
             2 -> secondCall.countDown()
         }
+        if (n <= held) release.await(5, TimeUnit.SECONDS)
         Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("OK")
             .body(body.toResponseBody()).build()
     }.build()
@@ -82,5 +82,21 @@ class NewsViewModelTest {
         }
         assertEquals(2, calls.get())
         assertNull(vm.error.value, "the cancelled first load is not an error")
+    }
+
+    @Test
+    fun `pulling to refresh again while a refresh is running sends nothing more`() {
+        held = 2
+        val vm = NewsViewModel(NewsRepository(api, db.newsDao(), db.fetchLogDao(), Clock.systemUTC()), SavedStateHandle())
+        assertTrue(firstHeld.await(5, TimeUnit.SECONDS))
+        vm.refresh()
+        assertTrue(secondCall.await(2, TimeUnit.SECONDS), "the pull to refresh replaces the opening load")
+        vm.refresh()
+        vm.refresh()
+        release.countDown()
+        runBlocking {
+            withTimeout(5_000) { vm.refreshing.first { !it } }
+        }
+        assertEquals(2, calls.get(), "the repeated pulls joined the refresh already running")
     }
 }

@@ -15,7 +15,7 @@ import kotlin.test.assertEquals
 class CheckReportTest {
 
     private fun record(at: String, outcome: CheckOutcome, bucket: Int? = UsageStatsManager.STANDBY_BUCKET_ACTIVE, attempt: Int = 0, idle: Boolean = false) =
-        CheckRecord(Instant.parse(at), 1200, attempt, 60, outcome, bucket, powerSave = false, deviceIdle = idle, network = NetworkKind.WIFI)
+        CheckRecord(Instant.parse(at).toEpochMilli(), Instant.parse(at), 1200, attempt, 60, outcome, bucket, powerSave = false, deviceIdle = idle, network = NetworkKind.WIFI)
 
     private val device = DeviceState(
         standbyBucket = UsageStatsManager.STANDBY_BUCKET_RARE,

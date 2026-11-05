@@ -42,14 +42,14 @@ data class ThreadItem(
  * other sections: the forum's id, numbered when the forum's threads come in more than one run (Popular, a user's
  * activity).
  */
-data class Section(val forum: ForumRef?, val items: List<ThreadItem>, val key: String = "forum-${forum?.id}")
-
-/** Lazy list keys for [section]'s rows: by thread id, numbered if a thread is listed twice. */
-fun rowKeys(section: Section): List<String> {
-    val seen = mutableMapOf<ThreadId, Int>()
-    return section.items.map { item ->
-        val n = seen.merge(item.id, 1, Int::plus)!!
-        "${section.key}/${item.id.value}" + if (n > 1) "#$n" else ""
+data class Section(val forum: ForumRef?, val items: List<ThreadItem>, val key: String = "forum-${forum?.id}") {
+    /** Lazy list keys for the rows: by thread id, numbered if a thread is listed twice. Worked out once per section. */
+    val rowKeys: List<String> by lazy {
+        val seen = mutableMapOf<ThreadId, Int>()
+        items.map { item ->
+            val n = seen.merge(item.id, 1, Int::plus)!!
+            "$key/${item.id.value}" + if (n > 1) "#$n" else ""
+        }
     }
 }
 

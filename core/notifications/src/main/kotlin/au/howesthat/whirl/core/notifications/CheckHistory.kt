@@ -68,8 +68,9 @@ data class DeviceState(
     val channelEnabled: Boolean,
 )
 
-/** One recorded check. */
+/** One recorded check; [id] is its row's. */
 data class CheckRecord(
+    val id: Long,
     val startedAt: Instant,
     val durationMs: Long,
     /** 0 for a scheduled run, then 1, 2… for WorkManager's retries. */
@@ -155,6 +156,7 @@ class CheckHistory @Inject constructor(
     }
 
     private fun CheckLogEntity.toRecord() = CheckRecord(
+        id = id,
         startedAt = Instant.ofEpochMilli(startedAt),
         durationMs = durationMs,
         attempt = attempt,

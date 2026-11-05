@@ -94,10 +94,10 @@ class ListKeysTest {
             sectioned = true,
         )
         assertEquals(listOf("forum-92", "forum-7", "forum-92-2"), runs.map { it.key })
-        assertEquals(listOf("forum-92-2/b", "forum-92-2/b#2"), rowKeys(runs[2]))
+        assertEquals(listOf("forum-92-2/b", "forum-92-2/b#2"), runs[2].rowKeys)
 
         val found = filterSections(runs, TextQuery("outage"))
         assertEquals(listOf("forum-92-2"), found.map { it.key }, "the earlier sections are hidden, the key is not shifted")
-        assertEquals(rowKeys(runs[2]), rowKeys(found.single()))
+        assertEquals(runs[2].rowKeys, found.single().rowKeys)
     }
 }
