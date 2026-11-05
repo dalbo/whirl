@@ -63,7 +63,7 @@ class WatchedRepositoryTest {
     class RecordingScheduler : WatchSendScheduler {
         val delays = mutableListOf<Duration>()
         var cancelled = false
-        override fun schedule(delay: Duration) {
+        override suspend fun schedule(delay: Duration) {
             delays += delay
         }
         override fun cancel() {
@@ -293,10 +293,11 @@ class WatchedRepositoryTest {
         val failed = async(start = CoroutineStart.UNDISPATCHED) { repo.events.filterIsInstance<WatchEvent.Failed>().first() }
         clock.now = clock.now.plusSeconds(25 * 3600)
         enqueue("", code = 429)
-        enqueueBothLists()
         assertEquals(Drain.Empty, repo.drain())
         assertIs<WhirlpoolError.RateLimited>(failed.await().error)
         assertEquals(listOf("9yvx1663", "9q684xp3"), ids(unreadOnly = true))
+        assertEquals(683, repo.watched(unreadOnly = true).first().value.first().unreadCount, "unread again, as it was")
+        assertEquals(3, server.requestCount, "the lists are not refreshed after giving up on a send that did not get through")
     }
 
     @Test
@@ -371,13 +372,19 @@ class WatchedRepositoryTest {
     }
 
     @Test
-    fun `a refresh in flight when the account changes stores nothing`() = runTest {
+    fun `lists fetched across an account switch are fetched again for the new account`() = runTest {
         loadBothLists()
+        // The two fetches below are held across the switch and answer with the old account's lists; anything fetched
+        // after it gets the new account's (two threads).
         val release = CountDownLatch(1)
+        val held = java.util.concurrent.atomic.AtomicInteger()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
-                release.await(5, TimeUnit.SECONDS)
-                return MockResponse.Builder().body(fixture("api_watched_mode1.json")).build()
+                if (held.incrementAndGet() <= 2) {
+                    release.await(5, TimeUnit.SECONDS)
+                    return MockResponse.Builder().body(fixture("api_watched_mode1.json")).build()
+                }
+                return MockResponse.Builder().body(fixture("api_watched_mode0.json")).build()
             }
         }
         clock.now = clock.now.plusSeconds(11)
@@ -387,10 +394,39 @@ class WatchedRepositoryTest {
         repo.switchAccount(change = {}, clear = db::clearAccountData)
         release.countDown()
         refresh.await()
-        assertEquals(emptyList(), unread.await(), "nothing to notify about for an account that has gone")
-        assertEquals(emptyList(), ids(unreadOnly = false))
-        assertEquals(emptyList(), ids(unreadOnly = true))
-        assertNull(db.fetchLogDao().fetchedAt("watched:all"), "the next account's list is fetched at once")
+        val newAccount = listOf("9yvx1663", "9q684xp3")
+        assertEquals(newAccount, unread.await().map { it.id.value }, "the notification check sees the new account's threads")
+        assertEquals(newAccount, ids(unreadOnly = false), "none of the old account's 19")
+        assertEquals(newAccount, ids(unreadOnly = true))
+    }
+
+    @Test
+    fun `signing out waits for the row being sent, not for the rest of the queue`() = runTest {
+        loadBothLists()
+        val release = CountDownLatch(1)
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                release.await(5, TimeUnit.SECONDS)
+                return MockResponse.Builder().body(fixture("api_watched_mode1.json")).build()
+            }
+        }
+        repo.perform(WatchAction.MARK_READ, listOf(bike), undoable = false)
+        repo.perform(WatchAction.UNWATCH, listOf(ThreadId("9q684xp3")), undoable = false)
+        server.takeRequest(5, TimeUnit.SECONDS)!! // the first is being sent
+        val signOut = async(Dispatchers.IO) { repo.switchAccount(change = {}, clear = db::clearAccountData) }
+        release.countDown()
+        signOut.await()
+        assertEquals(3, server.requestCount, "the second action was not sent")
+        assertEquals(emptyList(), queue.all())
+    }
+
+    @Test
+    fun `an action waited on when the account changes is reported as not sent`() = runTest {
+        loadBothLists()
+        val p = repo.perform(WatchAction.MARK_READ, listOf(bike))
+        val sent = async(Dispatchers.IO) { repo.awaitSend(p, 5.seconds) }
+        repo.switchAccount(change = {}, clear = {})
+        assertFalse(sent.await(), "a notification's Mark read stays, rather than going as if it were sent")
     }
 
     /** Sends [action] on [bike] after a refresh that renamed it, and has Whirlpool refuse it. */
@@ -419,13 +455,14 @@ class WatchedRepositoryTest {
         assertIs<WhirlpoolError.Maintenance>(failLate(WatchAction.MARK_READ).error)
         assertEquals("Bike Riding II", repo.watched(unreadOnly = false).first().value.single { it.id == bike }.title, "the details fetched since are kept")
         assertTrue(bike.value in ids(unreadOnly = true), "back on Unread, where it was")
+        assertEquals(683, repo.watched(unreadOnly = true).first().value.single { it.id == bike }.unreadCount, "and unread again")
     }
 
     @Test
-    fun `a late failure of an unwatch brings back a thread no longer cached`() = runTest {
+    fun `a late failure of an unwatch brings back the thread with what was fetched since`() = runTest {
         failLate(WatchAction.UNWATCH)
-        // Unwatched, the thread was on no list, so the refresh dropped it from the cache; the snapshot brings it back.
-        assertEquals("Bike Riding", repo.watched(unreadOnly = false).first().value.single { it.id == bike }.title)
+        // Unwatched, the thread was on no list; the queued action kept its row through the refresh.
+        assertEquals("Bike Riding II", repo.watched(unreadOnly = false).first().value.single { it.id == bike }.title)
         assertTrue(bike.value in ids(unreadOnly = true))
     }
 }

@@ -121,6 +121,9 @@ class WatchedRepository @Inject constructor(
     /** One sender at a time, in the app or in the worker. Taken before [mutex]. */
     private val sending = Mutex()
 
+    /** Set while an account switch waits for [sending]: the sender stops after the row it is sending. */
+    @Volatile private var switching = false
+
     internal var undoWindow: Duration = UNDO_WINDOW
 
     private val _events = MutableSharedFlow<WatchEvent>(extraBufferCapacity = 16)
@@ -150,11 +153,11 @@ class WatchedRepository @Inject constructor(
     private suspend fun refresh(unreadOnly: Boolean, maxAge: Duration, force: Boolean): Boolean {
         val key = key(unreadOnly)
         return refresher.refresh(logKey(key), maxAge, force, lastFetched = { log.fetchedAt(logKey(key)) }) {
-            val gen = account.current
-            val list = api.watched(unreadOnly).map { it.toColumns() }
-            storeLists(gen) {
-                dao.replaceWatchedList(key, list)
-                log.put(FetchLogEntity(logKey(key), clock.millis()))
+            account.fetchAndStore({ api.watched(unreadOnly).map { it.toColumns() } }) { gen, list ->
+                storeLists(gen) {
+                    dao.replaceWatchedList(key, list)
+                    log.put(FetchLogEntity(logKey(key), clock.millis()))
+                }
             }
         }
     }
@@ -164,13 +167,13 @@ class WatchedRepository @Inject constructor(
      * Returns what Whirlpool sent, less the threads with a Mark as read or Unwatch still waiting to be sent.
      */
     suspend fun fetchUnread(): List<WatchedThread> {
-        val gen = account.current
-        val list = api.watched(unreadOnly = true)
-        val queued = storeLists(gen) {
-            dao.replaceWatchedList(key(unreadOnly = true), list.map { it.toColumns() })
-            log.put(FetchLogEntity(logKey(key(unreadOnly = true)), clock.millis()))
-            queue.all().filter { it.action != WatchAction.WATCH.name }.flatMapTo(mutableSetOf()) { it.ids }
-        } ?: return emptyList() // fetched for an account that has since signed out
+        val (list, queued) = account.fetchAndStore({ api.watched(unreadOnly = true) }) { gen, list ->
+            storeLists(gen) {
+                dao.replaceWatchedList(key(unreadOnly = true), list.map { it.toColumns() })
+                log.put(FetchLogEntity(logKey(key(unreadOnly = true)), clock.millis()))
+                list to queue.all().filter { it.action != WatchAction.WATCH.name }.flatMapTo(mutableSetOf()) { it.ids }
+            }
+        } ?: return emptyList() // the account changed twice while it was fetched
         return list.filterNot { it.id.value in queued }
     }
 
@@ -287,6 +290,8 @@ class WatchedRepository @Inject constructor(
         // Nothing is being sent now, so a row still marked as sending was cut off when its process ended.
         queue.resetSending()
         while (true) {
+            // Signing out: the queue is about to be forgotten; stop after the row just sent.
+            if (switching) return Drain.Empty
             val rows = queue.all()
             if (rows.isEmpty()) return Drain.Empty
             val now = clock.millis()
@@ -351,8 +356,9 @@ class WatchedRepository @Inject constructor(
                 return false
             }
             finish(row.id, e)
-            // The action may be hours old: Whirlpool's lists, not what was cached then, say how things are now.
-            refreshQuietly()
+            // The action may be hours old: Whirlpool's lists, not what was cached then, say how things are now. Not
+            // after giving up on the network, which the lists would not get through either.
+            if (!e.isTransient()) refreshQuietly()
             _events.emit(WatchEvent.Failed(action, e))
             return true
         }
@@ -371,6 +377,10 @@ class WatchedRepository @Inject constructor(
                 if (p != null && error != null) {
                     val cached = dao.getAll(p.ids.map { it.value }).mapTo(mutableSetOf()) { it.id }
                     dao.upsert(p.threads.filterNot { it.id in cached })
+                    // While the action waited, every refresh re-applied Mark as read, so these columns are still ours.
+                    if (p.action == WatchAction.MARK_READ) {
+                        p.threads.filter { it.id in cached }.forEach { dao.setReadState(it.id, it.unreadCount, it.lastReadPost, it.isUnread) }
+                    }
                     restoreMembership(p)
                 }
             }
@@ -389,6 +399,7 @@ class WatchedRepository @Inject constructor(
 
     /** After a failure: Whirlpool's lists show what really happened. Fetched however recently they were. */
     private suspend fun refreshQuietly() {
+        if (switching) return
         try {
             refresh(unreadOnly = false, maxAge = Duration.ZERO, force = false)
             refresh(unreadOnly = true, maxAge = Duration.ZERO, force = false)
@@ -406,21 +417,31 @@ class WatchedRepository @Inject constructor(
 
     /**
      * Signing out or into another account. [change] stores the new key (or removes it) and [clear] deletes the old
-     * account's data. Nothing queued may be sent with the next key, so this waits for a send in progress and forgets the
-     * queue first; nothing fetched with the old key may be stored after [clear], so the account generation moves on in
-     * the same transaction, after [change].
+     * account's data. Nothing queued may be sent with the next key, so this waits for the row being sent (the sender
+     * stops after it) and forgets the queue first; nothing fetched with the old key may be stored after [clear], so the
+     * account generation moves on in the same transaction, after [change].
      */
-    suspend fun switchAccount(change: suspend () -> Unit, clear: suspend () -> Unit) = sending.withLock {
-        mutex.withLock {
-            scheduler.cancel()
-            queue.clear()
-            live.values.forEach { it.go.cancel() }
-            live.clear()
-            change()
-            transactor.run {
-                account.next()
-                clear()
+    suspend fun switchAccount(change: suspend () -> Unit, clear: suspend () -> Unit) {
+        switching = true
+        try {
+            sending.withLock {
+                mutex.withLock {
+                    scheduler.cancel()
+                    queue.clear()
+                    live.values.forEach {
+                        it.go.cancel()
+                        it.done.complete(CancellationException("The account changed before it was sent"))
+                    }
+                    live.clear()
+                    change()
+                    transactor.run {
+                        account.next()
+                        clear()
+                    }
+                }
             }
+        } finally {
+            switching = false
         }
     }
 
