@@ -1,15 +1,27 @@
 name: Reproducible build check
 
-# Run by hand before tagging a release (docs/plans/v1.7.md §6.3; docs/fdroid/README.md "Reproducibility"). F-Droid
-# ships our signed APK only if its own build of the tag accepts our signature, so the unsigned release build must be
-# byte-for-byte the same wherever it is built.
+# F-Droid ships our signed APK only if its own build of the tag accepts our signature, so the unsigned release build
+# must be byte-for-byte the same wherever it is built (docs/fdroid/README.md "Reproducibility"). Nobody waits on this:
+# - after each published release: builds the tag twice, and checks the release APK's signature transplants;
+# - on pull requests that change the build (Gradle, plugins, dependencies, R8 rules): builds the PR twice;
+# - by hand (Run workflow): any ref, and any release's signature.
 #
-# - "twice": builds `ref` unsigned on two clean runners, in different directories, and compares the APKs. Then it
+# - "twice": builds the commit unsigned on two clean runners, in different directories, and compares the APKs. Then it
 #   signs one with a throwaway key and copies that signature onto the other, as F-Droid will with the real one.
-# - "signature": builds the published `release` tag unsigned and copies the signature from that release's APK onto
-#   it (apksigcopier, the check F-Droid runs for `Binaries`). Before tagging, this shows the build still reproduces
-#   the last release on today's runners; after tagging, run it with the new tag.
+# - "signature": builds a published release tag unsigned and copies the signature from that release's APK onto it
+#   (apksigcopier, the check F-Droid runs for `Binaries`).
 on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  pull_request:
+    paths:
+      - 'gradle/**'
+      - 'build-logic/**'
+      - '**/*.gradle.kts'
+      - 'gradle.properties'
+      - '**/proguard-rules.pro'
+      - '.github/workflows/reproducible.yml'
   workflow_dispatch:
     inputs:
       ref:
@@ -18,6 +30,10 @@ on:
       release:
         description: Published release tag to check the signature against (empty for the latest)
         default: ''
+
+concurrency:
+  group: reproducible-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -28,21 +44,27 @@ env:
 
 jobs:
   resolve:
-    name: Resolve ${{ inputs.ref }}
+    name: Resolve
+    # After a release, only a published one (a failed Release run has no APK to compare).
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       sha: ${{ steps.sha.outputs.sha }}
+      release: ${{ steps.sha.outputs.release }}
     steps:
       # Both builds must be of the same commit, even if the branch moves between their checkouts.
       - id: sha
         env:
           GH_TOKEN: ${{ github.token }}
-          REF: ${{ inputs.ref }}
+          REF: ${{ inputs.ref || github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
+          # The tag the Release run was for, or the one asked for by hand. Empty: the latest release.
+          RELEASE: ${{ inputs.release || github.event.workflow_run.head_branch }}
         run: |
           sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$REF" -q .sha)
           echo "$REF is $sha"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "release=$RELEASE" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build in ${{ matrix.dir }}
@@ -115,7 +137,10 @@ jobs:
           "$BT/apksigner" verify --verbose transplanted.apk
 
   signature:
-    name: Signature of ${{ inputs.release || 'the latest release' }} transplants
+    name: Signature of ${{ needs.resolve.outputs.release || 'the latest release' }} transplants
+    needs: resolve
+    # A pull request changes the next build, not a published one.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -123,7 +148,7 @@ jobs:
         id: tag
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE: ${{ inputs.release }}
+          RELEASE: ${{ needs.resolve.outputs.release }}
         run: |
           tag="${RELEASE:-$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)}"
           [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Not a release tag: $tag"; exit 1; }

@@ -108,8 +108,8 @@ unit tests. Per-release checks: `docs/device-checklist.md`.
   the whole thread, posts by a user filtered in the app. First step: raw fixtures of a multi-page archive.
 - Waiting on others: Whirlpool's moderators (gates the community posts, `docs/community.md`, and the F-Droid merge
   request, `docs/fdroid/`); Play's closed test (12+ testers for 14 days, then production; `docs/play-console.md`).
-- Housekeeping: targetSdk 37 before August 2027; Google developer verification (2027); re-check reproducibility when
-  the build changes (`docs/fdroid/README.md`).
+- Housekeeping: targetSdk 37 before August 2027; Google developer verification (2027). Reproducibility is checked
+  automatically after each release and on build-changing PRs (`docs/fdroid/README.md`).
 - Small: the poster's name is a tap target under 48 dp; draggable scroll thumb; find scrolls to the post, not the
   match; linked images; an app widget.
 - Unknowns:
