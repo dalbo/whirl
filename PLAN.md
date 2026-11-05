@@ -178,6 +178,9 @@ From 1.8.12 and 2.14.12 code:
 ---
 
 ## 9. Phases
+*Historical:* the phases up to v1.0 as planned, with what became of each. Releases since are planned in `docs/plans/`
+(the current one is the newest), and `docs/history.md` records how each phase went.
+
 **Phase 0 — done** (2026-10-20): fixtures, API behaviour, 2.14.12 inventory, this plan.
 
 **Phase 1 — foundation (≈1.5 weeks)**
@@ -197,11 +200,11 @@ Accessibility (TalkBack, font scaling), landscape, Material You, store listing t
 
 **Parked until Whirlpool's moderators approve** (see Decisions, "Web session in the app"): any in-app web login, and everything it would unlock (private forums, PMs, mark-read-to-here, native posting). Ask in the API thread or of the moderators before any work on it.
 
-**Next (agreed 2026-10-31, `docs/plan-v1.3.md`)**: v1.3 find in list (filter the rows a list shows, with a "Search Whirlpool" chip); v1.4 tablet two-pane on Navigation 3, experimental and off by default until tried on a real tablet.
+**Next (agreed 2026-10-31, `docs/plans/v1.3.md`)**: v1.3 find in list (filter the rows a list shows, with a "Search Whirlpool" chip); v1.4 tablet two-pane on Navigation 3, experimental and off by default until tried on a real tablet.
 
 **Backlog**: app widget, loading linked images (Whirlpool has no inline images; a later idea), and the archive idea below.
 
-**Archive reader and in-app post filters (idea 2026-10-23; decided 2026-11-05 for v1.8, see `docs/plan-v1.7.md` §8).** `/archive/<id>` is the thread 800 posts at a time (`/archive/<id>-N` for later pages), public (no login), every post with `data-userid`, name and `.usergroup`. Two uses of one download:
+**Archive reader and in-app post filters (idea 2026-10-23; decided 2026-11-05 for v1.8: `docs/plans/v1.7.md` §8 is what the v1.8 plan must cover; the measurements below are its starting point).** `/archive/<id>` is the thread 800 posts at a time (`/archive/<id>-N` for later pages), public (no login), every post with `data-userid`, name and `.usergroup`. Two uses of one download:
 - *Archive reader*: read a thread a few hundred posts at a time by scrolling instead of paging; offline once cached.
 - *Filters in the app*: since v1.1.2, "Posts by me / OP / moderators / reps" and "user's posts" open the browser, because Whirlpool's `ux=`, `um=`, `ur=` views need a login (checked 2026-10-23). From the archive pages, Whirl could filter by user id itself.
 

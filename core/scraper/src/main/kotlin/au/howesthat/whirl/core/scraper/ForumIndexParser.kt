@@ -8,7 +8,7 @@ import au.howesthat.whirl.core.model.WhirlpoolError
 
 /**
  * The public forum index (`/`): sections of forums, each with its three most recently active threads. Not used by the
- * app yet (Forums comes from the API): kept for v1.8 (docs/plan-v1.7.md §8).
+ * app yet (Forums comes from the API): kept for v1.8 (docs/plans/v1.7.md §8).
  */
 object ForumIndexParser {
 

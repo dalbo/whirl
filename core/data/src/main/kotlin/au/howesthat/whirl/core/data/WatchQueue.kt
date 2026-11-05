@@ -88,7 +88,7 @@ sealed interface Drain {
  * whose answer already reflects the change and refreshes both lists in one call.
  *
  * Every action is stored (`pending_watch`) until it is sent, so it survives the app closing and waits for the
- * network: while the app runs, [commit] sends it; otherwise [WatchSendWorker] does (docs/plan-v1.6.md §1.3). Actions
+ * network: while the app runs, [commit] sends it; otherwise [WatchSendWorker] does (docs/plans/v1.6.md §1.3). Actions
  * on the same thread go out in the order they were made. A rejected action is undone locally and reported.
  */
 @Singleton
