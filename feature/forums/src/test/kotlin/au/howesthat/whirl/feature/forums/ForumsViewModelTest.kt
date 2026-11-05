@@ -1,0 +1,86 @@
+package au.howesthat.whirl.feature.forums
+
+import androidx.lifecycle.SavedStateHandle
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import au.howesthat.whirl.core.data.ForumRepository
+import au.howesthat.whirl.core.database.WhirlDatabase
+import au.howesthat.whirl.core.network.RetryPolicy
+import au.howesthat.whirl.core.network.WhirlpoolApi
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withTimeout
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import java.io.File
+import java.time.Clock
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+@OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+class ForumsViewModelTest {
+    private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), WhirlDatabase::class.java)
+        .allowMainThreadQueries().build()
+    private val body = File(System.getProperty("whirl.fixtures"), "api/api_forum.json").readText()
+
+    // The first API call is held until the test lets it go; later ones answer at once.
+    private val calls = AtomicInteger()
+    private val firstHeld = CountDownLatch(1)
+    private val release = CountDownLatch(1)
+    private val secondCall = CountDownLatch(1)
+    private val client = OkHttpClient.Builder().addInterceptor { chain ->
+        when (calls.incrementAndGet()) {
+            1 -> {
+                firstHeld.countDown()
+                release.await(5, TimeUnit.SECONDS)
+            }
+            2 -> secondCall.countDown()
+        }
+        Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("OK")
+            .body(body.toResponseBody()).build()
+    }.build()
+    private val api = WhirlpoolApi(client, { "k" }, retry = RetryPolicy.NONE)
+
+    @Before
+    fun setUp() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+    }
+
+    @After
+    fun tearDown() {
+        release.countDown()
+        Dispatchers.resetMain()
+        db.close()
+    }
+
+    @Test
+    fun `a pull to refresh while the list is loading is not dropped`() {
+        val vm = ForumsViewModel(ForumRepository(api, db.forumDao(), db.fetchLogDao(), Clock.systemUTC()), SavedStateHandle())
+        assertTrue(firstHeld.await(5, TimeUnit.SECONDS), "the first load is under way")
+        vm.refresh()
+        assertTrue(secondCall.await(2, TimeUnit.SECONDS), "the pull to refresh fetches while the first load is still held")
+        release.countDown()
+        runBlocking {
+            withTimeout(5_000) { vm.refreshing.first { !it } }
+        }
+        assertEquals(2, calls.get())
+        assertNull(vm.error.value, "the cancelled first load is not an error")
+    }
+}

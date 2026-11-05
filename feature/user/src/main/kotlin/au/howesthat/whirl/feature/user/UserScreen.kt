@@ -6,17 +6,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -37,15 +30,12 @@ import au.howesthat.whirl.core.data.UserRepository
 import au.howesthat.whirl.core.model.UserProfile
 import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.ui.NavIcon
-import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
-import au.howesthat.whirl.core.ui.whirlTopBarColors
 import au.howesthat.whirl.feature.threadlist.ListDeps
 import au.howesthat.whirl.feature.threadlist.ListState
-import au.howesthat.whirl.feature.threadlist.ListTitle
 import au.howesthat.whirl.feature.threadlist.ListViewModel
-import au.howesthat.whirl.feature.threadlist.ThreadListBody
 import au.howesthat.whirl.feature.threadlist.ThreadListNav
+import au.howesthat.whirl.feature.threadlist.ThreadListScaffold
 import au.howesthat.whirl.feature.threadlist.sectionsOf
 import au.howesthat.whirl.feature.threadlist.toItem
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -90,7 +80,6 @@ class UserViewModel @AssistedInject constructor(
 }
 
 /** A user's profile: the "About this user" lines, then their recent activity as a thread list. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserScreen(
     route: UserRoute,
@@ -100,53 +89,40 @@ fun UserScreen(
 ) {
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
-    val error by viewModel.error.collectAsStateWithLifecycle()
     val browser = rememberOpenInBrowser()
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                colors = whirlTopBarColors(),
-                title = { ListTitle(profile?.user?.name ?: stringResource(R.string.user_title), state.updatedAt, subtitle = "#${viewModel.userId}") },
-                navigationIcon = { NavIconButton(navIcon) },
-                actions = { IconButton(onClick = { viewModel.refresh() }) { Icon(Icons.Default.Refresh, stringResource(R.string.refresh)) } },
-            )
-        },
-    ) { padding ->
-        ThreadListBody(
-            sections = state.sections,
-            refreshing = refreshing,
-            error = error,
-            onRefresh = { viewModel.refresh() },
-            viewModel = viewModel,
-            nav = nav,
-            emptyText = stringResource(R.string.no_recent_activity),
-            browserUrl = viewModel.profileUrl(),
-            modifier = Modifier.padding(padding),
-            header = {
-                profile?.let { p ->
-                    item(key = "about") {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            p.about.forEach { (label, value) ->
-                                Row {
-                                    Text(label, Modifier.width(120.dp), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                                    Text(value, style = MaterialTheme.typography.bodyMedium)
-                                }
+    ThreadListScaffold(
+        title = profile?.user?.name ?: stringResource(R.string.user_title),
+        navIcon = navIcon,
+        nav = nav,
+        viewModel = viewModel,
+        state = state,
+        emptyText = stringResource(R.string.no_recent_activity),
+        subtitle = "#${viewModel.userId}",
+        canFind = false,
+        browserUrl = viewModel.profileUrl(),
+        header = {
+            profile?.let { p ->
+                item(key = "about") {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        p.about.forEach { (label, value) ->
+                            Row {
+                                Text(label, Modifier.width(120.dp), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                Text(value, style = MaterialTheme.typography.bodyMedium)
                             }
-                            TextButton(onClick = { browser(viewModel.profileUrl()) }) { Text(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser)) }
                         }
-                    }
-                    item(key = "recent") {
-                        Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                            Text(
-                                stringResource(R.string.recent_activity),
-                                Modifier.fillMaxWidth().semantics { heading() }.padding(horizontal = 16.dp, vertical = 8.dp),
-                                style = MaterialTheme.typography.titleSmall,
-                            )
-                        }
+                        TextButton(onClick = { browser(viewModel.profileUrl()) }) { Text(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser)) }
                     }
                 }
-            },
-        )
-    }
+                item(key = "recent") {
+                    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                        Text(
+                            stringResource(R.string.recent_activity),
+                            Modifier.fillMaxWidth().semantics { heading() }.padding(horizontal = 16.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                    }
+                }
+            }
+        },
+    )
 }

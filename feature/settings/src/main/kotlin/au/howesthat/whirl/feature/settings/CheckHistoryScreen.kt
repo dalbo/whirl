@@ -88,7 +88,7 @@ fun CheckHistoryScreen(onBack: () -> Unit, viewModel: CheckHistoryViewModel = hi
             if (s.records.isEmpty()) {
                 item { Text(stringResource(R.string.check_history_empty), Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium) }
             }
-            items(s.records.zip(gaps)) { (record, gap) -> Record(record, gap) }
+            items(s.records.zip(gaps), key = { (record, _) -> "${record.startedAt.toEpochMilli()}-${record.attempt}" }) { (record, gap) -> Record(record, gap) }
         }
     }
 }

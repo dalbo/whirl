@@ -80,3 +80,24 @@ class KeepRowTest {
         assertSame(before, keepRow(before, before, ThreadId("a")))
     }
 }
+
+class ListKeysTest {
+    private val isp = ForumRef(92, "Choosing an ISP")
+    private val desktops = ForumRef(7, "Desktops")
+    private fun item(id: String, title: String, forum: ForumRef) = ThreadItem(ThreadId(id), ThreadId(id), title, forum = forum)
+
+    @Test
+    fun `list keys stay put when find hides a section, and never repeat`() {
+        // Popular-style runs: the same forum twice, and a thread listed twice in one run.
+        val runs = sectionsOf(
+            listOf(item("a", "NBN plans", isp), item("c", "GPU prices", desktops), item("b", "NBN outage", isp), item("b", "NBN outage", isp)),
+            sectioned = true,
+        )
+        assertEquals(listOf("forum-92", "forum-7", "forum-92-2"), runs.map { it.key })
+        assertEquals(listOf("forum-92-2/b", "forum-92-2/b#2"), rowKeys(runs[2]))
+
+        val found = filterSections(runs, TextQuery("outage"))
+        assertEquals(listOf("forum-92-2"), found.map { it.key }, "the earlier sections are hidden, the key is not shifted")
+        assertEquals(rowKeys(runs[2]), rowKeys(found.single()))
+    }
+}

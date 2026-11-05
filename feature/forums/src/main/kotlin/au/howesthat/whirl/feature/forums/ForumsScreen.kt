@@ -41,6 +41,7 @@ import au.howesthat.whirl.core.ui.rememberNow
 import au.howesthat.whirl.core.ui.ActionsMenu
 import au.howesthat.whirl.core.ui.EmptyState
 import au.howesthat.whirl.core.ui.ErrorState
+import au.howesthat.whirl.core.ui.ListScreenState
 import au.howesthat.whirl.core.ui.FindBar
 import au.howesthat.whirl.core.ui.FindButton
 import au.howesthat.whirl.core.ui.MenuAction
@@ -56,11 +57,8 @@ import au.howesthat.whirl.core.ui.menuClickable
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 import au.howesthat.whirl.core.ui.whirlTopBarColors
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -89,51 +87,26 @@ fun filterForums(sections: List<ForumSection>, query: TextQuery): List<ForumSect
 data class ForumsState(val forums: List<ForumListItem>?, val updatedAt: Instant?)
 
 @HiltViewModel
-class ForumsViewModel @Inject constructor(private val repo: ForumRepository, private val savedState: SavedStateHandle) : ViewModel() {
-    /** Find in list: null while the bar is closed. Saved, so it survives process death. */
-    val query: StateFlow<String?> = savedState.getStateFlow(QUERY_KEY, null)
+class ForumsViewModel @Inject constructor(private val repo: ForumRepository, savedState: SavedStateHandle) : ViewModel() {
+    private val screen = ListScreenState(viewModelScope, savedState)
+    val query: StateFlow<String?> = screen.query
+    val refreshing: StateFlow<Boolean> = screen.refreshing
+    val error: StateFlow<Throwable?> = screen.error
 
-    fun setQuery(query: String?) {
-        savedState[QUERY_KEY] = query
-    }
+    fun setQuery(query: String?) = screen.setQuery(query)
 
     val state: StateFlow<ForumsState> = repo.forums
         .map { ForumsState(it.value.takeIf { _ -> it.updatedAt != null || it.value.isNotEmpty() }, it.updatedAt) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ForumsState(null, null))
 
-    private val _refreshing = MutableStateFlow(false)
-    val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
-
-    private val _error = MutableStateFlow<Throwable?>(null)
-    val error: StateFlow<Throwable?> = _error.asStateFlow()
-
     init {
         refresh(force = false)
     }
 
-    fun refresh(force: Boolean = true) {
-        if (_refreshing.value) return
-        _refreshing.value = true
-        viewModelScope.launch {
-            _error.value = try {
-                repo.refresh(force)
-                null
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                e
-            } finally {
-                _refreshing.value = false
-            }
-        }
-    }
+    fun refresh(force: Boolean = true) = screen.refresh { repo.refresh(force) }
 
     fun setFavourite(forumId: Int, favourite: Boolean) {
         viewModelScope.launch { repo.setFavourite(forumId, favourite) }
-    }
-
-    private companion object {
-        const val QUERY_KEY = "findQuery"
     }
 }
 

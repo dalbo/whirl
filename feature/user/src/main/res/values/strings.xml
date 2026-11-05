@@ -1,6 +1,5 @@
 <resources>
     <string name="user_title">User</string>
-    <string name="refresh">Refresh</string>
     <string name="recent_activity">Recent activity</string>
     <string name="no_recent_activity">No recent activity.</string>
 </resources>
