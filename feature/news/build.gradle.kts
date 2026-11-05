@@ -5,7 +5,3 @@ plugins {
 android {
     namespace = "au.howesthat.whirl.feature.news"
 }
-
-dependencies {
-    implementation(libs.compose.material.icons.core)
-}

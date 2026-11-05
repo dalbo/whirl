@@ -1,6 +1,6 @@
 plugins {
     alias(libs.plugins.whirl.jvm.library)
-    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.whirl.serialization)
 }
 
 dependencies {
@@ -8,7 +8,6 @@ dependencies {
     api(libs.okhttp)
     implementation(libs.okhttp.coroutines)
     api(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.serialization.json)
     implementation(libs.jsoup)
     compileOnly(libs.jspecify)
 

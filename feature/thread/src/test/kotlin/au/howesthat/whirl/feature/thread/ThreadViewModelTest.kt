@@ -49,17 +49,17 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import java.io.File
 import java.net.UnknownHostException
 import java.time.Clock
 import java.time.Duration
+import java.time.Instant
+import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
 class ThreadViewModelTest {
 
     private val server = MockWebServer().apply { start() }
@@ -69,7 +69,7 @@ class ThreadViewModelTest {
     private val client = WhirlpoolHttp.client("Whirl/test").newBuilder()
         .dns { host -> if (host == "localhost" || host == "127.0.0.1") Dns.SYSTEM.lookup(host) else throw UnknownHostException(host) }
         .build()
-    private val clock = Clock.systemUTC()
+    private val clock = Clock.fixed(Instant.parse("2026-11-05T00:00:00Z"), ZoneOffset.UTC)
     private val forums = ForumRepository(WhirlpoolApi(client, { null }, server.url("/api/"), RetryPolicy.NONE), db.forumDao(), db.fetchLogDao(), clock)
     private val repo = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock)
     private val settings = SettingsRepository(ApplicationProvider.getApplicationContext())

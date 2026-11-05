@@ -25,7 +25,6 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import java.io.File
 import java.time.Clock
 import java.time.Instant
@@ -45,7 +44,6 @@ class MutableClock(var now: Instant = Instant.parse("2026-10-20T09:00:00Z")) : C
 }
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
 class RepositoryTest {
 
     @get:Rule val tmp = TemporaryFolder()

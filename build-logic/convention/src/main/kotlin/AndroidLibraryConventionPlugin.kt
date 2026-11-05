@@ -1,6 +1,9 @@
 import com.android.build.api.dsl.LibraryExtension
+import com.android.build.api.variant.DeviceTestBuilder
+import com.android.build.api.variant.LibraryAndroidComponentsExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.withType
@@ -24,12 +27,17 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
             }
         }
         configureKotlinJvmTarget()
-        val fixturesDir = rootProject.layout.projectDirectory.dir("fixtures")
-        tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
-            systemProperty("whirl.fixtures", fixturesDir.asFile.absolutePath)
-            timeout.set(java.time.Duration.ofMinutes(10))
-            failOnNoDiscoveredTests.set(false)
+        // No module has instrumented tests: skip the androidTest variants.
+        extensions.configure<LibraryAndroidComponentsExtension> {
+            beforeVariants { it.deviceTests[DeviceTestBuilder.ANDROID_TEST_TYPE]?.enable = false }
+            // One Robolectric SDK for every module (build-logic/robolectric/robolectric.properties).
+            val robolectricConfig = rootProject.layout.projectDirectory.dir("build-logic/robolectric").asFile.absolutePath
+            onVariants { variant ->
+                variant.hostTests.values.forEach { it.sources.resources?.addStaticSourceDirectory(robolectricConfig) }
+            }
         }
+        configureTests()
+        tasks.withType<Test>().configureEach { failOnNoDiscoveredTests.set(false) }
         dependencies {
             add("testImplementation", lib("junit4"))
             add("testImplementation", lib("robolectric"))

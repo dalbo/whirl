@@ -4,7 +4,7 @@ Whirlpool sits behind a Cloudflare managed challenge that rejects curl, Node fet
 but passes a headed Chromium window. These scripts drive a headed Playwright Chromium (works under WSLg) to save
 real pages and API responses into `fixtures/`, which the parser unit tests and API models are written against.
 
-    cd tools/capture && npm install && npx playwright install chromium
+    cd tools/capture && npm ci && npx playwright install chromium   # versions from package-lock.json
     npm run public                      # public HTML pages listed in public.json
     printf '%s' 'YOUR-KEY' > ~/.config/whirldroid/apikey && chmod 600 ~/.config/whirldroid/apikey
     npm run api                         # JSON API calls (key read from the file, never printed or saved)

@@ -30,6 +30,10 @@ gradlePlugin {
             id = "whirl.android.feature"
             implementationClass = "AndroidFeatureConventionPlugin"
         }
+        register("serialization") {
+            id = "whirl.serialization"
+            implementationClass = "SerializationConventionPlugin"
+        }
         register("jvmLibrary") {
             id = "whirl.jvm.library"
             implementationClass = "JvmLibraryConventionPlugin"

@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -24,9 +27,9 @@ jobs:
         # en-AU is the Play listing; en-US is F-Droid's fallback locale. Edit en-AU and copy it over.
         run: diff -r fastlane/metadata/android/en-AU fastlane/metadata/android/en-US
       - name: Lint, unit tests, debug build
-        run: ./gradlew lint test assembleDebug --stacktrace
+        run: ./gradlew :app:lintDebug test assembleDebug --stacktrace
       - name: Upload test and lint reports
-        if: failure()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: reports

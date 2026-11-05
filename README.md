@@ -7,7 +7,7 @@ rewrite with the features of the abandoned Whirldroid. Not affiliated with Whirl
 
 ## Building
 
-Requires JDK 17+ and the Android SDK (compile SDK 37). `./gradlew test assembleDebug`.
+Requires JDK 17 (the Gradle daemon is pinned to it) and the Android SDK (compile SDK 37). `./gradlew test assembleDebug`.
 Parser tests run against real captured pages in `fixtures/`; no test touches the network.
 
 ## Releases

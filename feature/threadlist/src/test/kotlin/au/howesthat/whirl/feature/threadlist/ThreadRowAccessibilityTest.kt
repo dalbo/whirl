@@ -17,12 +17,10 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import java.time.Instant
 import kotlin.test.assertEquals
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
 class ThreadRowAccessibilityTest {
 
     @get:Rule val compose = createComposeRule()
@@ -45,7 +43,7 @@ class ThreadRowAccessibilityTest {
             WhirlTheme(darkTheme = false) {
                 ThreadRowItem(
                     item = item,
-                    now = Instant.now(),
+                    now = Instant.parse("2026-11-05T00:00:00Z"),
                     onOpen = {},
                     onLastPost = {},
                     onOpenInBrowser = {},

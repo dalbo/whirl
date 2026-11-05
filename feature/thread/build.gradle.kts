@@ -1,6 +1,6 @@
 plugins {
     alias(libs.plugins.whirl.android.feature)
-    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.whirl.serialization)
 }
 
 android {
@@ -11,8 +11,6 @@ dependencies {
     // PostBodyParser turns cached body HTML into blocks.
     implementation(project(":core:scraper"))
     implementation(libs.androidx.navigation3.runtime)
-    implementation(libs.kotlinx.serialization.json)
-    implementation(libs.compose.material.icons.core)
 
     testImplementation(project(":core:database"))
     testImplementation(libs.okhttp.mockwebserver)
