@@ -12,7 +12,6 @@ import au.howesthat.whirl.core.model.Style
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
@@ -20,7 +19,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
 class StylesTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private fun files(folder: String) = context.assets.list(folder).orEmpty().filter { it.endsWith(".json") }.map { it.removeSuffix(".json") }

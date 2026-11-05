@@ -23,14 +23,12 @@ import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import java.io.File
 import java.time.Clock
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
 class WatchSendWorkerTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()

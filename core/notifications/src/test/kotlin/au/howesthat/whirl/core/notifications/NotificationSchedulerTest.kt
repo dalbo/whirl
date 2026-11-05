@@ -27,21 +27,22 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
 class NotificationSchedulerTest {
+    private val clock = Clock.fixed(Instant.parse("2026-11-05T00:00:00Z"), ZoneOffset.UTC)
 
     private val context = ApplicationProvider.getApplicationContext<Application>()
     private val db = Room.inMemoryDatabaseBuilder(context, WhirlDatabase::class.java).allowMainThreadQueries().build()
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val settings = SettingsRepository(context)
-    private val watched = WatchedRepository(WhirlpoolApi(WhirlpoolHttp.client("t"), { null }), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, Clock.systemUTC(), appScope)
+    private val watched = WatchedRepository(WhirlpoolApi(WhirlpoolHttp.client("t"), { null }), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, clock, appScope)
     private val notifier = WatchedNotifier(context, settings, watched, db.notifiedDao())
     private val scheduler = NotificationScheduler(context, settings, notifier, appScope)
 

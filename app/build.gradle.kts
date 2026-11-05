@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.whirl.android.application)
     alias(libs.plugins.whirl.android.compose)
     alias(libs.plugins.whirl.hilt)
-    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.whirl.serialization)
 }
 
 // The version lives in app/version.properties (F-Droid reads it at each tag); the release workflow checks the tag.
@@ -64,6 +64,8 @@ android {
     }
 
     lint {
+        // `:app:lintDebug` also checks every library module, once, with these options (CI runs only that).
+        checkDependencies = true
         warningsAsErrors = false
         abortOnError = true
         checkReleaseBuilds = false
@@ -94,8 +96,6 @@ dependencies {
     implementation(libs.compose.material3.adaptive.layout)
     implementation(libs.compose.material3.adaptive.navigation3)
     implementation(libs.androidx.hilt.viewmodel.compose)
-    implementation(libs.kotlinx.serialization.json)
-    implementation(libs.compose.material.icons.core)
 
     testImplementation(libs.junit4)
     testImplementation(libs.kotlin.test.junit)

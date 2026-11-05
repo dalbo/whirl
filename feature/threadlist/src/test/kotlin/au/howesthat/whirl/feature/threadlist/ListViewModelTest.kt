@@ -45,8 +45,9 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -54,17 +55,17 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
 class ListViewModelTest {
+    private val clock = Clock.fixed(Instant.parse("2026-11-05T00:00:00Z"), ZoneOffset.UTC)
     private val dispatcher = StandardTestDispatcher()
     private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), WhirlDatabase::class.java)
         .allowMainThreadQueries().build()
     private val api = WhirlpoolApi(WhirlpoolHttp.client("t"), { null })
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val watched = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, Clock.systemUTC(), appScope)
+    private val watched = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, clock, appScope)
     private val deps = ListDeps(
         SettingsRepository(ApplicationProvider.getApplicationContext()),
-        ForumRepository(api, db.forumDao(), db.fetchLogDao(), Clock.systemUTC()),
+        ForumRepository(api, db.forumDao(), db.fetchLogDao(), clock),
         watched,
         SavedStateHandle(),
     )

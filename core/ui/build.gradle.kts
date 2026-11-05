@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.whirl.android.library)
     alias(libs.plugins.whirl.android.compose)
-    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.whirl.serialization)
 }
 
 android {
@@ -14,6 +14,4 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.browser)
-    implementation(libs.compose.material.icons.core)
-    implementation(libs.kotlinx.serialization.json)
 }

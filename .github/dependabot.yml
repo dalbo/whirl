@@ -4,11 +4,19 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # A dependency joins the first group that matches it, so test libraries come before androidx.
     groups:
+      test-libraries:
+        patterns: ["junit:junit", "org.junit*", "org.robolectric*", "app.cash.turbine*", "androidx.test*"]
       androidx:
         patterns: ["androidx.*"]
       kotlin:
         patterns: ["org.jetbrains.kotlin*", "org.jetbrains.kotlinx*", "com.google.devtools.ksp"]
+  # Playwright for fixture captures (tools/capture). tools/spike is frozen and not watched.
+  - package-ecosystem: npm
+    directory: /tools/capture
+    schedule:
+      interval: monthly
   - package-ecosystem: github-actions
     directory: /
     schedule:
