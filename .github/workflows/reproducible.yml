@@ -4,7 +4,8 @@ name: Reproducible build check
 # ships our signed APK only if its own build of the tag accepts our signature, so the unsigned release build must be
 # byte-for-byte the same wherever it is built.
 #
-# - "twice": builds `ref` unsigned on two clean runners, in different directories, and compares the APKs.
+# - "twice": builds `ref` unsigned on two clean runners, in different directories, and compares the APKs. Then it
+#   signs one with a throwaway key and copies that signature onto the other, as F-Droid will with the real one.
 # - "signature": builds the published `release` tag unsigned and copies the signature from that release's APK onto
 #   it (apksigcopier, the check F-Droid runs for `Binaries`). Before tagging, this shows the build still reproduces
 #   the last release on today's runners; after tagging, run it with the new tag.
@@ -21,9 +22,31 @@ on:
 permissions:
   contents: read
 
+env:
+  # F-Droid's own tool for the Binaries check (https://pypi.org/project/apksigcopier/).
+  APKSIGCOPIER: apksigcopier==1.1.1
+
 jobs:
+  resolve:
+    name: Resolve ${{ inputs.ref }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      # Both builds must be of the same commit, even if the branch moves between their checkouts.
+      - id: sha
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ inputs.ref }}
+        run: |
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$REF" -q .sha)
+          echo "$REF is $sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
   build:
-    name: Build ${{ inputs.ref }} in ${{ matrix.dir }}
+    name: Build in ${{ matrix.dir }}
+    needs: resolve
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -33,14 +56,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ needs.resolve.outputs.sha }}
           path: ${{ matrix.dir }}
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 17
       # No Gradle cache: each build starts clean, as F-Droid's does.
-      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
+      - uses: gradle/actions/setup-gradle@v6
         with:
           cache-disabled: true
       - name: Build the unsigned release APK
@@ -57,6 +80,7 @@ jobs:
     name: Same APK twice
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -68,10 +92,25 @@ jobs:
             echo "Identical."
             exit 0
           fi
-          echo "::error::The two builds differ. Entries that differ:"
-          for i in 0 1; do (cd apk-$i && unzip -q app-release-unsigned.apk -d x && cd x && find . -type f -exec sha256sum {} + | sort -k2 > ../../sums-$i.txt); done
+          echo "::error::The two builds differ."
+          echo "Entries whose contents differ:"
+          for i in 0 1; do (mkdir -p x-$i && cd x-$i && unzip -q ../apk-$i/app-release-unsigned.apk && find . -type f -exec sha256sum {} + | sort -k2 > ../sums-$i.txt); done
           diff sums-0.txt sums-1.txt || true
+          # Same contents can still differ in order, timestamps, compression or alignment.
+          echo "Zip metadata:"
+          for i in 0 1; do zipinfo -v apk-$i/app-release-unsigned.apk > zipinfo-$i.txt; done
+          diff zipinfo-0.txt zipinfo-1.txt | head -200 || true
           exit 1
+      - name: A signature on one build transplants onto the other
+        # The real key never leaves release.yml: sign with a throwaway one, which is enough to show that signing
+        # (alignment, v1/v2/v3 blocks) leaves nothing that the other unsigned build lacks.
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/[0-9]* | sort -V | tail -1)
+          keytool -genkeypair -keystore throwaway.jks -storepass throwaway -keypass throwaway -alias t \
+            -keyalg RSA -keysize 2048 -validity 1 -dname CN=throwaway -noprompt
+          "$BT/apksigner" sign --ks throwaway.jks --ks-pass pass:throwaway --out signed.apk apk-0/app-release-unsigned.apk
+          pipx run "$APKSIGCOPIER" copy signed.apk apk-1/app-release-unsigned.apk transplanted.apk
+          "$BT/apksigner" verify --verbose transplanted.apk
 
   signature:
     name: Signature of ${{ inputs.release || 'the latest release' }} transplants
@@ -94,7 +133,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
+      - uses: gradle/actions/setup-gradle@v6
         with:
           cache-disabled: true
       - name: Build the unsigned release APK
@@ -102,10 +141,13 @@ jobs:
       - name: Download the published APK
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release download "${{ steps.tag.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --pattern '*.apk' --dir published
+          TAG: ${{ steps.tag.outputs.tag }}
+        # The name release.yml gives it, and the one F-Droid's Binaries URL points at.
+        run: gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "whirl-$TAG.apk" --dir published
       - name: Copy its signature onto this build and verify
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
-          pip install --quiet apksigcopier
           BT=$(ls -d "$ANDROID_HOME"/build-tools/[0-9]* | sort -V | tail -1)
-          apksigcopier copy published/*.apk app/build/outputs/apk/release/app-release-unsigned.apk transplanted.apk
+          pipx run "$APKSIGCOPIER" copy "published/whirl-$TAG.apk" app/build/outputs/apk/release/app-release-unsigned.apk transplanted.apk
           "$BT/apksigner" verify --verbose transplanted.apk
