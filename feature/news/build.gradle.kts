@@ -5,3 +5,7 @@ plugins {
 android {
     namespace = "au.howesthat.whirl.feature.news"
 }
+
+dependencies {
+    testImplementation(project(":core:database"))
+}

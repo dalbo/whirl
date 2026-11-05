@@ -70,26 +70,32 @@ fun CheckHistoryScreen(onBack: () -> Unit, viewModel: CheckHistoryViewModel = hi
         },
     ) { padding ->
         val s = state ?: return@Scaffold
-        val gaps = gaps(s.records)
-        LazyColumn(Modifier.padding(padding)) {
-            item { Status(s) }
-            item {
-                OutlinedButton(onClick = { openAppInfo(context) }, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    Text(stringResource(R.string.check_history_app_info))
-                }
-                Text(
-                    stringResource(R.string.check_history_explain),
-                    Modifier.padding(16.dp, 8.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        CheckHistoryList(s, onAppInfo = { openAppInfo(context) }, Modifier.padding(padding))
+    }
+}
+
+/** The device's state, what the checks depend on, and the recorded checks, newest first. */
+@Composable
+internal fun CheckHistoryList(s: CheckHistoryState, onAppInfo: () -> Unit, modifier: Modifier = Modifier) {
+    val gaps = gaps(s.records)
+    LazyColumn(modifier) {
+        item { Status(s) }
+        item {
+            OutlinedButton(onClick = onAppInfo, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Text(stringResource(R.string.check_history_app_info))
             }
-            item { SectionHeading(stringResource(R.string.check_history_recent)) }
-            if (s.records.isEmpty()) {
-                item { Text(stringResource(R.string.check_history_empty), Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium) }
-            }
-            items(s.records.zip(gaps)) { (record, gap) -> Record(record, gap) }
+            Text(
+                stringResource(R.string.check_history_explain),
+                Modifier.padding(16.dp, 8.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
+        item { SectionHeading(stringResource(R.string.check_history_recent)) }
+        if (s.records.isEmpty()) {
+            item { Text(stringResource(R.string.check_history_empty), Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium) }
+        }
+        items(s.records.zip(gaps), key = { (record, _) -> record.id }) { (record, gap) -> Record(record, gap) }
     }
 }
 

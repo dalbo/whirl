@@ -37,7 +37,21 @@ data class ThreadItem(
 )
 
 /** A list section: a forum header (null for an ungrouped list) and its rows. */
-data class Section(val forum: ForumRef?, val items: List<ThreadItem>)
+/**
+ * Rows under a forum heading (or none). [key] identifies the section in a lazy list and does not change when find hides
+ * other sections: the forum's id, numbered when the forum's threads come in more than one run (Popular, a user's
+ * activity).
+ */
+data class Section(val forum: ForumRef?, val items: List<ThreadItem>, val key: String = "forum-${forum?.id}") {
+    /** Lazy list keys for the rows: by thread id, numbered if a thread is listed twice. Worked out once per section. */
+    val rowKeys: List<String> by lazy {
+        val seen = mutableMapOf<ThreadId, Int>()
+        items.map { item ->
+            val n = seen.merge(item.id, 1, Int::plus)!!
+            "$key/${item.id.value}" + if (n > 1) "#$n" else ""
+        }
+    }
+}
 
 fun ThreadRow.toItem(pageForum: ForumRef?, unreadIds: Set<ThreadId> = emptySet()) = ThreadItem(
     id = id,
@@ -117,7 +131,7 @@ fun keepRow(sections: List<Section>, previous: List<Section>?, id: ThreadId?): L
             list[at] = list[at].copy(items = items)
         }
     } else {
-        sections.toMutableList().apply { add(sectionIndex.coerceAtMost(size), Section(old.forum, listOf(row))) }
+        sections.toMutableList().apply { add(sectionIndex.coerceAtMost(size), old.copy(items = listOf(row))) }
     }
 }
 
@@ -129,4 +143,10 @@ fun sectionsOf(items: List<ThreadItem>, sectioned: Boolean): List<Section> =
         if (last != null && last.forum?.id == item.forum?.id) acc[acc.lastIndex] = last.copy(items = last.items + item)
         else acc += Section(item.forum, listOf(item))
         acc
+    }.let { sections ->
+        val runs = mutableMapOf<String, Int>()
+        sections.map { s ->
+            val n = runs.merge(s.key, 1, Int::plus)!!
+            if (n > 1) s.copy(key = "${s.key}-$n") else s
+        }
     }

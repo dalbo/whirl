@@ -38,6 +38,7 @@ import au.howesthat.whirl.core.model.NewsItem
 import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.ui.rememberNow
 import au.howesthat.whirl.core.ui.ErrorState
+import au.howesthat.whirl.core.ui.ListScreenState
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.model.TextQuery
@@ -50,15 +51,11 @@ import au.howesthat.whirl.core.ui.errorMessage
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 import au.howesthat.whirl.core.ui.whirlTopBarColors
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -87,49 +84,24 @@ fun filterNews(days: List<NewsDay>, query: TextQuery): List<NewsDay> =
 data class NewsState(val days: List<NewsDay>?, val updatedAt: Instant?)
 
 @HiltViewModel
-class NewsViewModel @Inject constructor(private val repo: NewsRepository, private val savedState: SavedStateHandle) : ViewModel() {
-    /** Find in list: null while the bar is closed. Saved, so it survives process death. */
-    val query: StateFlow<String?> = savedState.getStateFlow(QUERY_KEY, null)
+class NewsViewModel @Inject constructor(private val repo: NewsRepository, savedState: SavedStateHandle) : ViewModel() {
+    private val screen = ListScreenState(viewModelScope, savedState)
+    val query: StateFlow<String?> = screen.query
+    val refreshing: StateFlow<Boolean> = screen.refreshing
+    val error: StateFlow<Throwable?> = screen.error
 
-    fun setQuery(query: String?) {
-        savedState[QUERY_KEY] = query
-    }
+    fun setQuery(query: String?) = screen.setQuery(query)
 
     val state: StateFlow<NewsState> = combine(repo.news, query) { news, query ->
         NewsState(news.updatedAt?.let { _ -> filterNews(groupByDay(news.value, ZoneId.systemDefault()), TextQuery(query)) }, news.updatedAt)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NewsState(null, null))
 
-    private val _refreshing = MutableStateFlow(false)
-    val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
-
-    private val _error = MutableStateFlow<Throwable?>(null)
-    val error: StateFlow<Throwable?> = _error.asStateFlow()
-
     init {
         refresh(force = false)
     }
 
-    fun refresh(force: Boolean = true) {
-        if (_refreshing.value) return
-        _refreshing.value = true
-        viewModelScope.launch {
-            _error.value = try {
-                repo.refresh(force)
-                null
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                e
-            } finally {
-                _refreshing.value = false
-            }
-        }
-    }
-
-    private companion object {
-        const val QUERY_KEY = "findQuery"
-    }
+    fun refresh(force: Boolean = true) = screen.refreshSame(force) { repo.refresh(force) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

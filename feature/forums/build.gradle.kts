@@ -5,3 +5,7 @@ plugins {
 android {
     namespace = "au.howesthat.whirl.feature.forums"
 }
+
+dependencies {
+    testImplementation(project(":core:database"))
+}

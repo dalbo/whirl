@@ -13,14 +13,11 @@ import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.model.TextQuery
 import au.howesthat.whirl.core.model.ThreadId
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
+import au.howesthat.whirl.core.ui.ListScreenState
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -46,19 +43,12 @@ abstract class ListViewModel(private val deps: ListDeps, private val from: Opene
     /** Watched threads (both lists, plus actions waiting out their Undo window), to offer Watch or Unwatch. */
     val watchedIds: StateFlow<Set<ThreadId>> = deps.watched.watchedIds.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
-    private val _refreshing = MutableStateFlow(false)
-    val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
+    private val screen = ListScreenState(viewModelScope, deps.savedState)
+    val refreshing: StateFlow<Boolean> = screen.refreshing
+    val error: StateFlow<Throwable?> = screen.error
+    val query: StateFlow<String?> = screen.query
 
-    private val _error = MutableStateFlow<Throwable?>(null)
-    /** The last refresh's failure; the cached list (if any) stays on screen. */
-    val error: StateFlow<Throwable?> = _error.asStateFlow()
-
-    /** Find in list: null while the bar is closed, else what is typed. Saved, so it survives process death. */
-    val query: StateFlow<String?> = deps.savedState.getStateFlow(QUERY_KEY, null)
-
-    fun setQuery(query: String?) {
-        deps.savedState[QUERY_KEY] = query
-    }
+    fun setQuery(query: String?) = screen.setQuery(query)
 
     /** This list with only the rows that match [query]. */
     protected fun Flow<ListState>.filtered(matchForum: Boolean = true): Flow<ListState> =
@@ -71,29 +61,8 @@ abstract class ListViewModel(private val deps: ListDeps, private val from: Opene
         if (from != OpenedFrom.WATCHED) viewModelScope.launch { deps.watched.ensureKnown() }
     }
 
-    private var refreshJob: Job? = null
-
-    /**
-     * Refreshes what is on screen. The latest call wins: a page swipe or tab change during a fetch cancels it, so the
-     * new page always loads (ignoring calls while busy left it blank).
-     */
-    fun refresh(force: Boolean = true) {
-        refreshJob?.cancel()
-        _refreshing.value = true
-        val job = viewModelScope.launch {
-            try {
-                fetch(force)
-                _error.value = null
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _error.value = e
-            }
-        }
-        refreshJob = job
-        // Only the newest job clears the indicator, not one it cancelled.
-        job.invokeOnCompletion { if (refreshJob === job) _refreshing.value = false }
-    }
+    /** Refreshes what is on screen; the latest call wins ([ListScreenState.refresh]). */
+    fun refresh(force: Boolean = true) = screen.refresh { fetch(force) }
 
     /** How to open [item]; waits for the settings on the first tap after launch, so it never decides on the defaults. */
     suspend fun open(item: ThreadItem): OpenThread? {
@@ -133,8 +102,4 @@ abstract class ListViewModel(private val deps: ListDeps, private val from: Opene
     }
 
     fun browserUrl(item: ThreadItem): String = opener.browserUrl(item.openId ?: item.id)
-
-    private companion object {
-        const val QUERY_KEY = "findQuery"
-    }
 }

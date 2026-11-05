@@ -164,11 +164,11 @@ fun ThreadListBody(
                         )
                     }
                 }
-                sections.orEmpty().forEachIndexed { index, section ->
+                sections.orEmpty().forEach { section ->
                     section.forum?.let { forum ->
-                        item(key = "section-$index") { SectionHeading(forum.title, onClick = { nav.openForum(forum) }) }
+                        item(key = "section-${section.key}") { SectionHeading(forum.title, onClick = { nav.openForum(forum) }) }
                     }
-                    itemsIndexed(section.items, key = { _, it -> "$index-${it.id.value}" }) { i, item ->
+                    itemsIndexed(section.items, key = { i, _ -> section.rowKeys[i] }) { i, item ->
                         SectionRow(RowPosition.of(i, section.items.size)) {
                             ThreadRowItem(
                                 item = item,

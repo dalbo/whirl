@@ -13,6 +13,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    // ListScreenState takes a SavedStateHandle.
+    api(libs.androidx.lifecycle.viewmodel.savedstate)
     implementation(libs.androidx.browser)
 
     // Post bodies for UI tests come from the real parser.
