@@ -1,12 +1,10 @@
 package au.howesthat.whirl.feature.thread
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,22 +16,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,47 +47,32 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.model.ForumRef
-import au.howesthat.whirl.core.model.Post
-import au.howesthat.whirl.core.model.PostFilter
 import au.howesthat.whirl.core.ui.rememberNow
-import au.howesthat.whirl.core.ui.ActionsMenu
 import au.howesthat.whirl.core.ui.ErrorState
-import au.howesthat.whirl.core.ui.LocalAppStyle
-import au.howesthat.whirl.core.ui.MenuAction
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.PagePickerDialog
 import au.howesthat.whirl.core.ui.PostBodyView
 import au.howesthat.whirl.core.ui.ScrollThumb
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.ui.res.pluralStringResource
-import au.howesthat.whirl.core.ui.FindBar
 import au.howesthat.whirl.core.ui.FindHighlight
 import au.howesthat.whirl.core.ui.OnFindShortcut
-import au.howesthat.whirl.core.ui.highlighted
 import au.howesthat.whirl.core.ui.style
-import au.howesthat.whirl.core.ui.Surfaces
 import au.howesthat.whirl.core.ui.errorMessage
-import au.howesthat.whirl.core.ui.menuClickable
 import au.howesthat.whirl.core.ui.readableWidth
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 import au.howesthat.whirl.core.ui.timeAgo
@@ -125,12 +102,7 @@ fun ThreadScreen(
     nav: ThreadNav,
     viewModel: ThreadViewModel = hiltViewModel<ThreadViewModel, ThreadViewModel.Factory> { it.create(route) },
 ) {
-    val startPage by viewModel.startPage.collectAsStateWithLifecycle()
-    val pageCount by viewModel.pageCount.collectAsStateWithLifecycle()
-    val title by viewModel.title.collectAsStateWithLifecycle()
-    val filter by viewModel.filter.collectAsStateWithLifecycle()
-    val error by viewModel.error.collectAsStateWithLifecycle()
-    val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val browser = rememberOpenInBrowser()
     val snackbar = remember { SnackbarHostState() }
     val failedText = stringResource(R.string.link_failed)
@@ -154,12 +126,12 @@ fun ThreadScreen(
         snackbarHost = { SnackbarHost(snackbar) },
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
     ) { outer ->
-        val start = startPage
+        val start = state.startPage
         if (start == null) {
             Column(Modifier.padding(outer)) {
-                TopAppBar(colors = whirlTopBarColors(), title = { Text(title.orEmpty()) }, navigationIcon = { NavIconButton(navIcon) }, windowInsets = TopBarInsets)
+                TopAppBar(colors = whirlTopBarColors(), title = { Text(state.title.orEmpty()) }, navigationIcon = { NavIconButton(navIcon) }, windowInsets = TopBarInsets)
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    val failed = error
+                    val failed = state.error
                     if (failed != null) {
                         ErrorState(failed, onRetry = { viewModel.refresh() }, onOpenInBrowser = { browser(viewModel.threadUrl(1)) })
                     } else {
@@ -168,28 +140,40 @@ fun ThreadScreen(
                 }
             }
         } else {
-            ThreadPager(start, pageCount, title, filter, error, refreshing, navIcon, nav.openWatched, viewModel, Modifier.padding(outer))
+            ThreadPager(start, state, navIcon, nav.openWatched, viewModel, Modifier.padding(outer))
         }
     }
 }
+
+/** What every page needs from the thread, collected once by the pager. */
+private data class PageContext(
+    val pageCount: Int,
+    val settings: Settings,
+    val myUserId: Long?,
+    val firstUnread: Int?,
+    val isWatched: Boolean,
+    val find: FindMatches?,
+    val currentMatch: Long?,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ThreadPager(
     start: Int,
-    pageCount: Int,
-    title: String?,
-    filter: PostFilter,
-    error: Throwable?,
-    refreshing: Boolean,
+    state: ThreadUiState,
     navIcon: NavIcon,
     onWatched: () -> Unit,
     viewModel: ThreadViewModel,
     modifier: Modifier,
 ) {
+    val pageCount = state.pageCount
     val pager = rememberPagerState(initialPage = (start - 1).coerceAtLeast(0)) { pageCount }
     val jumpTo by viewModel.jumpTo.collectAsStateWithLifecycle()
-    val opUserId by viewModel.opUserId.collectAsStateWithLifecycle()
+    val target by viewModel.scrollTarget.collectAsStateWithLifecycle()
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val myUserId by viewModel.myUserId.collectAsStateWithLifecycle()
+    val firstUnread by viewModel.firstUnread.collectAsStateWithLifecycle()
+    val isWatched by viewModel.isWatched.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val browser = rememberOpenInBrowser()
     var picking by remember { mutableStateOf(false) }
@@ -198,7 +182,6 @@ private fun ThreadPager(
     // Which match next/previous last went to; starts again on a new page or query.
     var findIndex by remember(find?.page, findQuery) { mutableIntStateOf(-1) }
     val matchIds = find?.replyIds.orEmpty()
-    val currentMatch = matchIds.getOrNull(findIndex)
     fun step(by: Int) {
         val f = find ?: return
         if (f.replyIds.isEmpty()) return
@@ -219,54 +202,25 @@ private fun ThreadPager(
     Column(modifier) {
         val query = findQuery
         if (query != null) {
-            FindBar(
+            ThreadFindBar(
                 query = query,
                 onQueryChange = viewModel::setFindQuery,
                 onClose = { viewModel.setFindQuery(null) },
-                label = stringResource(R.string.find_on_page),
-                matches = null,
+                pageOf = pageOf,
+                matchCount = matchIds.size,
+                index = findIndex,
+                onStep = ::step,
                 windowInsets = TopBarInsets,
-                actions = {
-                    IconButton(onClick = { step(-1) }, enabled = matchIds.isNotEmpty()) {
-                        Icon(Icons.Default.KeyboardArrowUp, stringResource(R.string.find_previous))
-                    }
-                    IconButton(onClick = { step(1) }, enabled = matchIds.isNotEmpty()) {
-                        Icon(Icons.Default.KeyboardArrowDown, stringResource(R.string.find_next))
-                    }
-                },
-                footer = {
-                    val status = when {
-                        query.isBlank() -> null
-                        matchIds.isEmpty() -> stringResource(R.string.find_none_on_page)
-                        findIndex < 0 -> pluralStringResource(R.plurals.find_posts, matchIds.size, matchIds.size)
-                        else -> stringResource(R.string.find_post_of, findIndex + 1, matchIds.size)
-                    }
-                    // Announced as the page or the match changes, as the bar's subtitle is otherwise.
-                    Text(
-                        listOfNotNull(pageOf, status).joinToString(" · "),
-                        Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp).semantics { liveRegion = LiveRegionMode.Polite },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = topBarSubtleColor(),
-                    )
-                },
             )
         } else TopAppBar(
             colors = whirlTopBarColors(),
             windowInsets = TopBarInsets,
             title = {
                 Column(Modifier.clickable(role = Role.Button, onClickLabel = stringResource(au.howesthat.whirl.core.ui.R.string.go_to_page)) { picking = true }) {
-                    Text(title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    val sub = listOfNotNull(
-                        stringResource(au.howesthat.whirl.core.ui.R.string.page_of, pager.currentPage + 1, pageCount),
-                        when (filter) {
-                            PostFilter.All -> null
-                            PostFilter.ByUser(opUserId ?: -1) -> stringResource(R.string.filter_op)
-                            else -> filterLabel(filter)
-                        },
-                    ).joinToString(" · ")
+                    Text(state.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     // Announced when a swipe changes the page.
                     Text(
-                        sub,
+                        pageOf,
                         Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                         style = MaterialTheme.typography.labelSmall,
                         color = topBarSubtleColor(),
@@ -277,13 +231,13 @@ private fun ThreadPager(
             actions = {
                 IconButton(onClick = { viewModel.refresh() }) { Icon(Icons.Default.Refresh, stringResource(R.string.refresh)) }
                 ThreadMenu(
-                    isWatched = viewModel.isWatched.collectAsStateWithLifecycle().value,
+                    isWatched = isWatched,
                     onWatchAction = viewModel::perform,
-                    filter = filter,
-                    myUserId = viewModel.myUserId.collectAsStateWithLifecycle().value,
-                    opUserId = opUserId,
-                    onFilter = viewModel::setFilter,
+                    myUserId = myUserId,
+                    onUsersPosts = viewModel::showUsersPosts,
                     onOpPosts = viewModel::showOpPosts,
+                    onModeratorPosts = viewModel::showModeratorPosts,
+                    onRepPosts = viewModel::showRepPosts,
                     onFirst = { scope.launch { pager.scrollToPage(0) } },
                     onLast = viewModel::lastPage,
                     onGoTo = { picking = true },
@@ -294,15 +248,16 @@ private fun ThreadPager(
                 )
             },
         )
+        val context = PageContext(pageCount, settings, myUserId, firstUnread, isWatched, find, matchIds.getOrNull(findIndex))
         HorizontalPager(pager, Modifier.fillMaxSize(), key = { it }, beyondViewportPageCount = 0) { index ->
             val current = index == pager.settledPage
             PageContent(
                 page = index + 1,
                 viewModel = viewModel,
-                error = error.takeIf { current },
-                refreshing = refreshing && current,
-                find = find,
-                currentMatch = currentMatch,
+                context = context,
+                target = target,
+                error = state.error.takeIf { current },
+                refreshing = state.refreshing && current,
             )
         }
     }
@@ -312,7 +267,7 @@ private fun ThreadPager(
             pageCount,
             pager.currentPage + 1,
             onDismiss = { picking = false },
-            firstUnreadPage = viewModel.firstUnreadPage().takeIf { filter == PostFilter.All },
+            firstUnreadPage = viewModel.firstUnreadPage(),
             onFirstUnread = {
                 picking = false
                 viewModel.goToFirstUnread()
@@ -326,25 +281,19 @@ private fun ThreadPager(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PageContent(page: Int, viewModel: ThreadViewModel, error: Throwable?, refreshing: Boolean, find: FindMatches?, currentMatch: Long?) {
+private fun PageContent(page: Int, viewModel: ThreadViewModel, context: PageContext, target: ScrollTarget?, error: Throwable?, refreshing: Boolean) {
     val ui by remember(page, viewModel) { viewModel.page(page) }.collectAsStateWithLifecycle(null)
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
-    val target by viewModel.scrollTarget.collectAsStateWithLifecycle()
-    val myUserId by viewModel.myUserId.collectAsStateWithLifecycle()
-    val firstUnread by viewModel.firstUnread.collectAsStateWithLifecycle()
-    val filter by viewModel.filter.collectAsStateWithLifecycle()
     val browser = rememberOpenInBrowser()
     val list = rememberLazyListState()
     val base = MaterialTheme.typography.bodyMedium
-    val size = settings.postFontSize.sp
+    val size = context.settings.postFontSize.sp
     val textStyle = base.copy(fontSize = size.sp, lineHeight = (size * 1.4f).sp)
 
     val loaded = ui
     // Header rows before the posts: updated line, moderator note, parts.
     val headerCount = 1 + (if (loaded?.note != null) 1 else 0) + (if (loaded?.page?.parts?.isNotEmpty() == true) 1 else 0)
-    // The "New posts" marker sits above the first unread post; post numbers only line up without a filter.
-    val newFrom = firstUnread.takeIf { filter == PostFilter.All }
-    val markerAt = loaded?.posts?.indexOfFirst { it.post.number == newFrom } ?: -1
+    // The "New posts" marker sits above the first unread post.
+    val markerAt = loaded?.posts?.indexOfFirst { it.post.number == context.firstUnread } ?: -1
     LaunchedEffect(loaded, target) {
         val t = target ?: return@LaunchedEffect
         if (loaded == null || t.page != page) return@LaunchedEffect
@@ -370,7 +319,7 @@ private fun PageContent(page: Int, viewModel: ThreadViewModel, error: Throwable?
             )
             loaded == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             else -> {
-                PostList(loaded, page, list, error, textStyle, myUserId, newFrom, viewModel, find, currentMatch)
+                PostList(loaded, page, list, error, textStyle, context, viewModel)
                 // At the edge of the pane, not of the readable-width column of posts.
                 ScrollThumb(list, Modifier.align(Alignment.CenterEnd))
             }
@@ -385,18 +334,13 @@ private fun PostList(
     list: LazyListState,
     error: Throwable?,
     textStyle: TextStyle,
-    myUserId: Long?,
-    newFrom: Int?,
+    context: PageContext,
     viewModel: ThreadViewModel,
-    find: FindMatches?,
-    currentMatch: Long?,
 ) {
     val browser = rememberOpenInBrowser()
-    val isWatched by viewModel.isWatched.collectAsStateWithLifecycle()
-    val pageCount by viewModel.pageCount.collectAsStateWithLifecycle()
-    val filter by viewModel.filter.collectAsStateWithLifecycle()
+    val find = context.find
     // With "Mark as read when opened" the thread was marked as it opened: nothing left for the button to do.
-    val autoMarkRead = viewModel.settings.collectAsStateWithLifecycle().value.watchedAutoMarkAsRead
+    val autoMarkRead = context.settings.watchedAutoMarkAsRead
     val now = rememberNow()
     LazyColumn(Modifier.fillMaxSize(), state = list) {
         item(key = "updated") {
@@ -441,37 +385,37 @@ private fun PostList(
             item(key = "parts") {
                 PartsRow(
                     parts,
-                    onOpen = { viewModel.openLink("https://forums.whirlpool.net.au/thread/${it.threadId.value}") },
+                    onOpen = { viewModel.openPart(it.threadId) },
                     modifier = Modifier.readableWidth().cardGutter(),
                 )
             }
         }
         ui.posts.forEach { post ->
-            if (post.post.number == newFrom) item(key = "new_posts") { NewPostsMarker() }
+            if (post.post.number == context.firstUnread) item(key = "new_posts") { NewPostsMarker() }
             item(key = post.post.replyId) {
                 // Posts stay a readable width in landscape and on large screens.
                 PostFrame {
                     PostItem(
                         post = post,
                         textStyle = textStyle,
-                        isMine = myUserId != null && post.post.author.id == myUserId,
+                        isMine = context.myUserId != null && post.post.author.id == context.myUserId,
                         onLink = viewModel::openLink,
                         onQuote = { viewModel.openQuote(it, ui) },
-                        onUser = { viewModel.openLink("https://forums.whirlpool.net.au/user/${post.post.author.id}") },
-                        onUsersPosts = { viewModel.setFilter(PostFilter.ByUser(post.post.author.id)) },
+                        onUser = { viewModel.openUser(post.post.author.id) },
+                        onUsersPosts = { viewModel.showUsersPosts(post.post.author.id) },
                         onReply = { browser(viewModel.replyToPostUrl(post.post)) },
                         onEdit = { browser(viewModel.editPostUrl(post.post)) },
                         onReport = { browser(viewModel.reportPostUrl(post.post)) },
                         onOpenInBrowser = { browser(viewModel.postUrl(post.post, page)) },
                         highlight = find?.takeIf { it.page == page && post.post.replyId in it.replyIds }
-                            ?.let { FindHighlight(it.query, current = post.post.replyId == currentMatch) },
+                            ?.let { FindHighlight(it.query, current = post.post.replyId == context.currentMatch) },
                     )
                 }
             }
         }
         // As on Whirlpool and in Whirldroid: mark a watched thread read at the end of its last page, for those who
         // leave auto mark as read off so a half-read thread stays unread.
-        if (isWatched && page == pageCount && filter == PostFilter.All && !autoMarkRead) {
+        if (context.isWatched && page == context.pageCount && !autoMarkRead) {
             item(key = "mark_read") {
                 Box(Modifier.readableWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                     FilledTonalButton(onClick = { viewModel.perform(WatchAction.MARK_READ) }) {
@@ -482,213 +426,5 @@ private fun PostList(
                 }
             }
         }
-    }
-}
-
-/** Where the unread posts start, like the orange line on Whirlpool. */
-@Composable
-private fun NewPostsMarker() {
-    val color = MaterialTheme.colorScheme.tertiary
-    Row(Modifier.readableWidth().padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        HorizontalDivider(Modifier.weight(1f), thickness = 2.dp, color = color)
-        Text(
-            stringResource(R.string.new_posts),
-            Modifier.padding(horizontal = 12.dp),
-            style = MaterialTheme.typography.labelMedium,
-            color = color,
-        )
-        HorizontalDivider(Modifier.weight(1f), thickness = 2.dp, color = color)
-    }
-}
-
-/** A post full width with a divider below, or an outlined card ([Surfaces.CARDS]). */
-@Composable
-private fun PostFrame(content: @Composable () -> Unit) {
-    if (LocalAppStyle.current.layout.posts != Surfaces.CARDS) {
-        Column(Modifier.readableWidth()) {
-            content()
-            HorizontalDivider()
-        }
-        return
-    }
-    val shape = cardShape()
-    Surface(
-        modifier = Modifier.readableWidth().cardGutter(),
-        shape = shape,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) { content() }
-}
-
-/** Card corners in styles with post cards, square otherwise. */
-@Composable
-private fun cardShape(): Shape = LocalAppStyle.current.layout.let { if (it.posts == Surfaces.CARDS) RoundedCornerShape(it.cornerDp) else RectangleShape }
-
-/** The space around a card in styles with post cards. */
-@Composable
-private fun Modifier.cardGutter(): Modifier = LocalAppStyle.current.layout.let {
-    if (it.posts == Surfaces.CARDS) padding(horizontal = it.gutterDp, vertical = 6.dp) else this
-}
-
-@Composable
-private fun PostItem(
-    post: UiPost,
-    textStyle: TextStyle,
-    isMine: Boolean,
-    onLink: (String) -> Unit,
-    onQuote: (Long) -> Unit,
-    onUser: () -> Unit,
-    onUsersPosts: () -> Unit,
-    onReply: () -> Unit,
-    onEdit: () -> Unit,
-    onReport: () -> Unit,
-    onOpenInBrowser: () -> Unit,
-    highlight: FindHighlight?,
-) {
-    val p = post.post
-    var menu by remember { mutableStateOf(false) }
-    val actions = listOfNotNull(
-        MenuAction(stringResource(R.string.post_reply), onClick = onReply),
-        MenuAction(stringResource(R.string.post_edit), onClick = onEdit).takeIf { isMine },
-        MenuAction(stringResource(R.string.post_user_info, p.author.name), onClick = onUser),
-        MenuAction(stringResource(R.string.post_users_posts, p.author.name), onClick = onUsersPosts),
-        MenuAction(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser), onClick = onOpenInBrowser),
-        MenuAction(stringResource(R.string.post_report), onClick = onReport),
-    )
-    val body: @Composable () -> Unit = {
-        when {
-            p.isHidden -> Text(
-                stringResource(R.string.post_hidden, p.hiddenReason.orEmpty()),
-                style = textStyle,
-                fontStyle = FontStyle.Italic,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            p.isDeleted && post.body.blocks.isEmpty() -> Text(
-                stringResource(R.string.post_deleted),
-                style = textStyle,
-                fontStyle = FontStyle.Italic,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            else -> PostBodyView(post.body, onLink = onLink, onQuote = onQuote, textStyle = textStyle, highlight = highlight)
-        }
-    }
-    val clickable = Modifier
-        .fillMaxWidth()
-        .menuClickable(
-            actions,
-            onLongClick = { menu = true },
-            onClick = {},
-            onLongClickLabel = stringResource(au.howesthat.whirl.core.ui.R.string.show_actions),
-        )
-    Box {
-        if (LocalAppStyle.current.layout.posts == Surfaces.CARDS) {
-            // In a card: the author on a deeper band above the body.
-            Column(clickable) {
-                Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    PostHeader(p, onUser, highlight)
-                }
-                Box(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) { body() }
-            }
-        } else {
-            Column(clickable.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                PostHeader(p, onUser, highlight)
-                body()
-            }
-        }
-        ActionsMenu(menu, onDismiss = { menu = false }, actions)
-    }
-}
-
-@Composable
-private fun PostHeader(p: Post, onUser: () -> Unit, highlight: FindHighlight?) {
-    Column {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                highlighted(p.author.name, highlight?.let { it.query to it.style() }),
-                Modifier.weight(1f, fill = false).clickable(role = Role.Button, onClick = onUser),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text("#${p.number}", Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        // The user group sits here rather than beside the name, which large text would squeeze to nothing.
-        val meta = listOfNotNull(
-            p.userGroup,
-            stringResource(R.string.post_op).takeIf { p.isOp },
-            p.postedText,
-            p.editedText?.let { stringResource(R.string.post_edited, it) },
-        ).joinToString(" · ")
-        if (meta.isNotEmpty()) {
-            Text(
-                meta,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = if (p.isOp) FontWeight.Medium else null,
-            )
-        }
-        p.quip?.let { Text(it, style = MaterialTheme.typography.labelSmall, fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-    }
-}
-
-@Composable
-private fun filterLabel(filter: PostFilter): String = when (filter) {
-    PostFilter.All -> stringResource(R.string.filter_all)
-    PostFilter.Moderators -> stringResource(R.string.filter_mods)
-    PostFilter.Reps -> stringResource(R.string.filter_reps)
-    is PostFilter.ByUser -> stringResource(R.string.filter_user)
-}
-
-@Composable
-private fun ThreadMenu(
-    isWatched: Boolean,
-    onWatchAction: (WatchAction) -> Unit,
-    filter: PostFilter,
-    myUserId: Long?,
-    opUserId: Long?,
-    onFilter: (PostFilter) -> Unit,
-    onOpPosts: () -> Unit,
-    onFirst: () -> Unit,
-    onLast: () -> Unit,
-    onGoTo: () -> Unit,
-    onReply: () -> Unit,
-    onOpenInBrowser: () -> Unit,
-    onWatched: () -> Unit,
-    onFind: () -> Unit,
-) {
-    var open by remember { mutableStateOf(false) }
-    IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, stringResource(R.string.more)) }
-    DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-        if (isWatched) {
-            DropdownMenuItem(text = { Text(stringResource(R.string.mark_read)) }, onClick = { open = false; onWatchAction(WatchAction.MARK_READ) })
-            DropdownMenuItem(text = { Text(stringResource(R.string.unwatch)) }, onClick = { open = false; onWatchAction(WatchAction.UNWATCH) })
-        } else {
-            DropdownMenuItem(text = { Text(stringResource(R.string.watch)) }, onClick = { open = false; onWatchAction(WatchAction.WATCH) })
-        }
-        DropdownMenuItem(text = { Text(stringResource(R.string.find_on_page)) }, onClick = { open = false; onFind() })
-        DropdownMenuItem(text = { Text(stringResource(R.string.watched_threads)) }, onClick = { open = false; onWatched() })
-        HorizontalDivider()
-        DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.first_page)) }, onClick = { open = false; onFirst() })
-        DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.last_page)) }, onClick = { open = false; onLast() })
-        DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.go_to_page)) }, onClick = { open = false; onGoTo() })
-        HorizontalDivider()
-        // Whirlpool shows these filtered views only to signed-in users, so they open in the browser (its login).
-        Text(
-            stringResource(R.string.filters_in_browser),
-            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        @Composable
-        fun FilterItem(label: String, onClick: () -> Unit) = DropdownMenuItem(text = { Text(label) }, onClick = { open = false; onClick() })
-        myUserId?.let { me -> FilterItem(stringResource(R.string.filter_mine)) { onFilter(PostFilter.ByUser(me)) } }
-        // The thread starter's id is known only once page 1 has been read, so this item finds it first.
-        FilterItem(stringResource(R.string.filter_op), onOpPosts)
-        FilterItem(filterLabel(PostFilter.Moderators)) { onFilter(PostFilter.Moderators) }
-        FilterItem(filterLabel(PostFilter.Reps)) { onFilter(PostFilter.Reps) }
-        HorizontalDivider()
-        DropdownMenuItem(text = { Text(stringResource(R.string.reply_to_thread)) }, onClick = { open = false; onReply() })
-        DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser)) }, onClick = { open = false; onOpenInBrowser() })
     }
 }

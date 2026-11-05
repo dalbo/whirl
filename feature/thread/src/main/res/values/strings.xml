@@ -25,14 +25,12 @@
     <string name="unwatch">Unwatch</string>
     <string name="watched_threads">Watched threads</string>
     <string name="reply_to_thread">Reply in browser</string>
-    <string name="filter_all">All posts</string>
     <string name="filter_mine">Posts by me</string>
     <string name="filter_op">Posts by OP</string>
     <string name="filter_mods">Posts by moderators</string>
     <string name="filter_reps">Posts by reps</string>
     <!-- Above the post filters in the thread menu: Whirlpool shows filtered views only to signed-in users. -->
     <string name="filters_in_browser">In your browser</string>
-    <string name="filter_user">One user\'s posts</string>
     <string name="new_posts">New posts</string>
     <string name="find_on_page">Find on page</string>
     <string name="find_previous">Previous match</string>

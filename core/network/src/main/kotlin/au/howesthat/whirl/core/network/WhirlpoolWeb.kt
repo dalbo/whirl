@@ -35,7 +35,15 @@ class WhirlpoolWeb(
 }
 
 /** URL forms verified against the live site (PLAN.md §2.3). */
-class WhirlpoolUrls(val forums: HttpUrl = "https://forums.whirlpool.net.au/".toHttpUrl()) {
+class WhirlpoolUrls(
+    val forums: HttpUrl = "https://forums.whirlpool.net.au/".toHttpUrl(),
+    val site: HttpUrl = "https://whirlpool.net.au/".toHttpUrl(),
+) {
+    /** The news page; its articles open through [newsArticle], which redirects to the story. */
+    fun news(): HttpUrl = site.newBuilder().addPathSegment("news").addPathSegment("").build()
+
+    fun newsArticle(id: Long): HttpUrl =
+        site.newBuilder().addPathSegments("news/go.cfm").addQueryParameter("article", id.toString()).build()
 
     fun index(): HttpUrl = forums
 

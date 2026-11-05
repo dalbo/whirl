@@ -38,6 +38,8 @@ class WhirlpoolWebTest {
         )
         assertEquals("https://forums.whirlpool.net.au/forum/?action=newthread&f=92", urls.newThread(92).toString())
         assertEquals("https://forums.whirlpool.net.au/user/30703?days=7", urls.user(30703, 7).toString())
+        assertEquals("https://whirlpool.net.au/news/", urls.news().toString())
+        assertEquals("https://whirlpool.net.au/news/go.cfm?article=123", urls.newsArticle(123).toString())
         assertEquals(
             "https://forums.whirlpool.net.au/forum/?action=search&q=nbn&f=&fg=&w=t&o=list",
             urls.searchList("nbn").toString(),

@@ -5,7 +5,6 @@ import au.howesthat.whirl.core.database.ThreadPageDao
 import au.howesthat.whirl.core.database.ThreadPageEntity
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.Post
-import au.howesthat.whirl.core.model.PostFilter
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.model.ThreadPage
 import au.howesthat.whirl.core.model.ThreadPart
@@ -46,18 +45,18 @@ class ThreadPageRepository @Inject constructor(
      * re-runs the query on every write to `thread_pages` (opening any page touches it, storing one evicts others), and
      * the screen would re-read and re-parse every page on screen each time.
      */
-    fun page(id: ThreadId, page: Int, filter: PostFilter = PostFilter.All): Flow<Cached<ThreadPage>?> =
-        dao.observePage(id.value, filter.key, page)
+    fun page(id: ThreadId, page: Int): Flow<Cached<ThreadPage>?> =
+        dao.observePage(id.value, page)
             // Only the access time changes when a page is touched.
             .distinctUntilChangedBy { it?.copy(accessedAt = 0) }
             // The page row is rewritten in the same transaction as its posts, so reading the posts when it changes
             // never sees a half-stored page (combining two flows did, briefly showing an empty page).
             .map { meta ->
-                meta?.let { Cached(it.toModel(dao.posts(id.value, filter.key, page)), Instant.ofEpochMilli(it.fetchedAt)) }
+                meta?.let { Cached(it.toModel(dao.posts(id.value, page)), Instant.ofEpochMilli(it.fetchedAt)) }
             }
 
     /** The thread's page count as last seen, to show its last page from the cache before `?p=-1` returns. */
-    suspend fun lastKnownPage(id: ThreadId, filter: PostFilter = PostFilter.All): Int? = dao.lastKnownPageCount(id.value, filter.key)
+    suspend fun lastKnownPage(id: ThreadId): Int? = dao.lastKnownPageCount(id.value)
 
     /**
      * Makes [page] (or [LAST_PAGE]) of the thread available through [page] and returns the page number it resolved to.
@@ -67,23 +66,22 @@ class ThreadPageRepository @Inject constructor(
     suspend fun load(
         id: ThreadId,
         page: Int,
-        filter: PostFilter = PostFilter.All,
         forumId: Int? = null,
         force: Boolean = false,
     ): Int {
         require(page >= 1 || page == LAST_PAGE) { "page must be >= 1 or LAST_PAGE" }
         var loaded = page
-        refresher.refresh("thread:${id.value}:${filter.key}:$page", MaxAge.THREAD_PAGE, force, lastFetched = {
+        refresher.refresh("thread:${id.value}:$page", MaxAge.THREAD_PAGE, force, lastFetched = {
             // For the last page, a fresh cached copy of the last known page will do.
-            val known = if (page == LAST_PAGE) dao.lastKnownPageCount(id.value, filter.key) else page
+            val known = if (page == LAST_PAGE) dao.lastKnownPageCount(id.value) else page
             known?.let { loaded = it }
-            known?.let { dao.fetchedAt(id.value, filter.key, it) }
+            known?.let { dao.fetchedAt(id.value, it) }
         }) {
-            val parsed = fetch(id, page, filter, forumId)
-            store(id, filter, parsed)
+            val parsed = fetch(id, page, forumId)
+            store(id, parsed)
             loaded = parsed.page
         }
-        if (loaded != LAST_PAGE) dao.touch(id.value, filter.key, loaded, clock.millis())
+        if (loaded != LAST_PAGE) dao.touch(id.value, loaded, clock.millis())
         return loaded
     }
 
@@ -94,7 +92,7 @@ class ThreadPageRepository @Inject constructor(
     suspend fun locate(replyId: Long): Located {
         val html = web.get(web.urls.locateReply(replyId))
         val page = parseOrDrift(parsing) { ThreadPageParser.parse(html) }
-        store(page.threadId, PostFilter.All, page)
+        store(page.threadId, page)
         val post = page.posts.firstOrNull { it.replyId == replyId }
             ?: throw WhirlpoolError.Drift("Reply $replyId is not on the page it redirected to")
         return Located(page.threadId, page.page, post.number)
@@ -109,29 +107,20 @@ class ThreadPageRepository @Inject constructor(
         return WhirlpoolLink.parse(target.toString())
     }
 
-    private suspend fun fetch(id: ThreadId, page: Int, filter: PostFilter, forumId: Int?): ThreadPage {
-        val url = web.urls.thread(
-            id,
-            page = page,
-            userId = (filter as? PostFilter.ByUser)?.userId,
-            moderatorsOnly = filter == PostFilter.Moderators,
-            repsOnly = filter == PostFilter.Reps,
-        )
-        val html = web.get(url)
+    private suspend fun fetch(id: ThreadId, page: Int, forumId: Int?): ThreadPage {
+        val html = web.get(web.urls.thread(id, page = page))
         return try {
             parseOrDrift(parsing) { ThreadPageParser.parse(html) }
         } catch (e: WhirlpoolError.NotSignedIn) {
-            // Only the plain thread says the forum is private: filtered views need a login in every forum.
-            if (filter == PostFilter.All) forumId?.let { forums.markPrivate(it) }
+            forumId?.let { forums.markPrivate(it) }
             throw e
         }
     }
 
-    private suspend fun store(id: ThreadId, filter: PostFilter, page: ThreadPage) {
+    private suspend fun store(id: ThreadId, page: ThreadPage) {
         val now = clock.millis()
         val meta = ThreadPageEntity(
             threadId = id.value,
-            filter = filter.key,
             page = page.page,
             pageCount = page.pageCount,
             title = page.title,
@@ -143,7 +132,7 @@ class ThreadPageRepository @Inject constructor(
             fetchedAt = now,
             accessedAt = now,
         )
-        dao.store(meta, page.posts.map { it.toEntity(id, filter, page.page) }, keep = KEEP_PAGES)
+        dao.store(meta, page.posts.map { it.toEntity(id, page.page) }, keep = KEEP_PAGES)
     }
 
     companion object {
@@ -153,8 +142,8 @@ class ThreadPageRepository @Inject constructor(
     }
 }
 
-private fun Post.toEntity(id: ThreadId, filter: PostFilter, page: Int) = PostEntity(
-    threadId = id.value, filter = filter.key, page = page, replyId = replyId, replyNum = number,
+private fun Post.toEntity(id: ThreadId, page: Int) = PostEntity(
+    threadId = id.value, page = page, replyId = replyId, replyNum = number,
     userId = author.id, userName = author.name, userGroup = userGroup, quip = quip, postCount = postCount,
     postedText = postedText, postedAt = postedAt?.atZone(WhirlpoolTime.SYDNEY)?.toInstant()?.toEpochMilli(),
     editedText = editedText, isOp = isOp, hiddenReason = hiddenReason, isDeleted = isDeleted, shortUrl = shortUrl,

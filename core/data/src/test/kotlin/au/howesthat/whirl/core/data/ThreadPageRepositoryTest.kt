@@ -4,7 +4,6 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import au.howesthat.whirl.core.database.ForumEntity
 import au.howesthat.whirl.core.database.WhirlDatabase
-import au.howesthat.whirl.core.model.PostFilter
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.model.WhirlpoolError
 import au.howesthat.whirl.core.network.RetryPolicy
@@ -132,22 +131,6 @@ class ThreadPageRepositoryTest {
     }
 
     @Test
-    fun `filters use the site's parameters and cache apart`() = runTest {
-        enqueueHtml("thread_3pxj858k_p2.html")
-        repo.load(nbn, 1, PostFilter.ByUser(30703))
-        assertEquals("/thread/3pxj858k?ux=30703", server.takeRequest().target)
-        enqueueHtml("thread_3pxj858k_p2.html")
-        repo.load(nbn, 1, PostFilter.Moderators)
-        assertEquals("/thread/3pxj858k?um=1", server.takeRequest().target)
-        enqueueHtml("thread_3pxj858k_p2.html")
-        repo.load(nbn, 1, PostFilter.Reps)
-        assertEquals("/thread/3pxj858k?ur=1", server.takeRequest().target)
-        // The fixture is page 2, so each filter's copy is stored under the page the server reported.
-        assertNotNull(repo.page(nbn, 2, PostFilter.Moderators).first())
-        assertNull(repo.page(nbn, 2).first())
-    }
-
-    @Test
     fun `a page that needs a web login marks its forum private`() = runTest {
         db.forumDao().replaceAll(listOf(ForumEntity(35, "Feedback", "Whirlpool", 0)))
         enqueueHtml("thread_private_feedback_3nzn4p83.html")
@@ -156,13 +139,8 @@ class ThreadPageRepositoryTest {
     }
 
     @Test
-    fun `a filtered view that needs a login leaves its forum alone, and learned private forums are forgotten once`() = runTest {
+    fun `learned private forums are forgotten once`() = runTest {
         db.forumDao().replaceAll(listOf(ForumEntity(92, "ISPs", "ISPs", 0)))
-        // Whirlpool answers ux=/um=/ur= with "not signed in" in every forum (2026-10-23).
-        enqueueHtml("thread_private_feedback_3nzn4p83.html")
-        assertFailsWith<WhirlpoolError.NotSignedIn> { repo.load(nbn, 1, PostFilter.Moderators, forumId = 92) }
-        assertFalse(forums.forums.first().value.single().isPrivate)
-
         forums.markPrivate(92)
         forums.forgetLearnedPrivateOnce()
         assertFalse(forums.forums.first().value.single().isPrivate)
