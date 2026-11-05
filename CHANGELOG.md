@@ -2,6 +2,17 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.7.0
+Fixes and speed-ups, before the archive reader in v1.8.
+- Watched threads with new posts open with the first unread post at the top of the screen, just under the "New posts" line, as asked for by a tester (it used to be a little further down). When the last post you read ended a page, the thread opens on the next page.
+- Pages are fetched and read off the main thread, and each page of posts is read once, so the app stays smooth while a page loads.
+- Forums stays on its page after Back from a thread, instead of going back to the first.
+- Tapping a spoiler always reveals that spoiler.
+- "Updated N ago" keeps counting while the screen is open.
+- Pull to refresh on News and Forums works while they are still loading.
+- Watched: a thread marked read no longer flickers back for a moment; signing out or switching accounts while a list is refreshing no longer shows the old account's list; and a watch action that fails to send no longer brings back an older copy of the list.
+- Two settings changed at once no longer undo each other, and a tap straight after opening a screen uses your settings.
+
 ## v1.6.1
 - Undo now lasts 5 seconds instead of 10. Settings › Watched threads › "Undo time" sets it to 3, 5, 7 or 10 seconds.
 

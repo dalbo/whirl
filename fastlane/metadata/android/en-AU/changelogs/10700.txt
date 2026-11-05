@@ -1,0 +1,7 @@
+Whirl 1.7.0
+- Watched threads open with the first unread post at the top of the screen
+- Smoother while pages load
+- Forums keeps its page after Back
+- Spoilers, "Updated N ago" and pull to refresh fixes
+- Watched lists no longer flicker or show another account's threads
+- Settings changed at once no longer undo each other
