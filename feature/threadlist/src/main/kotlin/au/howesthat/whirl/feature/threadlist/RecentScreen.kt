@@ -45,7 +45,7 @@ import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class RecentViewModel @Inject constructor(private val deps: ListDeps, private val repo: RecentRepository) :
+class RecentViewModel @Inject constructor(deps: ListDeps, private val repo: RecentRepository) :
     ListViewModel(deps, OpenedFrom.RECENT) {
 
     val state = stateOf(

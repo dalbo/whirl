@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlin.time.Duration
 
-/** Starts the backstop that sends queued watch actions when the app is not there to (see [WatchedRepository]). */
+/** Starts the backstop that sends queued watch actions when the app is not there to (see [WatchQueue]). */
 interface WatchSendScheduler {
     /**
      * Makes sure a send runs after [delay] once there is a network. Work already waiting or running is kept, never
@@ -84,12 +84,12 @@ internal abstract class WatchSendModule {
 class WatchSendWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
-    private val watched: WatchedRepository,
+    private val queue: WatchQueue,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         while (true) {
-            when (val outcome = watched.drain()) {
+            when (val outcome = queue.drain()) {
                 Drain.Empty -> return Result.success()
                 Drain.Retry -> return Result.retry()
                 is Drain.Waiting -> delay(outcome.wait)

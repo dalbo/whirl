@@ -10,6 +10,7 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import au.howesthat.whirl.core.database.PendingWatchEntity
 import au.howesthat.whirl.core.database.RoomTransactor
 import au.howesthat.whirl.core.database.WhirlDatabase
+import au.howesthat.whirl.core.model.WatchAction
 import au.howesthat.whirl.core.network.RetryPolicy
 import au.howesthat.whirl.core.network.WhirlpoolApi
 import au.howesthat.whirl.core.network.WhirlpoolHttp
@@ -37,12 +38,12 @@ class WatchSendWorkerTest {
     private val db = Room.inMemoryDatabaseBuilder(context, WhirlDatabase::class.java).allowMainThreadQueries().build()
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val api = WhirlpoolApi(WhirlpoolHttp.client("Whirl/test"), { "k" }, server.url("/api/"), RetryPolicy.NONE)
-    private val watched =
-        WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, Clock.systemUTC(), appScope)
+    private val store = WatchedStore(db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), Clock.systemUTC())
+    private val watchQueue = WatchQueue(api, store, WatchedRepository(api, store), WatchSendScheduler.None, Dispatchers.Default, appScope)
 
     private val factory = object : WorkerFactory() {
         override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters) =
-            WatchSendWorker(appContext, workerParameters, watched)
+            WatchSendWorker(appContext, workerParameters, watchQueue)
     }
 
     private fun worker() = TestListenableWorkerBuilder<WatchSendWorker>(context).setWorkerFactory(factory).build()
@@ -60,9 +61,9 @@ class WatchSendWorkerTest {
     fun `sends what an earlier process left, and asks for a retry when it cannot`() = runTest {
         val queue = db.pendingWatchDao()
         val now = System.currentTimeMillis()
-        queue.insert(PendingWatchEntity(action = "UNWATCH", threadIds = "9yvx1663", sendAfter = now, createdAt = now))
+        queue.insert(PendingWatchEntity(action = WatchAction.UNWATCH, ids = listOf("9yvx1663"), sendAfter = now, createdAt = now))
         // Due in a moment: the worker waits for it rather than leaving it.
-        queue.insert(PendingWatchEntity(action = "MARK_READ", threadIds = "9q684xp3", sendAfter = now + 300, createdAt = now))
+        queue.insert(PendingWatchEntity(action = WatchAction.MARK_READ, ids = listOf("9q684xp3"), sendAfter = now + 300, createdAt = now))
 
         enqueue("", code = 429)
         assertIs<ListenableWorker.Result.Retry>(worker().doWork())

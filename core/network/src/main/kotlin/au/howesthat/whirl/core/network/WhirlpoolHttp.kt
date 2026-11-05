@@ -25,6 +25,9 @@ object WhirlpoolHttp {
     fun client(userAgent: String): OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        // The read timeout is per read, so a page trickling in could otherwise take for ever. Generous: v1.8's archive
+        // pages run to megabytes on a slow phone connection.
+        .callTimeout(90, TimeUnit.SECONDS)
         .addInterceptor { chain -> chain.proceed(chain.request().newBuilder().header("User-Agent", userAgent).build()) }
         .build()
 }

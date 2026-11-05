@@ -29,6 +29,7 @@ import au.howesthat.whirl.core.data.OpenedFrom
 import au.howesthat.whirl.core.data.UserRepository
 import au.howesthat.whirl.core.model.UserProfile
 import au.howesthat.whirl.core.network.WhirlpoolUrls
+import au.howesthat.whirl.core.ui.ListPaneRoute
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 import au.howesthat.whirl.feature.threadlist.ListDeps
@@ -46,7 +47,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class UserRoute(val userId: Long) : NavKey
+data class UserRoute(val userId: Long) : NavKey, ListPaneRoute
 
 @HiltViewModel(assistedFactory = UserViewModel.Factory::class)
 class UserViewModel @AssistedInject constructor(

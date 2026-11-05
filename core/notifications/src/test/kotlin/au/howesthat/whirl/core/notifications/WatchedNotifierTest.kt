@@ -16,7 +16,7 @@ import au.howesthat.whirl.core.data.Account
 import au.howesthat.whirl.core.data.AccountGeneration
 import au.howesthat.whirl.core.data.NotifyStyle
 import au.howesthat.whirl.core.data.SettingsRepository
-import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.model.WatchAction
 import au.howesthat.whirl.core.data.WatchSendScheduler
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.database.NotifiedEntity
@@ -50,6 +50,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import au.howesthat.whirl.core.data.WatchedStore
+import au.howesthat.whirl.core.data.WatchQueue
 
 @RunWith(RobolectricTestRunner::class)
 class WatchedNotifierTest {
@@ -60,8 +62,9 @@ class WatchedNotifierTest {
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val settings = SettingsRepository(context)
     private val api = WhirlpoolApi(WhirlpoolHttp.client("Whirl/test"), settings::apiKey, server.url("/api/"), RetryPolicy.NONE)
-    private val watched = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, Clock.systemUTC(), appScope)
-    private val notifier = WatchedNotifier(context, settings, watched, db.notifiedDao())
+    private val store = WatchedStore(db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), Clock.systemUTC())
+    private val watched = WatchedRepository(api, store)
+    private val notifier = WatchedNotifier(context, settings, watched, WatchQueue(api, store, watched, WatchSendScheduler.None, Dispatchers.Default, appScope), db.notifiedDao())
     private val manager = context.getSystemService(NotificationManager::class.java)
 
     @Before

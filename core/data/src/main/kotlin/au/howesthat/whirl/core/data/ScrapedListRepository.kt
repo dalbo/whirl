@@ -7,13 +7,9 @@ import au.howesthat.whirl.core.network.WhirlpoolWeb
 import au.howesthat.whirl.core.scraper.ThreadListParser
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import java.time.Clock
-import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -51,26 +47,23 @@ class ScrapedListRepository @Inject constructor(
     private val clock: Clock,
     @DefaultDispatcher private val parsing: CoroutineDispatcher,
 ) {
-    private val refresher = Refresher(log = null, clock = clock)
-    private val cache = MutableStateFlow<Map<ScrapedList, Cached<ThreadListPage>>>(emptyMap())
+    private val cache = MemoryCache<ScrapedList, ThreadListPage>(KEEP, clock)
 
-    fun observe(list: ScrapedList): Flow<Cached<ThreadListPage>?> = cache.map { it[list] }
+    fun observe(list: ScrapedList): Flow<Cached<ThreadListPage>?> = cache.observe(list)
 
     /**
      * Fetches [list] unless it is fresh. A forum page that needs a web login throws [WhirlpoolError.NotSignedIn] and
      * marks its forum private; an unreadable page throws [WhirlpoolError.Drift].
      */
     suspend fun refresh(list: ScrapedList, force: Boolean = false): Boolean =
-        refresher.refresh(list.toString(), MaxAge.THREAD_LISTS, force, lastFetched = { cache.value[list]?.updatedAt?.toEpochMilli() }) {
-            val page = try {
+        cache.refresh(list, MaxAge.THREAD_LISTS, force) {
+            try {
                 val html = web.get(list.url(web.urls))
                 parseOrDrift(parsing) { ThreadListParser.parse(html) }
             } catch (e: WhirlpoolError.NotSignedIn) {
                 if (list is ScrapedList.ForumPage) forums.markPrivate(list.forumId)
                 throw e
             }
-            val entry = Cached(page, Instant.ofEpochMilli(clock.millis()))
-            cache.update { old -> (old - list).entries.sortedByDescending { it.value.updatedAt }.take(KEEP - 1).associate { it.toPair() } + (list to entry) }
         }
 
     private companion object {

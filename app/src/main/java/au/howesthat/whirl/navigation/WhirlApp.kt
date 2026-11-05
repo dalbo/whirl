@@ -63,6 +63,7 @@ import androidx.navigation3.ui.NavDisplay
 import au.howesthat.whirl.about.AboutScreen
 import au.howesthat.whirl.core.data.Account
 import au.howesthat.whirl.core.data.OpenThread
+import au.howesthat.whirl.core.ui.ListPaneRoute
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 import au.howesthat.whirl.feature.forums.ForumsScreen
@@ -303,9 +304,7 @@ private fun listPaneWidth(): Dp {
 }
 
 /** Screens shown as the list beside a thread. */
-internal fun isListPane(key: NavKey): Boolean =
-    key is WatchedRoute || key is RecentRoute || key is LatestRoute || key is PopularRoute ||
-        key is ForumRoute || key is SearchRoute || key is UserRoute
+internal fun isListPane(key: NavKey): Boolean = key is ListPaneRoute
 
 /**
  * Two panes when the setting is on and the window is at least 600 dp wide and 480 dp tall (and, with "Only in
@@ -335,6 +334,3 @@ private fun ChooseThread() {
         )
     }
 }
-
-/** Drawer destinations (not Settings or About, which push on top). */
-internal fun isTopLevelRoute(route: Any): Boolean = TOP_LEVEL.any { it.route == route }

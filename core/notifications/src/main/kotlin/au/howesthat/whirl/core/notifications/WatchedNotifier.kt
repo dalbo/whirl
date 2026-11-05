@@ -11,7 +11,9 @@ import androidx.core.app.NotificationManagerCompat
 import au.howesthat.whirl.core.data.NotifyStyle
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.SettingsRepository
-import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.model.WatchAction
+import au.howesthat.whirl.core.data.SendResult
+import au.howesthat.whirl.core.data.WatchQueue
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.database.NotifiedDao
 import au.howesthat.whirl.core.database.NotifiedEntity
@@ -46,6 +48,7 @@ class WatchedNotifier @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settings: SettingsRepository,
     private val watched: WatchedRepository,
+    private val queue: WatchQueue,
     private val notified: NotifiedDao,
 ) {
     private val manager = NotificationManagerCompat.from(context)
@@ -92,11 +95,15 @@ class WatchedNotifier @Inject constructor(
     fun cancel() = manager.cancelAll()
 
     /**
-     * A notification button: sends [action] for [ids] at once and removes them from the notifications. False if
-     * Whirlpool rejected it (rolled back). With no network it stays queued and is sent later, so the notification goes.
+     * A notification button: sends [action] for [ids] at once and removes them from the notifications. With no network
+     * it stays queued and is sent later, so the notification goes. False, keeping the notification, if Whirlpool
+     * rejected it (rolled back) or an account switch dropped it.
      */
     suspend fun act(action: WatchAction, ids: List<ThreadId>): Boolean {
-        val sent = watched.awaitSend(watched.perform(action, ids, undoable = false), ACT_WAIT)
+        val sent = when (queue.awaitSend(queue.perform(action, ids, undoable = false), ACT_WAIT)) {
+            SendResult.SentOrQueued -> true
+            is SendResult.Rejected, SendResult.Dropped -> false
+        }
         if (sent) {
             // The summary is gone along with its threads; a thread's own notification takes the rest with it.
             manager.cancel(NOTIFICATION_ID)

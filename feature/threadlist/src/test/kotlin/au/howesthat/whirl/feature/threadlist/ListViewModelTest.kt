@@ -14,7 +14,7 @@ import au.howesthat.whirl.core.data.AppVisits
 import au.howesthat.whirl.core.data.ForumRepository
 import au.howesthat.whirl.core.data.OpenedFrom
 import au.howesthat.whirl.core.data.SettingsRepository
-import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.model.WatchAction
 import au.howesthat.whirl.core.data.WatchEvent
 import au.howesthat.whirl.core.data.WatchedPosition
 import au.howesthat.whirl.core.data.WatchSendScheduler
@@ -62,6 +62,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import au.howesthat.whirl.core.data.WatchedStore
+import au.howesthat.whirl.core.data.WatchQueue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -72,10 +74,13 @@ class ListViewModelTest {
         .allowMainThreadQueries().build()
     private val api = WhirlpoolApi(WhirlpoolHttp.client("t"), { null })
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val watched = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, clock, appScope)
+    private val store = WatchedStore(db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), clock)
+    private val lists = WatchedRepository(api, store)
+    private val watched = WatchQueue(api, store, lists, WatchSendScheduler.None, Dispatchers.Default, appScope)
     private val deps = ListDeps(
         SettingsRepository(ApplicationProvider.getApplicationContext()),
         ForumRepository(api, db.forumDao(), db.fetchLogDao(), clock),
+        lists,
         watched,
         SavedStateHandle(),
     )
@@ -204,7 +209,7 @@ class ListViewModelTest {
         threads.replaceWatchedList("all", listOf(watchedRow("a", "NBN plans", 3), watchedRow("b", "Bike lights", 2), watchedRow("c", "Bike racks", 0)))
         db.fetchLogDao().put(FetchLogEntity("watched:unread", 1))
         db.fetchLogDao().put(FetchLogEntity("watched:all", 1))
-        val vm = held { WatchedViewModel(deps, watched, AppVisits()) }
+        val vm = held { WatchedViewModel(deps, lists, AppVisits()) }
         backgroundScope.launch { vm.markAllIds.collect {} }
 
         assertEquals(listOf(ThreadId("a"), ThreadId("b")), vm.markAllIds.first { it.isNotEmpty() })

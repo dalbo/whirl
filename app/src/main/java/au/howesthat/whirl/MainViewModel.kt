@@ -9,9 +9,9 @@ import au.howesthat.whirl.core.data.PendingWatch
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadOpener
-import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.model.WatchAction
 import au.howesthat.whirl.core.data.WatchedPosition
-import au.howesthat.whirl.core.data.WatchedRepository
+import au.howesthat.whirl.core.data.WatchQueue
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.network.WhirlpoolApi
 import au.howesthat.whirl.feature.thread.ThreadRoute
@@ -33,7 +33,7 @@ data class MainState(val settings: Settings, val setupDone: Boolean)
 class MainViewModel @Inject constructor(
     private val settings: SettingsRepository,
     api: WhirlpoolApi,
-    private val watched: WatchedRepository,
+    private val watched: WatchQueue,
     private val forums: ForumRepository,
 ) : ViewModel() {
     /** Null until settings are read, which keeps the splash screen up. */

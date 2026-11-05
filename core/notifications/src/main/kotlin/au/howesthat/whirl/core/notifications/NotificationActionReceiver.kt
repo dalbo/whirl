@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import au.howesthat.whirl.core.data.ApplicationScope
-import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.model.WatchAction
 import au.howesthat.whirl.core.model.ThreadId
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope

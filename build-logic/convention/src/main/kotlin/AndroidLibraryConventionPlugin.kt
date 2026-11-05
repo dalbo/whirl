@@ -16,7 +16,6 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
             compileSdk = Sdk.COMPILE
             defaultConfig {
                 minSdk = Sdk.MIN
-                consumerProguardFiles("consumer-rules.pro")
             }
             compileOptions {
                 sourceCompatibility = JAVA_VERSION

@@ -83,7 +83,7 @@ class MainActivity : ComponentActivity() {
                 val alert by viewModel.alert.collectAsStateWithLifecycle()
                 if (!loaded.setupDone) {
                     // Finishing setup or signing out flips setupDone, which swaps between these two trees.
-                    SetupScreen(onFinished = {})
+                    SetupScreen()
                 } else {
                     // Fixed while this tree lives: a changed homepage setting must not re-route an open NavHost.
                     val startRoute = remember { loaded.settings.homepage.route() }

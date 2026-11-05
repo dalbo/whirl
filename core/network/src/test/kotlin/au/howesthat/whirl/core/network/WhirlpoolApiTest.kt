@@ -47,6 +47,11 @@ class WhirlpoolApiTest {
     fun tearDown() = server.close()
 
     @Test
+    fun `a call has a deadline as a whole, not only per read`() {
+        assertEquals(90_000, WhirlpoolHttp.client("Whirl/test").callTimeoutMillis)
+    }
+
+    @Test
     fun `user call sends key, json output, get and user agent`() = runTest {
         enqueue("api_user.json")
         assertEquals(ApiUser(216903, "d@llin"), api.user())

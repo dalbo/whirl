@@ -43,6 +43,7 @@ import au.howesthat.whirl.core.data.OpenedFrom
 import au.howesthat.whirl.core.data.ScrapedList
 import au.howesthat.whirl.core.data.ScrapedListRepository
 import au.howesthat.whirl.core.network.WhirlpoolUrls
+import au.howesthat.whirl.core.ui.ListPaneRoute
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.whirlTopBarColors
@@ -60,7 +61,7 @@ import kotlinx.serialization.Serializable
 
 /** Thread-title search, optionally scoped to a forum (and group), as the forum screen's search box did in 2.14.12. */
 @Serializable
-data class SearchRoute(val query: String = "", val forumId: Int? = null, val groupId: Int? = null, val scopeTitle: String? = null) : NavKey
+data class SearchRoute(val query: String = "", val forumId: Int? = null, val groupId: Int? = null, val scopeTitle: String? = null) : NavKey, ListPaneRoute
 
 /**
  * Search results in list view (`/forum/?action=search&o=list`), the thread table 2.14.12 parsed: 100 per page, with

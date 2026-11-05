@@ -6,7 +6,10 @@ import au.howesthat.whirl.core.model.ForumIndexSection
 import au.howesthat.whirl.core.model.LatestThread
 import au.howesthat.whirl.core.model.WhirlpoolError
 
-/** The public forum index (`/`): sections of forums, each with its three most recently active threads. */
+/**
+ * The public forum index (`/`): sections of forums, each with its three most recently active threads. Not used by the
+ * app yet (Forums comes from the API): kept for v1.8 (docs/plan-v1.7.md §8).
+ */
 object ForumIndexParser {
 
     fun parse(html: String): ForumIndex {

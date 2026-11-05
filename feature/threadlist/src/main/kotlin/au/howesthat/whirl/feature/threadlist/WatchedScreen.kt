@@ -39,7 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import au.howesthat.whirl.core.data.AppVisits
 import au.howesthat.whirl.core.data.OpenedFrom
-import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.model.WatchAction
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.model.TextQuery
 import au.howesthat.whirl.core.model.ThreadId
@@ -119,7 +119,7 @@ class WatchedViewModel @Inject constructor(deps: ListDeps, private val repo: Wat
 
     fun markAllRead() {
         val ids = markAllIds.value
-        if (ids.isNotEmpty()) viewModelScope.launch { repo.perform(WatchAction.MARK_READ, ids) }
+        if (ids.isNotEmpty()) viewModelScope.launch { deps.watchQueue.perform(WatchAction.MARK_READ, ids) }
     }
 
     /** Threads with unread posts, for "N unread" in the title. */

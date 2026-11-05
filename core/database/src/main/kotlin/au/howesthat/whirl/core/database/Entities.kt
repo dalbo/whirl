@@ -5,6 +5,9 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import androidx.room.TypeConverter
+import androidx.room.TypeConverters
+import au.howesthat.whirl.core.model.WatchAction
 
 /** A forum from `get=forum`, in API order. [isPrivate] is learned when a forum page says "Not signed in". */
 @Entity(tableName = "forums")
@@ -35,7 +38,6 @@ data class ThreadEntity(
     @ColumnInfo(name = "forum_name", defaultValue = "") val forumName: String = "",
     @ColumnInfo(name = "group_name") val groupName: String? = null,
     @ColumnInfo(defaultValue = "0") val replies: Int = 0,
-    @ColumnInfo(name = "page_count") val pageCount: Int? = null,
     @ColumnInfo(name = "first_user_id") val firstUserId: Long? = null,
     @ColumnInfo(name = "first_user_name") val firstUserName: String? = null,
     @ColumnInfo(name = "first_date") val firstDate: Long? = null,
@@ -48,24 +50,26 @@ data class ThreadEntity(
     @ColumnInfo(name = "unread_count") val unreadCount: Int? = null,
     @ColumnInfo(name = "last_read_post") val lastReadPost: Int? = null,
     @ColumnInfo(name = "last_page") val lastPage: Int? = null,
-    @ColumnInfo(name = "is_sticky", defaultValue = "0") val isSticky: Boolean = false,
-    @ColumnInfo(name = "is_closed", defaultValue = "0") val isClosed: Boolean = false,
 )
 
-/** Which list shows which thread, in what order. [source] is a [ThreadSource] name; [key] narrows it (forum page, mode). */
+/** Which list shows which thread, in what order. [key] narrows the [source] (a forum, Unread or All). */
 @Entity(
     tableName = "thread_source",
     primaryKeys = ["source", "key", "thread_id"],
     indices = [Index("thread_id")],
 )
 data class ThreadSourceEntity(
-    val source: String,
+    val source: ThreadSource,
     val key: String,
     @ColumnInfo(name = "thread_id") val threadId: String,
     val position: Int,
 )
 
-enum class ThreadSource { FORUM, WATCHED, RECENT, POPULAR, SEARCH, LATEST }
+/**
+ * The API lists cached in Room, stored by name. Scraped lists (forum pages, Popular, search) are kept in memory only
+ * (`ScrapedListRepository`).
+ */
+enum class ThreadSource { FORUM, WATCHED, RECENT, LATEST }
 
 @Entity(tableName = "news")
 data class NewsEntity(
@@ -109,19 +113,30 @@ data class CheckLogEntity(
 
 /**
  * A watch action applied on this device and not yet sent to Whirlpool, so it survives the app closing (v1.6). Rows are
- * sent in [id] order; [threadIds] is comma-separated; [state] is a `PendingState` name. Times are epoch milliseconds.
+ * sent in [id] order. Times are epoch milliseconds.
  */
 @Entity(tableName = "pending_watch")
+@TypeConverters(ThreadIdsConverter::class)
 data class PendingWatchEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val action: String,
-    @ColumnInfo(name = "thread_ids") val threadIds: String,
+    val action: WatchAction,
+    @ColumnInfo(name = "thread_ids") val ids: List<String>,
     @ColumnInfo(name = "send_after") val sendAfter: Long,
-    val state: String = PendingState.WAITING.name,
+    val state: PendingState = PendingState.WAITING,
     val attempts: Int = 0,
     @ColumnInfo(name = "created_at") val createdAt: Long,
-) {
-    val ids: List<String> get() = threadIds.split(',').filter { it.isNotEmpty() }
+)
+
+/**
+ * `pending_watch.thread_ids`: the ids joined with commas. [ThreadDao.deleteOrphans] matches ids in it with `LIKE`, so
+ * the format must stay as it is. Thread ids are alphanumeric, so a comma never occurs in one.
+ */
+object ThreadIdsConverter {
+    @TypeConverter
+    fun join(ids: List<String>): String = ids.joinToString(",")
+
+    @TypeConverter
+    fun split(joined: String): List<String> = joined.split(',').filter { it.isNotEmpty() }
 }
 
 enum class PendingState { WAITING, SENDING }

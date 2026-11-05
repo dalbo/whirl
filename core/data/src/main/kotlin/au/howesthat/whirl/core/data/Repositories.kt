@@ -25,10 +25,31 @@ import java.time.Clock
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import kotlin.time.Duration
 import javax.inject.Inject
 import javax.inject.Singleton
 
 data class ForumListItem(val forum: Forum, val isFavourite: Boolean, val isPrivate: Boolean)
+
+/**
+ * A list from the API cached in Room, with when it was fetched (the fetch log, under each list's key): what every
+ * repository here observes and refreshes. Fetched when older than [maxAge], or on a forced refresh once
+ * [MaxAge.MANUAL_THROTTLE] has passed.
+ */
+class CachedApiList(private val log: FetchLogDao, clock: Clock, private val maxAge: Duration) {
+    private val refresher = Refresher(log, clock)
+
+    /** [rows] as [map] turns them into the model, with the time [logKey] was last fetched. */
+    fun <R, T> observe(rows: Flow<List<R>>, logKey: String, map: (R) -> T): Flow<Cached<List<T>>> =
+        combine(rows, log.observeFetchedAt(logKey)) { list, at -> Cached(list.map(map), at?.let(Instant::ofEpochMilli)) }
+
+    /** Runs [fetch] if [logKey] is due, then logs the fetch. True if it fetched. */
+    suspend fun refresh(logKey: String, force: Boolean, fetch: suspend () -> Unit): Boolean = refresher.refresh(logKey, maxAge, force, fetch)
+
+    /** As [refresh], for a [fetch] that logs itself, in the transaction that stores the list. */
+    suspend fun refreshLogged(logKey: String, force: Boolean, fetch: suspend () -> Unit): Boolean =
+        refresher.refresh(logKey, maxAge, force, lastFetched = { log.fetchedAt(logKey) }, fetch)
+}
 
 @Singleton
 class ForumRepository @Inject constructor(
@@ -37,20 +58,16 @@ class ForumRepository @Inject constructor(
     private val log: FetchLogDao,
     private val clock: Clock,
 ) {
-    private val refresher = Refresher(log, clock)
+    private val list = CachedApiList(log, clock, MaxAge.FORUMS)
 
-    val forums: Flow<Cached<List<ForumListItem>>> =
-        combine(dao.observeAll(), log.observeFetchedAt(KEY)) { rows, at ->
-            Cached(
-                rows.map { ForumListItem(Forum(it.id, it.title, it.section), it.isFavourite, it.isPrivate || it.id in KNOWN_PRIVATE) },
-                at?.let(Instant::ofEpochMilli),
-            )
-        }
+    val forums: Flow<Cached<List<ForumListItem>>> = list.observe(dao.observeAll(), KEY) {
+        ForumListItem(Forum(it.id, it.title, it.section), it.isFavourite, it.isPrivate || it.id in KNOWN_PRIVATE)
+    }
 
     /** Forums whose pages need a web login: the known ones plus any learned from a "Not signed in" page. */
     val privateIds: Flow<Set<Int>> = dao.observeAll().map { rows -> rows.filter { it.isPrivate }.mapTo(KNOWN_PRIVATE.toMutableSet()) { it.id } }
 
-    suspend fun refresh(force: Boolean = false) = refresher.refresh(KEY, MaxAge.FORUMS, force) {
+    suspend fun refresh(force: Boolean = false) = list.refresh(KEY, force) {
         dao.replaceAll(api.forums().mapIndexed { i, f -> ForumEntity(f.id, f.title, f.section, i) })
     }
 
@@ -87,19 +104,13 @@ class NewsRepository @Inject constructor(
     private val log: FetchLogDao,
     clock: Clock,
 ) {
-    private val refresher = Refresher(log, clock)
+    private val list = CachedApiList(log, clock, MaxAge.NEWS)
 
-    val news: Flow<Cached<List<NewsItem>>> = combine(dao.observeAll(), log.observeFetchedAt(KEY)) { rows, at ->
-        Cached(
-            rows.map {
-                val offset = ZoneOffset.ofTotalSeconds(it.offsetSeconds)
-                NewsItem(it.id, it.title, it.source, it.blurb, OffsetDateTime.ofInstant(Instant.ofEpochMilli(it.date), offset))
-            },
-            at?.let(Instant::ofEpochMilli),
-        )
+    val news: Flow<Cached<List<NewsItem>>> = list.observe(dao.observeAll(), KEY) {
+        NewsItem(it.id, it.title, it.source, it.blurb, OffsetDateTime.ofInstant(Instant.ofEpochMilli(it.date), ZoneOffset.ofTotalSeconds(it.offsetSeconds)))
     }
 
-    suspend fun refresh(force: Boolean = false) = refresher.refresh(KEY, MaxAge.NEWS, force) {
+    suspend fun refresh(force: Boolean = false) = list.refresh(KEY, force) {
         dao.replaceAll(
             api.news().map {
                 NewsEntity(it.id, it.title, it.source, it.blurb, it.date.toInstant().toEpochMilli(), it.date.offset.totalSeconds)
@@ -120,11 +131,11 @@ class LatestThreadsRepository @Inject constructor(
     private val log: FetchLogDao,
     clock: Clock,
 ) {
-    private val refresher = Refresher(log, clock)
+    private val list = CachedApiList(log, clock, MaxAge.THREAD_LISTS)
 
-    val threads: Flow<Cached<List<ThreadSummary>>> = observeApiList(dao, log, ThreadSource.LATEST, KEY, LOG_KEY)
+    val threads: Flow<Cached<List<ThreadSummary>>> = list.observe(dao.observeSource(ThreadSource.LATEST, KEY), LOG_KEY) { it.toSummary() }
 
-    suspend fun refresh(force: Boolean = false) = refresher.refresh(LOG_KEY, MaxAge.THREAD_LISTS, force) {
+    suspend fun refresh(force: Boolean = false) = list.refresh(LOG_KEY, force) {
         dao.replaceApiList(ThreadSource.LATEST, KEY, api.threads(count = 100).map { it.toColumns() })
     }
 
@@ -145,12 +156,12 @@ class ForumThreadsRepository @Inject constructor(
     private val log: FetchLogDao,
     clock: Clock,
 ) {
-    private val refresher = Refresher(log, clock)
+    private val list = CachedApiList(log, clock, MaxAge.THREAD_LISTS)
 
     fun threads(forumId: Int): Flow<Cached<List<ThreadSummary>>> =
-        observeApiList(dao, log, ThreadSource.FORUM, forumId.toString(), logKey(forumId))
+        list.observe(dao.observeSource(ThreadSource.FORUM, forumId.toString()), logKey(forumId)) { it.toSummary() }
 
-    suspend fun refresh(forumId: Int, force: Boolean = false) = refresher.refresh(logKey(forumId), MaxAge.THREAD_LISTS, force) {
+    suspend fun refresh(forumId: Int, force: Boolean = false) = list.refresh(logKey(forumId), force) {
         dao.replaceApiList(ThreadSource.FORUM, forumId.toString(), api.threads(listOf(forumId), count = 100).map { it.toColumns() })
     }
 
@@ -167,9 +178,9 @@ class RecentRepository @Inject constructor(
     private val account: AccountGeneration,
     private val clock: Clock,
 ) {
-    private val refresher = Refresher(log, clock)
+    private val list = CachedApiList(log, clock, MaxAge.THREAD_LISTS)
 
-    fun threads(days: Int): Flow<Cached<List<ThreadSummary>>> = observeApiList(dao, log, ThreadSource.RECENT, KEY, logKey(days))
+    fun threads(days: Int): Flow<Cached<List<ThreadSummary>>> = list.observe(dao.observeSource(ThreadSource.RECENT, KEY), logKey(days)) { it.toSummary() }
 
     /**
      * A changed history length is a different list, so it fetches at once. An answer from before an account switch is
@@ -177,7 +188,7 @@ class RecentRepository @Inject constructor(
      */
     suspend fun refresh(days: Int, force: Boolean = false): Boolean {
         val logKey = logKey(days)
-        return refresher.refresh(logKey, MaxAge.THREAD_LISTS, force, lastFetched = { log.fetchedAt(logKey) }) {
+        return list.refreshLogged(logKey, force) {
             account.fetchAndStore({ api.recent(days).map { it.toColumns() } }) { gen, list ->
                 transactor.run {
                     if (account.current != gen) return@run null
@@ -197,11 +208,6 @@ class RecentRepository @Inject constructor(
         const val KEY = ""
     }
 }
-
-private fun observeApiList(dao: ThreadDao, log: FetchLogDao, source: ThreadSource, key: String, logKey: String) =
-    combine(dao.observeSource(source.name, key), log.observeFetchedAt(logKey)) { rows, at ->
-        Cached(rows.map { it.toSummary() }, at?.let(Instant::ofEpochMilli))
-    }
 
 private fun ThreadSummary.toColumns() = ApiThreadColumns(
     id = id.value, title = title, forumId = forumId, forumName = forumName, groupName = group, replies = replies,

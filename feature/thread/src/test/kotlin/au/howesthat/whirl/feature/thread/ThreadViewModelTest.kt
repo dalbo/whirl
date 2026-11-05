@@ -8,7 +8,7 @@ import au.howesthat.whirl.core.data.AccountGeneration
 import au.howesthat.whirl.core.data.ForumRepository
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository
-import au.howesthat.whirl.core.data.WatchAction
+import au.howesthat.whirl.core.model.WatchAction
 import au.howesthat.whirl.core.data.WatchSendScheduler
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.database.RoomTransactor
@@ -63,6 +63,8 @@ import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import au.howesthat.whirl.core.data.WatchedStore
+import au.howesthat.whirl.core.data.WatchQueue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -81,7 +83,17 @@ class ThreadViewModelTest {
     private val settings = SettingsRepository(ApplicationProvider.getApplicationContext())
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     // No key: watch actions apply locally and their sends fail without a request.
-    private val watched = WatchedRepository(WhirlpoolApi(client, { null }, server.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, clock, appScope)
+    private val watched = Watched(WhirlpoolApi(client, { null }, server.url("/api/"), RetryPolicy.NONE))
+
+    /** The watched lists and the send queue, as Hilt wires them. */
+    private inner class Watched(api: WhirlpoolApi) {
+        private val store = WatchedStore(db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), clock)
+        val lists = WatchedRepository(api, store)
+        val queue = WatchQueue(api, store, lists, WatchSendScheduler.None, Dispatchers.Default, appScope)
+
+        fun viewModel(route: ThreadRoute, repo: ThreadPageRepository, saved: SavedStateHandle = SavedStateHandle()) =
+            ThreadViewModel(route, repo, settings, lists, queue, saved, Dispatchers.Default)
+    }
 
     @Before
     fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -110,7 +122,7 @@ class ThreadViewModelTest {
         server.enqueue(MockResponse.Builder().body(File(System.getProperty("whirl.fixtures"), "html/$name").readText()).build())
 
     private fun viewModel(route: ThreadRoute, saved: SavedStateHandle = SavedStateHandle()): ThreadViewModel {
-        val factory = viewModelFactory { initializer { ThreadViewModel(route, repo, settings, watched, saved, Dispatchers.Default) } }
+        val factory = viewModelFactory { initializer { watched.viewModel(route, repo, saved) } }
         return ViewModelProvider.create(viewModels, factory)["vm${viewModelCount++}", ThreadViewModel::class].also { created += it }
     }
 
@@ -182,7 +194,7 @@ class ThreadViewModelTest {
         // Marked read (as auto mark as read does, after the position is read): the cache moves on, the marker does not.
         // Done on the cache directly: this test client has no key, so a real mark-read send fails and rolls back.
         db.threadDao().markRead(listOf("3pxj858k"))
-        assertEquals(null, watched.lastReadPost(ThreadId("3pxj858k")))
+        assertEquals(null, watched.lists.lastReadPost(ThreadId("3pxj858k")))
         assertEquals(53, vm.firstUnread.value)
     }
 
@@ -268,7 +280,7 @@ class ThreadViewModelTest {
         // Two minutes later the cached page is stale, so the view model fetches, and the fetch fails.
         val later = Clock.offset(clock, Duration.ofMinutes(2))
         val staleRepo = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, later, Dispatchers.Default)
-        val vm = ThreadViewModel(ThreadRoute("3pxj858k", 2), staleRepo, settings, watched, SavedStateHandle(), Dispatchers.Default)
+        val vm = watched.viewModel(ThreadRoute("3pxj858k", 2), staleRepo)
         assertEquals(2, await { vm.state.mapNotNull { it.startPage }.first() })
         assertEquals("Simple, ad-free NBN plan comparison tool I built", await { vm.state.mapNotNull { it.title }.first() })
         await { vm.state.mapNotNull { it.error }.first() }
@@ -352,10 +364,10 @@ class ThreadViewModelTest {
             }
             start()
         }
-        val keyed = WatchedRepository(WhirlpoolApi(client, { "k" }, api.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, clock, appScope)
+        val keyed = Watched(WhirlpoolApi(client, { "k" }, api.url("/api/"), RetryPolicy.NONE))
         val pages = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(api.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock, Dispatchers.Default)
         settings.update { it.copy(watchedAutoMarkAsRead = true) }
-        ThreadViewModel(ThreadRoute("9yvx1663", 1), pages, settings, keyed, SavedStateHandle(), Dispatchers.Default)
+        keyed.viewModel(ThreadRoute("9yvx1663", 1), pages)
         val marked = await {
             generateSequence { api.takeRequest(5, TimeUnit.SECONDS) }.first { it.url.queryParameter("watchedread") != null }
         }
@@ -375,11 +387,11 @@ class ThreadViewModelTest {
             }
             start()
         }
-        val keyed = WatchedRepository(WhirlpoolApi(client, { "k" }, api.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, clock, appScope)
+        val keyed = Watched(WhirlpoolApi(client, { "k" }, api.url("/api/"), RetryPolicy.NONE))
         val pages = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(api.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock, Dispatchers.Default)
         settings.update { it.copy(watchUndo = false) }
         // Nothing commits it: with Undo on it would wait out the window instead.
-        ThreadViewModel(ThreadRoute("9yvx1663", 1, fromWatched = true), pages, settings, keyed, SavedStateHandle(), Dispatchers.Default).perform(WatchAction.MARK_READ)
+        keyed.viewModel(ThreadRoute("9yvx1663", 1, fromWatched = true), pages).perform(WatchAction.MARK_READ)
         val marked = await {
             generateSequence { api.takeRequest(5, TimeUnit.SECONDS) }.first { it.url.queryParameter("watchedread") != null }
         }

@@ -4,15 +4,16 @@ import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.model.UserRef
 import au.howesthat.whirl.core.model.WhirlpoolError
+import au.howesthat.whirl.core.model.WhirlpoolSite
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 
-internal const val FORUMS_BASE = "https://forums.whirlpool.net.au"
-internal const val SITE_BASE = "https://whirlpool.net.au"
+internal const val FORUMS_BASE = WhirlpoolSite.FORUMS
 
 private val THREAD_HREF = Regex("""^(?:https?://forums\.whirlpool\.net\.au)?/(?:thread|archive)/([A-Za-z0-9]+)""")
 private val FORUM_HREF = Regex("""^(?:https?://forums\.whirlpool\.net\.au)?/forum/(\d+)(?:\?(?:.*&)?g=(\d+))?""")
+private val WHITESPACE = Regex("""\s+""")
 private val USER_HREF = Regex("""^(?:https?://forums\.whirlpool\.net\.au)?/user/(\d+)""")
 
 internal fun parseDocument(html: String): Document = Jsoup.parse(html, "$FORUMS_BASE/")
@@ -41,7 +42,7 @@ internal fun userFromLink(a: Element?): UserRef? {
 internal fun parseCount(text: String?): Int? = text?.filter(Char::isDigit)?.takeIf(String::isNotEmpty)?.toIntOrNull()
 
 /** Text with whitespace collapsed and `&nbsp;` treated as a space. */
-internal fun String.squash(): String = replace(' ', ' ').replace(Regex("\\s+"), " ").trim()
+internal fun String.squash(): String = replace(' ', ' ').replace(WHITESPACE, " ").trim()
 
 /** Breadcrumb entries `(name, href)` from the schema.org list; the href comes from `a` or `link[itemprop=item]`. */
 internal fun Document.breadcrumb(): List<Pair<String, String>> =
@@ -63,7 +64,7 @@ internal fun Document.breadcrumbForum(): ForumRef? {
 /** Make a link from a post absolute: `//host/x` → https, `/wiki/` → the main site, other `/x` → the forums host. */
 internal fun absoluteUrl(href: String): String = when {
     href.startsWith("//") -> "https:$href"
-    href.startsWith("/wiki/") || href == "/wiki" -> SITE_BASE + href
+    href.startsWith("/wiki/") || href == "/wiki" -> WhirlpoolSite.MAIN + href
     href.startsWith("/") -> FORUMS_BASE + href
     else -> href
 }
