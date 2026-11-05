@@ -8,6 +8,9 @@ Items marked ✔ were checked against the code while writing this plan; the rest
 (or dropped) as each PR is built. Dependencies were brought up to date the same day (OkHttp 5.5.1, KSP 2.3.13,
 DataStore 1.3.0, AGP 9.5.0; #76, #105, #75, #107).
 
+**Progress (2026-11-05): A–F are merged** (#109–#114). Next is **G**, then H, then the release. §11 has what each
+merged PR decided beyond this plan, and the notes G, H and the release need.
+
 ---
 
 ## 1. Network and parsing off the main thread ✔
@@ -176,3 +179,93 @@ One PR each, in this order (each small enough to review on its own):
 ## 10. Decisions (Dallin, 2026-11-05)
 1. v1.7 is only the tidy-up; new features (archive reader, search within it, posts by a user) are v1.8.
 2. The current in-app post filters can go: they are unused, and v1.8 brings filtering back from the archive.
+
+## 11. Progress and notes for the remaining PRs
+
+### 11.1 Merged
+| PR | | Notes beyond the plan |
+|---|---|---|
+| A #109 | Build and CI (§6.1–6.2, 6.4–6.8) | §6.8 only partly: fixed clocks, but the wall-clock waits for Room, DataStore and MockWebServer stay. |
+| B #110 | Off the main thread, parse once (§1, §2) | `@IoDispatcher`/`@DefaultDispatcher` in `:core:data`. |
+| C #111 | UI bugs (§3.1–3.3, 3.5–3.7) | §3.2 snackbar not checked on the phone (no way to make a link fail); §3.5 drawer highlight shows only in two panes, so it is unit-tested only. |
+| D #112 | Data integrity (§4) | See 11.2. Two code-review rounds; each fix's test was shown failing with that fix reverted. |
+| E #113 | Post filter removed, thread screen split (§5.2) | Room **v5** (`MIGRATION_4_5`, manual): the tables are rebuilt keeping the plain pages (`filter = ''`), so cached threads still open offline. `ThreadUiState`, `PageContext`; `PostItem.kt`, `ThreadMenu.kt`, `ThreadFindBar.kt`. `WhirlpoolUrls.site`, `news()`, `newsArticle()`. |
+| F #114 | Shared list plumbing (§5.1, fixes §3.4) | `ListScreenState` (`:core:ui`): `refresh` (latest call wins: thread lists, where a page or tab change fetches something else) and `refreshSame` (News, Forums: a call joins the running fetch unless it is forced and that one is not). `ThreadListScaffold`; `DrawerLists.kt` split per screen. Lazy keys: `Section.key` (forum id, numbered per run), `Section.rowKeys`; Check history by `CheckRecord.id`. |
+
+### 11.2 How D works now (read before touching the watched/account code)
+- **Transactions.** Every section under `WatchedRepository`'s mutex is one database transaction (`Transactor`, bound
+  to `RoomTransactor`). Lock order: `sending`, then `mutex`, then the transaction.
+- **Account switches.** `AccountRepository` calls `WatchedRepository.switchAccount(change, clear)`. It sets
+  `switching` (the sender stops after the row it is sending, and no refresh follows a failure), takes `sending`,
+  forgets the queue (live actions complete as not sent), runs `change` (the key), then bumps `AccountGeneration`
+  and runs `clearAccountData()` in one transaction.
+- **Any new account-scoped fetch** must store through `AccountGeneration.fetchAndStore`. It reads the generation
+  before the fetch, the store checks it in its transaction, and an answer dropped by a switch is fetched once more,
+  so the new account's first lists are kept. After sign-out that second fetch fails at once with `BadKey`, and
+  nothing is sent or stored.
+- **Failure rollback.** Only membership of the watched lists goes back, plus the read position for Mark as read.
+  The snapshot is used only for a thread no longer cached. Both lists are then refetched, ignoring the throttle,
+  unless the give-up was a network, Cloudflare or rate-limit failure. Undo still restores the full snapshot.
+- **Orphans.** `deleteOrphans()` runs after every list replacement and keeps threads a queued action names.
+- **Backstop worker.** `WatchSendScheduler.schedule` is `suspend`. `policyFor` keeps a run that has not started and
+  appends only after a running one, so the chain is at most two long.
+- **Settings.** `update` read-modify-writes inside `edit` and stores only non-defaults. `DropStoredDefaults`
+  (a DataStore migration, marker key `stored_defaults_dropped`) removed what v1.6 and earlier had stored at the
+  defaults.
+
+### 11.3 G: data-layer cleanup and dead code (§5.3, §5.4), next
+As planned, plus:
+- **`awaitSend`** gets a sealed result and an injected time source instead of `withContext(Dispatchers.Default)`.
+  The result needs three outcomes: sent or still queued, rejected (rolled back), and dropped by an account switch.
+  Today the switch completes `done` with a `CancellationException`, and `awaitSend` returns false for it.
+  `WatchedNotifier.act` is the only caller.
+- **Splitting `WatchedRepository`:** keep 11.2's lock order and the single `switchAccount` entry point. The send
+  queue and the lists share `mutex`, `live` and `switching`.
+- **`Settings` table of keys:** `SettingsRepository.kt` already has `toSettings()`/`writeSettings()` at file level,
+  which `DropStoredDefaults` uses. The table replaces both, and the migration keeps working through it.
+- **The setup screen's `PROFILE_URL` and the scraper's `SITE_BASE` (`Html.kt`)** move to `WhirlpoolUrls.site`
+  (found in E's review).
+- **Room enums (§5.3):** typed `action`/`state`/`source` columns are still TEXT, so check whether the exported
+  schema changes. If it does, it needs v6 and a `MigrationTest` case; build the schema once before the test can see
+  it.
+- **Deferred to v1.8 (from D's review):** private-forum lists (`ForumThreadsRepository`) fetched with the old key
+  are not account-guarded. They were never cleared on sign-out, so guarding them belongs with any per-account
+  change to those lists.
+
+### 11.4 H: docs (§7)
+As planned. HANDOFF.md still describes the removed filter: `load(id, page|LAST_PAGE, filter, …)`, "filtered pages
+(`PostFilter`) cache apart", `ThreadRoute(… userId)` and `ThreadViewModel.setFilter`. Now: `showUsersPosts`,
+`showModeratorPosts`, `showRepPosts`, browser only. It also says Room v2 in places; the database is v5. Fold 11.2
+into the new HANDOFF's notes.
+
+### 11.5 Release v1.7.0
+- **Reproducibility check (§6.3):** the `workflow_dispatch` job is **not built yet**; build it in H or a PR of its
+  own, then run it before tagging.
+- **Release PR:** as §9 says. The changelog says "fixes and speed-ups".
+- **Phone pass:** `docs/device-checklist.md`, plus:
+  - forum Back (§3.1); a spoiler post;
+  - settings kept after the DataStore 1.3 upgrade and the `DropStoredDefaults` migration (change nothing, check
+    each setting reads as before);
+  - a queued watch action across sign-out (it is not sent with the next key);
+  - cached threads open after the Room v5 migration, offline too;
+  - the thread menu's filter entries open the browser;
+  - each list's top bar: Watched (tabs, ⋮ in both bars, "Show N in All"), Recent (days picker), Popular, Latest,
+    User (no find);
+  - pull to refresh on News and Forums while they load.
+- **Carried over:** §6.8's wall-clock waits, §3.2 on the phone, §3.5 unit-tested only.
+
+### 11.6 Working notes
+- **Red/green:** for each bug fix, revert just that fix (keeping new seams so the test compiles), run its test, and
+  restore it. The PR descriptions of #112–#114 show the form.
+- **Robolectric/coroutines tests:**
+  - Clearing a view model cancels its work but does not finish it. Join the cleared view models' jobs before
+    `Dispatchers.resetMain()` (`ThreadViewModelTest.tearDown`); otherwise work resuming on Main can land in the
+    next test.
+  - `advanceUntilIdle` skips `backgroundScope` work.
+  - Two DataStores on one file must not be open at once.
+- **Stacked PRs:** after the lower one squash-merges, merge `origin/main` into the upper branch (conflicts resolve
+  to the upper side once `git diff <lower> origin/main` is empty), `gh pr edit N --base main`, wait for CI, then
+  squash-merge.
+- **The full local check** is `./gradlew :app:lintDebug test assembleDebug` (daemon on JDK 17 from `~/.jdks`).
+  It takes 2–12 minutes; a change to `:core:ui` reruns every module's tests.
+

@@ -150,6 +150,8 @@ Open ideas, roughly by value:
 ## Next: v1.7 tidy-up, then v1.8 archive reader (agreed 2026-11-05)
 **`docs/plan-v1.7.md`** is the plan: no new features in v1.7 (fixes from the 2026-11-05 review, dead code including the in-app post filter, build/CI, a shorter HANDOFF); the archive reader with search within a thread and posts by a user is v1.8 (§8 there).
 
+**Progress (2026-11-05):** PRs A–F are merged (#109–#114). **Next: G** (data-layer cleanup and dead code), then H (docs), then the v1.7.0 release. Read `docs/plan-v1.7.md` **§11** first: it records what each merged PR decided, how the watched/account code works now (§11.2), and the notes and phone checks for what is left. Parts of this file further up still describe the removed in-app post filter and Room v2; the database is v5, and H rewrites this file.
+
 ## Known unknowns to resolve as you go
 - Shape of `get=recent` when non-empty (assumed to match `THREADS`; the Recent screen must cope with it failing as Drift).
 - Markup of a deleted post and of a post with an image (capture when found: add the URL to `tools/capture/public.json`, run `npm run public`).
