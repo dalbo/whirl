@@ -22,8 +22,18 @@ class ThreadOpenerTest {
         assertEquals(InApp(id, 3, 48, 92, fromWatched = true, lastReadPost = 47), open(OpenedFrom.WATCHED, w = watched))
         // The last read post ends page 2: the first unread one is on page 3, past LASTPAGE.
         assertEquals(InApp(id, 3, 41, 92, fromWatched = true, lastReadPost = 40), open(OpenedFrom.WATCHED, w = WatchedPosition(2, 40, 3)))
-        // At the top, the new posts are still marked.
-        assertEquals(InApp(id, 3, null, 92, fromWatched = true, lastReadPost = 47), open(OpenedFrom.WATCHED, defaults.copy(loadWatchedAtTop = true), w = watched))
+        // At the top, the new posts are still marked, and their page is the one that opens.
+        val atTop = defaults.copy(loadWatchedAtTop = true)
+        assertEquals(InApp(id, 3, null, 92, fromWatched = true, lastReadPost = 47), open(OpenedFrom.WATCHED, atTop, w = watched))
+        assertEquals(InApp(id, 3, null, 92, fromWatched = true, lastReadPost = 40), open(OpenedFrom.WATCHED, atTop, w = WatchedPosition(2, 40, 3)))
+    }
+
+    @Test
+    fun `the page follows LASTPAGE, not a page size of its own`() {
+        // Whirlpool says which page the last read post is on; only a post ending a page moves the first unread one on.
+        assertEquals(5, WatchedPosition(lastPage = 5, lastReadPost = 47, unreadCount = 2).openPage)
+        assertEquals(6, WatchedPosition(lastPage = 5, lastReadPost = 100, unreadCount = 2).openPage)
+        assertEquals(5, WatchedPosition(lastPage = 5, lastReadPost = 100, unreadCount = 0).openPage)
     }
 
     @Test
@@ -55,6 +65,8 @@ class ThreadOpenerTest {
         assertEquals(Browser("https://forums.whirlpool.net.au/thread/3pxj858k?p=3#r48"), open(OpenedFrom.WATCHED, private = true, w = watched))
         assertEquals(Browser("https://forums.whirlpool.net.au/thread/3pxj858k?p=3#r41"), open(OpenedFrom.WATCHED, private = true, w = WatchedPosition(2, 40, 3)))
         assertEquals(Browser("https://forums.whirlpool.net.au/thread/3pxj858k?p=3#r47"), open(OpenedFrom.WATCHED, private = true, w = watched.copy(unreadCount = 0)))
+        // Nothing read yet: no post to jump to.
+        assertEquals(Browser("https://forums.whirlpool.net.au/thread/3pxj858k"), open(OpenedFrom.WATCHED, private = true, w = WatchedPosition(1, 0, 5)))
     }
 
     @Test

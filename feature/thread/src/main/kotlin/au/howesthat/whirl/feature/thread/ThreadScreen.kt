@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
@@ -297,16 +298,13 @@ private fun PageContent(page: Int, viewModel: ThreadViewModel, context: PageCont
     LaunchedEffect(loaded, target) {
         val t = target ?: return@LaunchedEffect
         if (loaded == null || t.page != page) return@LaunchedEffect
-        val index = if (t.lastPost) {
-            loaded.posts.lastIndex
-        } else {
-            loaded.posts.indexOfFirst { p ->
-                (t.replyId != null && p.post.replyId == t.replyId) || (t.postNumber != null && p.post.number == t.postNumber)
-            }
-        }
+        val step = t.step(loaded.posts.map { it.post }, loaded.updatedAt)
         // Past the marker, a post is one row further down; the first unread post itself scrolls to the marker.
-        if (index >= 0) list.scrollToItem(headerCount + index + if (markerAt in 0 until index) 1 else 0)
-        viewModel.scrollHandled()
+        step.index?.let { list.scrollToItem(headerCount + it + if (markerAt in 0 until it) 1 else 0) }
+        if (step.done) viewModel.scrollHandled()
+    }
+    LaunchedEffect(list) {
+        list.interactionSource.interactions.collect { if (it is DragInteraction.Start) viewModel.userScrolled() }
     }
 
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = { viewModel.refresh() }, modifier = Modifier.fillMaxSize()) {

@@ -171,7 +171,7 @@ class ListViewModelTest {
         val row = ThreadItem(ThreadId("3pxj858k"), ThreadId("3pxj858k"), "NBN", forum = ForumRef(92, "Choosing an ISP"))
         assertEquals(listOf(WatchAction.WATCH), vm.watchActions(row))
         assertEquals(emptyList(), vm.watchActions(row.copy(openId = null)), "deleted rows with nowhere to go")
-        assertEquals(listOf(WatchAction.MARK_READ, WatchAction.UNWATCH), vm.watchActions(row.copy(unreadCount = 3, watched = WatchedPosition(1, 1))))
+        assertEquals(listOf(WatchAction.MARK_READ, WatchAction.UNWATCH), vm.watchActions(row.copy(unreadCount = 3, watched = WatchedPosition(1, 1, 3))))
 
         watched.perform(WatchAction.WATCH, listOf(row.id))
         vm.watchedIds.first { row.id in it }

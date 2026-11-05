@@ -25,26 +25,24 @@ sealed interface OpenThread {
 enum class OpenedFrom { WATCHED, RECENT, LIST }
 
 /** Read position of a watched thread (`LASTPAGE`, `LASTREAD`, `UNREAD`). */
-data class WatchedPosition(val lastPage: Int, val lastReadPost: Int, val unreadCount: Int = 0) {
+data class WatchedPosition(val lastPage: Int, val lastReadPost: Int, val unreadCount: Int) {
     /** The first post not read yet; null with nothing unread, or nothing read yet (the thread opens at its start). */
     val firstUnread: Int? get() = (lastReadPost + 1).takeIf { lastReadPost > 0 && unreadCount > 0 }
 
-    /** Where a watched thread opens: the first unread post (on the next page if the last read one ends a page), else the last read one. */
+    /** Where a watched thread opens: the first unread post, else the last read one; null with nothing read. */
     val openAt: Int? get() = firstUnread ?: lastReadPost.takeIf { it > 0 }
 
-    /** The page of [openAt]; `LASTPAGE` is the page of the last read post. */
-    val openPage: Int get() = firstUnread?.let(::pageOfPost) ?: lastPage
+    /**
+     * The page of [openAt]. `LASTPAGE` is the page of the last read post, so the first unread post is on the next page
+     * only when the last read one ends a page.
+     */
+    val openPage: Int get() = if (firstUnread != null && lastReadPost % POSTS_PER_PAGE == 0) lastPage + 1 else lastPage
 }
-
-/** Whirlpool shows 20 posts per thread page. */
-const val POSTS_PER_PAGE = 20
-
-/** The thread page holding post [number] (1-based). */
-fun pageOfPost(number: Int): Int = (number - 1) / POSTS_PER_PAGE + 1
 
 /**
  * The opening rules of 2.14.12 `ForumPageFragment.openThread` (PLAN.md §1.1):
- * - watched → `LASTPAGE`, scrolled to the last read post unless "open watched at top";
+ * - watched → the first unread post at the top of the screen (the last read post with nothing unread; 2.14.12
+ *   scrolled to the last read post); "open watched at top" opens that post's page at its top;
  * - recent → last page unless "open recent at top";
  * - other lists → last page if "open public threads at the last page";
  * - private forums, and everything when "open threads in the browser" is on → the browser, at the same position
@@ -68,7 +66,7 @@ class ThreadOpener(private val urls: WhirlpoolUrls = WhirlpoolUrls()) {
         if (isPrivateForum || settings.openThreadsInBrowser) {
             val url = when {
                 watched != null && from == OpenedFrom.WATCHED ->
-                    urls.thread(id, watched.openPage).newBuilder().fragment("r${watched.openAt ?: watched.lastReadPost}").build()
+                    urls.thread(id, watched.openPage).newBuilder().fragment(watched.openAt?.let { "r$it" }).build()
                 atLastPage -> urls.thread(id, ThreadPageRepository.LAST_PAGE).newBuilder().fragment("bottom").build()
                 else -> urls.thread(id)
             }

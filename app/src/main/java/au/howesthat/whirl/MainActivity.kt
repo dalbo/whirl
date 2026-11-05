@@ -141,8 +141,8 @@ class MainActivity : ComponentActivity() {
                 WatchedPosition(
                     intent.getIntExtra(WatchedNotifier.EXTRA_LAST_PAGE, 1),
                     intent.getIntExtra(WatchedNotifier.EXTRA_LAST_READ_POST, 0),
-                    // A notification posted before v1.7 has no count; it was for an unread thread.
-                    intent.getIntExtra(WatchedNotifier.EXTRA_UNREAD_COUNT, 1),
+                    // A notification posted before v1.7 has no count: open it at the last read post, as v1.6 did.
+                    intent.getIntExtra(WatchedNotifier.EXTRA_UNREAD_COUNT, 0),
                 ),
             )
             null

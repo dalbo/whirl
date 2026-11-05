@@ -182,6 +182,35 @@ class ThreadViewModelTest {
     }
 
     @Test
+    fun `a fresh cached page without the first unread post is fetched, and the target waits for it`() = runTest {
+        enqueueHtml("thread_3pxj858k_p2.html")
+        repo.load(ThreadId("3pxj858k"), 2)
+        // 30 s later the page is still fresh, but Watched says post 41 is new: it is fetched again.
+        val later = Clock.offset(clock, Duration.ofSeconds(30))
+        val laterRepo = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, later, Dispatchers.Default)
+        enqueueHtml("thread_3pxj858k_p2.html")
+        val vm = watched.viewModel(ThreadRoute("3pxj858k", 2, scrollToPost = 41, fromWatched = true, lastReadPost = 40), laterRepo)
+        val target = await { vm.scrollTarget.first { it?.fetched != null } }!!
+        assertEquals(2, server.requestCount)
+        assertEquals(ScrollTarget(2, postNumber = 41, waitForFetch = true, fetched = later.instant()), target)
+        // Not on the fetched page either: the list ends at the last read post.
+        val page = vm.page(2).filterNotNull().first()
+        assertEquals(ScrollStep(page.posts.lastIndex, done = true), target.step(page.posts.map { it.post }, page.updatedAt))
+        // The reader scrolling first cancels it.
+        vm.userScrolled()
+        assertEquals(null, vm.scrollTarget.value)
+    }
+
+    @Test
+    fun `a cached page with the first unread post is not fetched again`() = runTest {
+        enqueueHtml("thread_3pxj858k_p2.html")
+        repo.load(ThreadId("3pxj858k"), 2)
+        val vm = viewModel(ThreadRoute("3pxj858k", 2, scrollToPost = 31, fromWatched = true, lastReadPost = 30))
+        await { vm.scrollTarget.first { it?.fetched != null } }
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
     fun `a watched thread opened elsewhere keeps its new-posts marker once marked read`() = runTest {
         val row = WatchedThreadColumns(
             "3pxj858k", "NBN", 92, "Choosing an ISP", replies = 60, firstUserId = 1, firstUserName = "a", firstDate = 0,

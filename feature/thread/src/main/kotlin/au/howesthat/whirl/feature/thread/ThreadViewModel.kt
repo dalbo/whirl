@@ -85,8 +85,34 @@ data class ThreadUiState(
     val refreshing: Boolean = false,
 )
 
-/** A post to bring into view once its page is showing: by number, by reply id, or the page's last. */
-data class ScrollTarget(val page: Int, val postNumber: Int? = null, val replyId: Long? = null, val lastPost: Boolean = false)
+/**
+ * A post to bring into view once its page is showing: by number, by reply id, or the page's last. [waitForFetch] is
+ * for the post a watched thread opens at, which a cached page may predate: until a copy fetched at [fetched] or later
+ * is on screen, a missing post scrolls to the post before it and the target stays, so the fetched page can finish.
+ */
+data class ScrollTarget(
+    val page: Int,
+    val postNumber: Int? = null,
+    val replyId: Long? = null,
+    val lastPost: Boolean = false,
+    val waitForFetch: Boolean = false,
+    val fetched: Instant? = null,
+)
+
+/** What a page does with a scroll target: scrolls to the post at [index] on the page (if any), then forgets the target if [done]. */
+internal data class ScrollStep(val index: Int?, val done: Boolean)
+
+internal fun ScrollTarget.step(posts: List<Post>, updatedAt: Instant?): ScrollStep {
+    val index = if (lastPost) {
+        posts.lastIndex
+    } else {
+        posts.indexOfFirst { (replyId != null && it.replyId == replyId) || (postNumber != null && it.number == postNumber) }
+    }
+    if (index >= 0) return ScrollStep(index, done = true)
+    if (!waitForFetch || postNumber == null) return ScrollStep(null, done = true)
+    val before = posts.indexOfLast { it.number < postNumber }.takeIf { it >= 0 }
+    return ScrollStep(before, done = fetched != null && updatedAt != null && updatedAt >= fetched)
+}
 
 /** One-off navigation out of the thread. */
 sealed interface ThreadEvent {
@@ -131,7 +157,7 @@ class ThreadViewModel @AssistedInject constructor(
     private val _scrollTarget = MutableStateFlow(
         when {
             route.scrollToReply != null -> ScrollTarget(route.page, replyId = route.scrollToReply)
-            route.scrollToPost != null -> ScrollTarget(route.page, postNumber = route.scrollToPost)
+            route.scrollToPost != null -> ScrollTarget(route.page, postNumber = route.scrollToPost, waitForFetch = route.fromWatched)
             else -> null
         },
     )
@@ -267,7 +293,11 @@ class ThreadViewModel @AssistedInject constructor(
             _state.value.startPage?.let { start ->
                 repo.page(threadId, start).first()?.value?.title?.let { title -> _state.update { it.copy(title = title) } }
             }
-            load(page, force = false)
+            // Watched says there are posts the cached page does not have: fetch it even if it is fresh.
+            val target = _scrollTarget.value
+            val missing = target?.waitForFetch == true && target.postNumber != null &&
+                repo.page(threadId, target.page).first()?.value?.posts?.none { it.number == target.postNumber } != false
+            load(page, force = missing)
         }
     }
 
@@ -294,7 +324,9 @@ class ThreadViewModel @AssistedInject constructor(
         val job = viewModelScope.launch {
             try {
                 val resolved = repo.load(threadId, page, route.forumId, force)
-                val loaded = repo.page(threadId, resolved).first()?.value
+                val cached = repo.page(threadId, resolved).first()
+                settleTarget(resolved, cached?.updatedAt)
+                val loaded = cached?.value
                 if (loaded != null) _state.update { it.copy(pageCount = loaded.pageCount, title = loaded.title) }
                 if (page == LAST_PAGE && toLastPost) {
                     toLastPost = false
@@ -311,6 +343,8 @@ class ThreadViewModel @AssistedInject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                // Offline: the cached copy is all there is.
+                if (page != LAST_PAGE) settleTarget(page, repo.page(threadId, page).first()?.updatedAt)
                 _state.update { it.copy(error = e) }
             }
         }
@@ -325,6 +359,18 @@ class ThreadViewModel @AssistedInject constructor(
 
     fun scrollHandled() {
         _scrollTarget.value = null
+    }
+
+    /** A load of [page] ended: a target waiting for it is decided by the copy fetched at [at] (null: nothing cached). */
+    private fun settleTarget(page: Int, at: Instant?) {
+        _scrollTarget.update { t ->
+            if (t != null && t.waitForFetch && t.fetched == null && t.page == page) t.copy(fetched = at ?: Instant.EPOCH) else t
+        }
+    }
+
+    /** The reader scrolled: a target still waiting for the fetched page would move the posts under them. */
+    fun userScrolled() {
+        _scrollTarget.update { t -> t?.takeUnless { it.waitForFetch } }
     }
 
     fun goToPage(page: Int) {
