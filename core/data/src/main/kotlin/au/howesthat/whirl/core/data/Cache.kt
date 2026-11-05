@@ -4,6 +4,7 @@ import au.howesthat.whirl.core.database.FetchLogDao
 import au.howesthat.whirl.core.database.FetchLogEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
@@ -26,7 +27,8 @@ class MemoryCache<K : Any, V>(private val keep: Int, private val clock: Clock) {
     private val entries = MutableStateFlow<Map<K, Cached<V>>>(emptyMap())
     private val refresher = Refresher(log = null, clock = clock)
 
-    fun observe(key: K): Flow<Cached<V>?> = entries.map { it[key] }
+    /** [key]'s value; a refresh of another key does not emit it again. */
+    fun observe(key: K): Flow<Cached<V>?> = entries.map { it[key] }.distinctUntilChanged()
 
     /** Runs [fetch] if [key] is older than [maxAge] (or forced, past the throttle) and keeps what it returns. */
     suspend fun refresh(key: K, maxAge: Duration, force: Boolean, fetch: suspend () -> V): Boolean =

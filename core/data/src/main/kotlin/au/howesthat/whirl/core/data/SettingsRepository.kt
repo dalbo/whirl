@@ -67,7 +67,7 @@ private fun string(name: String, get: (Settings) -> String, set: Settings.(Strin
     SettingField(stringPreferencesKey(name), get, set, { it }, { it })
 
 private fun time(name: String, get: (Settings) -> LocalTime, set: Settings.(LocalTime) -> Settings) =
-    SettingField(stringPreferencesKey(name), get, set, LocalTime::toString, LocalTime::parse)
+    SettingField(stringPreferencesKey(name), get, set, LocalTime::toString) { runCatching { LocalTime.parse(it) }.getOrNull() }
 
 private inline fun <reified E : Enum<E>> enum(name: String, noinline get: (Settings) -> E, noinline set: Settings.(E) -> Settings) =
     SettingField(stringPreferencesKey(name), get, set, { it.name }, { stored -> enumValues<E>().firstOrNull { it.name == stored } })
