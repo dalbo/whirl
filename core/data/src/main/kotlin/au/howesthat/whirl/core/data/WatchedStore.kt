@@ -17,11 +17,11 @@ import javax.inject.Singleton
 
 /**
  * What the watched lists ([WatchedRepository]) and the send queue ([WatchQueue]) share: the cached lists, the queue
- * table, the actions made in this process, and the locks.
+ * table and [mutex]. The queue's own state (actions made in this process, the sender's lock) stays in [WatchQueue].
  *
- * Lock order: [sending], then [mutex], then the database transaction. Every section under [mutex] is one transaction,
- * so observers (screens, the notification check) never see a list replaced without the actions still waiting to be
- * sent.
+ * Lock order: `WatchQueue.sending`, then [mutex], then the database transaction. Every section under [mutex] is one
+ * transaction, so observers (screens, the notification check) never see a list replaced without the actions still
+ * waiting to be sent.
  */
 @Singleton
 class WatchedStore @Inject constructor(
@@ -34,15 +34,6 @@ class WatchedStore @Inject constructor(
 ) {
     /** Serialises local edits, list replacements and the queue. Always taken before any database transaction. */
     internal val mutex = Mutex()
-
-    /** Actions made in this process, by row id, for Undo and rollback. Guarded by [mutex]. */
-    internal val live = mutableMapOf<Long, PendingWatch>()
-
-    /** One sender at a time, in the app or in the worker. Taken before [mutex]. */
-    internal val sending = Mutex()
-
-    /** Set while an account switch waits for [sending]: the sender stops after the row it is sending. */
-    @Volatile internal var switching = false
 
     /**
      * Runs [block] under [mutex] in one transaction, then re-applies the actions not yet sent and drops threads no list

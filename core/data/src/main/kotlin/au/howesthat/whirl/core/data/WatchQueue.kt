@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -105,7 +106,15 @@ class WatchQueue @Inject constructor(
     private val queue = store.queue
     private val clock = store.clock
     private val mutex = store.mutex
-    private val live = store.live
+
+    /** Actions made in this process, by row id, for Undo and rollback. Guarded by [mutex]. */
+    private val live = mutableMapOf<Long, PendingWatch>()
+
+    /** One sender at a time, in the app or in the worker. Taken before [mutex]. */
+    private val sending = Mutex()
+
+    /** Set while an account switch waits for [sending]: the sender stops after the row it is sending. */
+    @Volatile private var switching = false
 
     internal var undoWindow: Duration = UNDO_WINDOW
 
@@ -188,14 +197,14 @@ class WatchQueue @Inject constructor(
     }
 
     /** Sends the queued actions that are due, oldest first. Called by the app and by [WatchSendWorker]. */
-    suspend fun drain(): Drain = store.sending.withLock { drainLocked() }
+    suspend fun drain(): Drain = sending.withLock { drainLocked() }
 
     private suspend fun drainLocked(): Drain {
         // Nothing is being sent now, so a row still marked as sending was cut off when its process ended.
         queue.resetSending()
         while (true) {
             // Signing out: the queue is about to be forgotten; stop after the row just sent.
-            if (store.switching) return Drain.Empty
+            if (switching) return Drain.Empty
             val rows = queue.all()
             if (rows.isEmpty()) return Drain.Empty
             val now = clock.millis()
@@ -301,10 +310,10 @@ class WatchQueue @Inject constructor(
 
     /** After a failure: Whirlpool's lists show what really happened. Fetched however recently they were. */
     private suspend fun refreshQuietly() {
-        if (store.switching) return
+        if (switching) return
         try {
-            lists.refresh(unreadOnly = false, maxAge = Duration.ZERO, force = false)
-            lists.refresh(unreadOnly = true, maxAge = Duration.ZERO, force = false)
+            lists.refresh(unreadOnly = false, force = false, maxAge = Duration.ZERO)
+            lists.refresh(unreadOnly = true, force = false, maxAge = Duration.ZERO)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -325,9 +334,9 @@ class WatchQueue @Inject constructor(
      * moves on in the same transaction, after [change].
      */
     suspend fun switchAccount(change: suspend () -> Unit, clear: suspend () -> Unit) {
-        store.switching = true
+        switching = true
         try {
-            store.sending.withLock {
+            sending.withLock {
                 mutex.withLock {
                     scheduler.cancel()
                     queue.clear()
@@ -344,7 +353,7 @@ class WatchQueue @Inject constructor(
                 }
             }
         } finally {
-            store.switching = false
+            switching = false
         }
     }
 

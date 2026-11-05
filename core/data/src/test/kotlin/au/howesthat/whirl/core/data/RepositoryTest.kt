@@ -297,6 +297,19 @@ class RepositoryTest {
     }
 
     @Test
+    fun `a stored value this version cannot read falls back to the default`() = runTest {
+        store.edit {
+            it[stringPreferencesKey("night_start")] = "25:99"
+            it[stringPreferencesKey("theme")] = "SEPIA"
+            it[stringPreferencesKey("homepage")] = Homepage.NEWS.name
+        }
+        val s = settings.settings.first()
+        assertEquals(Settings().nightStart, s.nightStart)
+        assertEquals(Settings().theme, s.theme)
+        assertEquals(Homepage.NEWS, s.homepage, "the rest still read")
+    }
+
+    @Test
     fun `settings changed at the same time all take effect`() = runTest {
         withContext(Dispatchers.Default) {
             repeat(20) { launch { settings.update { it.copy(undoSeconds = it.undoSeconds + 1) } } }

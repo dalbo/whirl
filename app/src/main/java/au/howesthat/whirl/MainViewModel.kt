@@ -33,7 +33,7 @@ data class MainState(val settings: Settings, val setupDone: Boolean)
 class MainViewModel @Inject constructor(
     private val settings: SettingsRepository,
     api: WhirlpoolApi,
-    private val watched: WatchQueue,
+    private val watchQueue: WatchQueue,
     private val forums: ForumRepository,
 ) : ViewModel() {
     /** Null until settings are read, which keeps the splash screen up. */
@@ -68,7 +68,7 @@ class MainViewModel @Inject constructor(
     fun openWatchedThread(id: ThreadId, forumId: Int, position: WatchedPosition) {
         viewModelScope.launch {
             val s = settings.settings.first()
-            if (s.watchedAutoMarkAsRead) launch { watched.perform(WatchAction.MARK_READ, listOf(id), undoable = false) }
+            if (s.watchedAutoMarkAsRead) launch { watchQueue.perform(WatchAction.MARK_READ, listOf(id), undoable = false) }
             _link.value = when (val target = opener.open(id, forumId, forumId in forums.privateIds.first(), OpenedFrom.WATCHED, s, position)) {
                 is OpenThread.InApp -> ThreadRoute(
                     target.id.value, target.page, scrollToPost = target.scrollToPost, forumId = target.forumId, fromWatched = target.fromWatched,
@@ -80,9 +80,9 @@ class MainViewModel @Inject constructor(
     }
 
     /** Watch actions waiting for Undo, and failures, for the app-wide snackbar. */
-    val watchEvents = watched.events
+    val watchEvents = watchQueue.events
 
-    suspend fun undo(p: PendingWatch) = watched.undo(p)
+    suspend fun undo(p: PendingWatch) = watchQueue.undo(p)
 
-    fun commit(p: PendingWatch) = watched.commit(p)
+    fun commit(p: PendingWatch) = watchQueue.commit(p)
 }

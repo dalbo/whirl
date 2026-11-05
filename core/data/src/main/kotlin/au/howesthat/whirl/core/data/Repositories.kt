@@ -46,8 +46,11 @@ class CachedApiList(private val log: FetchLogDao, clock: Clock, private val maxA
     /** Runs [fetch] if [logKey] is due, then logs the fetch. True if it fetched. */
     suspend fun refresh(logKey: String, force: Boolean, fetch: suspend () -> Unit): Boolean = refresher.refresh(logKey, maxAge, force, fetch)
 
-    /** As [refresh], for a [fetch] that logs itself, in the transaction that stores the list. */
-    suspend fun refreshLogged(logKey: String, force: Boolean, fetch: suspend () -> Unit): Boolean =
+    /**
+     * As [refresh], for a [fetch] that logs itself, in the transaction that stores the list. [maxAge] can be shorter
+     * for this call (zero: fetch however recent, still one fetch at a time).
+     */
+    suspend fun refreshLogged(logKey: String, force: Boolean, maxAge: Duration = this.maxAge, fetch: suspend () -> Unit): Boolean =
         refresher.refresh(logKey, maxAge, force, lastFetched = { log.fetchedAt(logKey) }, fetch)
 }
 

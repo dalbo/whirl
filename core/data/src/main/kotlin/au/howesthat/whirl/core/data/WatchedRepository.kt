@@ -11,10 +11,8 @@ import au.howesthat.whirl.core.model.WatchedThread
 import au.howesthat.whirl.core.network.WhirlpoolApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration
@@ -30,12 +28,10 @@ class WatchedRepository @Inject constructor(
 ) {
     private val dao = store.dao
     private val log = store.log
-    private val refresher = Refresher(log, store.clock)
+    private val list = CachedApiList(log, store.clock, MaxAge.THREAD_LISTS)
 
     fun watched(unreadOnly: Boolean): Flow<Cached<List<WatchedThread>>> =
-        combine(dao.observeSource(ThreadSource.WATCHED, WatchedStore.key(unreadOnly)), log.observeFetchedAt(logKey(unreadOnly))) { rows, at ->
-            Cached(rows.map { it.toWatched() }, at?.let(Instant::ofEpochMilli))
-        }
+        list.observe(dao.observeSource(ThreadSource.WATCHED, WatchedStore.key(unreadOnly)), logKey(unreadOnly)) { it.toWatched() }
 
     /** Threads on either watched list, including actions not yet sent. Complete once the All list has been fetched. */
     val watchedIds: Flow<Set<ThreadId>> = dao.observeWatchedIds().map { ids -> ids.mapTo(mutableSetOf(), ::ThreadId) }
@@ -49,16 +45,13 @@ class WatchedRepository @Inject constructor(
         return t.lastReadPost?.takeIf { it > 0 && (t.unreadCount ?: 0) > 0 }
     }
 
-    suspend fun refresh(unreadOnly: Boolean, force: Boolean = false): Boolean = refresh(unreadOnly, MaxAge.THREAD_LISTS, force)
-
-    internal suspend fun refresh(unreadOnly: Boolean, maxAge: Duration, force: Boolean): Boolean {
-        val logKey = logKey(unreadOnly)
-        return refresher.refresh(logKey, maxAge, force, lastFetched = { log.fetchedAt(logKey) }) {
-            store.account.fetchAndStore({ api.watched(unreadOnly).map { it.toColumns() } }) { gen, list ->
-                store.storeLists(gen) { store.replaceList(unreadOnly, list) }
+    /** Fetches the list if it is older than [maxAge] ([MaxAge.THREAD_LISTS] unless the send queue asks for zero). */
+    suspend fun refresh(unreadOnly: Boolean, force: Boolean = false, maxAge: Duration = MaxAge.THREAD_LISTS): Boolean =
+        list.refreshLogged(logKey(unreadOnly), force, maxAge) {
+            store.account.fetchAndStore({ api.watched(unreadOnly).map { it.toColumns() } }) { gen, rows ->
+                store.storeLists(gen) { store.replaceList(unreadOnly, rows) }
             }
         }
-    }
 
     /**
      * Fetches the unread list now (no max age; the notification check) and stores it as the cached Unread list.

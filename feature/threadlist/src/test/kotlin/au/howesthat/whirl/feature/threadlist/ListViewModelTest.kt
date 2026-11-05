@@ -209,7 +209,7 @@ class ListViewModelTest {
         threads.replaceWatchedList("all", listOf(watchedRow("a", "NBN plans", 3), watchedRow("b", "Bike lights", 2), watchedRow("c", "Bike racks", 0)))
         db.fetchLogDao().put(FetchLogEntity("watched:unread", 1))
         db.fetchLogDao().put(FetchLogEntity("watched:all", 1))
-        val vm = held { WatchedViewModel(deps, lists, AppVisits()) }
+        val vm = held { WatchedViewModel(deps, AppVisits()) }
         backgroundScope.launch { vm.markAllIds.collect {} }
 
         assertEquals(listOf(ThreadId("a"), ThreadId("b")), vm.markAllIds.first { it.isNotEmpty() })
