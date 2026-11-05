@@ -2,27 +2,33 @@ package au.howesthat.whirl.core.network
 
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.model.WhirlpoolError
+import kotlinx.coroutines.Dispatchers
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import kotlin.coroutines.CoroutineContext
 
-/** Fetches raw forum HTML for the parsers in `:core:scraper`. No cookies: every page is the logged-out view. */
+/**
+ * Fetches raw forum HTML for the parsers in `:core:scraper`. No cookies: every page is the logged-out view.
+ * Main-safe: requests and body reads run on [io].
+ */
 class WhirlpoolWeb(
     private val client: OkHttpClient,
     val urls: WhirlpoolUrls = WhirlpoolUrls(),
     private val retry: RetryPolicy = RetryPolicy(),
+    private val io: CoroutineContext = Dispatchers.IO,
 ) {
     /** Returns the page body. "Not signed in" pages come back as 200 and are recognised by the parsers. */
     suspend fun get(url: HttpUrl): String {
-        val response = client.fetch(Request.Builder().url(url).build(), retry)
+        val response = client.fetch(Request.Builder().url(url).build(), retry, io)
         if (response.code !in 200..299) throw WhirlpoolError.Api("HTTP ${response.code}", response.code)
         return response.body
     }
 
     /** Follows [url]'s redirects (whrl.pl short links, the reply locator) and returns where they end. */
     suspend fun resolve(url: HttpUrl): HttpUrl {
-        val response = client.fetch(Request.Builder().url(url).build(), retry)
+        val response = client.fetch(Request.Builder().url(url).build(), retry, io)
         if (response.code !in 200..299) throw WhirlpoolError.Api("HTTP ${response.code}", response.code)
         return response.finalUrl
     }

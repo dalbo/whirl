@@ -11,8 +11,11 @@ import au.howesthat.whirl.core.network.RetryPolicy
 import au.howesthat.whirl.core.network.WhirlpoolApi
 import au.howesthat.whirl.core.network.WhirlpoolHttp
 import au.howesthat.whirl.core.network.WhirlpoolUrls
+import app.cash.turbine.test
 import au.howesthat.whirl.core.network.WhirlpoolWeb
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -30,6 +33,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class ThreadPageRepositoryTest {
 
@@ -41,7 +45,7 @@ class ThreadPageRepositoryTest {
     private val web = WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE)
     // The API is never called here; the forum repository only needs it to exist.
     private val forums = ForumRepository(WhirlpoolApi(client, { null }, server.url("/api/"), RetryPolicy.NONE), db.forumDao(), db.fetchLogDao(), clock)
-    private val repo = ThreadPageRepository(web, db.threadPageDao(), forums, clock)
+    private val repo = ThreadPageRepository(web, db.threadPageDao(), forums, clock, UnconfinedTestDispatcher())
 
     @After
     fun tearDown() {
@@ -90,6 +94,28 @@ class ThreadPageRepositoryTest {
         enqueueHtml("thread_3pxj858k_p2.html")
         repo.load(nbn, 2)
         assertEquals(3, server.requestCount, "past the max age")
+    }
+
+    @Test
+    fun `a page re-emits only when it is stored again, not when this or other pages are touched or evicted`() = runTest {
+        enqueueHtml("thread_3pxj858k_p2.html")
+        repo.load(nbn, 2)
+        repo.page(nbn, 2).test {
+            val first = assertNotNull(awaitItem())
+            // Another page stored (which evicts), this page touched by a fresh load.
+            enqueueHtml("thread_97r5wzn3_last.html")
+            repo.load(ThreadId("97r5wzn3"), ThreadPageRepository.LAST_PAGE)
+            clock.now = clock.now.plusSeconds(30)
+            repo.load(nbn, 2)
+            // Then this page refetched: the next emission must be that one, not a repeat of the first.
+            clock.now = clock.now.plus(Duration.ofMinutes(2))
+            enqueueHtml("thread_3pxj858k_p2.html")
+            repo.load(nbn, 2)
+            val next = assertNotNull(awaitItem())
+            assertEquals(clock.instant(), next.updatedAt)
+            assertTrue(next.updatedAt != first.updatedAt)
+            expectNoEvents()
+        }
     }
 
     @Test

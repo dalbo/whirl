@@ -7,6 +7,7 @@ import androidx.navigation3.runtime.NavKey
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import au.howesthat.whirl.core.data.DefaultDispatcher
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository
@@ -26,7 +27,7 @@ import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.scraper.PostBodyParser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -42,10 +43,12 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * A thread, opened at [page] (1-based, or -1 for the last page, at its newest post). [scrollToPost] is a post number, [scrollToReply] a
@@ -91,6 +94,7 @@ class ThreadViewModel @AssistedInject constructor(
     private val settingsRepo: SettingsRepository,
     private val watchedRepo: WatchedRepository,
     private val savedState: SavedStateHandle,
+    @DefaultDispatcher private val parsing: CoroutineDispatcher,
 ) : ViewModel() {
     @AssistedFactory
     interface Factory {
@@ -231,18 +235,25 @@ class ThreadViewModel @AssistedInject constructor(
         }
     }
 
-    /** Pages of the current filter; bodies are parsed off the main thread. */
-    fun page(page: Int): Flow<UiPage?> = _filter.flatMapLatest { filter ->
-        repo.page(threadId, page, filter).map { cached ->
-            cached?.let { c ->
-                UiPage(
-                    page = c.value,
-                    posts = c.value.posts.map { UiPost(it, PostBodyParser.parse(it.bodyHtml)) },
-                    note = c.value.moderatorNoteHtml?.let(PostBodyParser::parse),
-                    updatedAt = c.updatedAt,
-                )
-            }
-        }.flowOn(Dispatchers.Default)
+    private val pages = ConcurrentHashMap<Int, Flow<UiPage?>>()
+
+    /**
+     * Pages of the current filter, with their bodies parsed off the main thread. One shared flow per page, so the
+     * pager and find on page parse each page once; it stops (and forgets the page) 5 s after the page leaves the screen.
+     */
+    fun page(page: Int): Flow<UiPage?> = pages.getOrPut(page) {
+        _filter.flatMapLatest { filter ->
+            repo.page(threadId, page, filter).map { cached ->
+                cached?.let { c ->
+                    UiPage(
+                        page = c.value,
+                        posts = c.value.posts.map { UiPost(it, PostBodyParser.parse(it.bodyHtml)) },
+                        note = c.value.moderatorNoteHtml?.let(PostBodyParser::parse),
+                        updatedAt = c.updatedAt,
+                    )
+                }
+            }.flowOn(parsing)
+        }.shareIn(viewModelScope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), replay = 1)
     }
 
     /** Resolves the start page (cache first, then the network) and loads it. */
