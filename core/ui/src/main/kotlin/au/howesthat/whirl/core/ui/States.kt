@@ -10,12 +10,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import au.howesthat.whirl.core.model.WhirlpoolError
+import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
@@ -51,6 +53,23 @@ fun ErrorState(error: Throwable, onRetry: () -> Unit, modifier: Modifier = Modif
         }
     }
 }
+
+/**
+ * The current time for "N min ago" texts, moved on at each new minute while on screen. Reading `Instant.now()` in
+ * composition froze the text until something else recomposed.
+ */
+@Composable
+fun rememberNow(): Instant {
+    val now = produceState(Instant.now()) {
+        while (true) {
+            delay(MINUTE_MS - System.currentTimeMillis() % MINUTE_MS)
+            value = Instant.now()
+        }
+    }
+    return now.value
+}
+
+private const val MINUTE_MS = 60_000L
 
 /** "Updated N min ago" under a cached list. */
 @Composable

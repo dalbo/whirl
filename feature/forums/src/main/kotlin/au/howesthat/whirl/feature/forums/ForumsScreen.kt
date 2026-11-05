@@ -37,6 +37,7 @@ import au.howesthat.whirl.core.data.ForumRepository
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.TextQuery
 import au.howesthat.whirl.core.network.WhirlpoolUrls
+import au.howesthat.whirl.core.ui.rememberNow
 import au.howesthat.whirl.core.ui.ActionsMenu
 import au.howesthat.whirl.core.ui.EmptyState
 import au.howesthat.whirl.core.ui.ErrorState
@@ -186,7 +187,7 @@ fun ForumsScreen(navIcon: NavIcon, onOpenForum: (ForumRef) -> Unit, onSearch: (S
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
                     item(key = "updated") {
-                        UpdatedAgo(state.updatedAt, Instant.now(), Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                        UpdatedAgo(state.updatedAt, rememberNow(), Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
                         failed?.let { Text(errorMessage(it), Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error) }
                     }
                     if (sections != null && sections.isEmpty() && !query.isNullOrBlank()) {

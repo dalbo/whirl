@@ -14,4 +14,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.browser)
+
+    // Post bodies for UI tests come from the real parser.
+    testImplementation(project(":core:scraper"))
 }

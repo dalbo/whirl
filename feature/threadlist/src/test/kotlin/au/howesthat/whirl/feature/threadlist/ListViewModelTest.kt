@@ -3,6 +3,7 @@ package au.howesthat.whirl.feature.threadlist
 import androidx.lifecycle.SavedStateHandle
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import au.howesthat.whirl.core.data.OpenThread
 import au.howesthat.whirl.core.data.AppVisits
 import au.howesthat.whirl.core.data.ForumRepository
 import au.howesthat.whirl.core.data.OpenedFrom
@@ -49,6 +50,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -113,6 +115,20 @@ class ListViewModelTest {
         advanceUntilIdle()
         assertFalse(vm.refreshing.value)
         assertNull(vm.error.value)
+    }
+
+    @Test
+    fun `a tap right after launch opens as the stored settings say, not as the defaults`() = TestScope(dispatcher).runTest {
+        deps.settings.update { it.copy(openThreadsInBrowser = true) }
+        try {
+            // Nothing has run on Main yet, so the ViewModel's settings state still holds the defaults.
+            val vm = Blocking(deps)
+            val row = ThreadItem(ThreadId("3pxj858k"), ThreadId("3pxj858k"), "NBN", forum = ForumRef(92, "Choosing an ISP"))
+            assertIs<OpenThread.Browser>(vm.open(row))
+            assertIs<OpenThread.Browser>(vm.lastPost(row))
+        } finally {
+            deps.settings.update { it.copy(openThreadsInBrowser = false) }
+        }
     }
 
     @Test

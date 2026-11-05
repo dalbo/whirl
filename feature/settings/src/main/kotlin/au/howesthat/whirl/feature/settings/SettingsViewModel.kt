@@ -18,7 +18,8 @@ class SettingsViewModel @Inject constructor(
     private val repository: SettingsRepository,
     private val accounts: AccountRepository,
 ) : ViewModel() {
-    val settings: StateFlow<Settings> = repository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, Settings())
+    /** Null until read from disk: the screen waits for it, so a first tap never acts on the defaults. */
+    val settings: StateFlow<Settings?> = repository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val account: StateFlow<Account?> = accounts.account.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     fun update(change: (Settings) -> Settings) {

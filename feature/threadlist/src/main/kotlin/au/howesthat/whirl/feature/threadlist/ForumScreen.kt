@@ -194,7 +194,6 @@ fun ForumScreen(
     var picking by remember { mutableStateOf(false) }
 
     LaunchedEffect(pager.settledPage) { viewModel.showPage(pager.settledPage + 1) }
-    LaunchedEffect(group) { pager.scrollToPage(0) }
 
     val groupName = groups.firstOrNull { it.id == group }?.name
     val title by viewModel.title.collectAsStateWithLifecycle()
@@ -227,7 +226,18 @@ fun ForumScreen(
                 if (!isPrivate && (groups.isNotEmpty() || pageCount > 1)) {
                     Surface(tonalElevation = 2.dp) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            if (groups.isNotEmpty()) GroupPicker(groups, group, viewModel::selectGroup, Modifier.weight(1f))
+                            if (groups.isNotEmpty()) GroupPicker(
+                                groups,
+                                group,
+                                // Back to page 1 only when the group changes: not when the screen returns (from a thread).
+                                onSelect = { picked ->
+                                    if (picked != group) {
+                                        viewModel.selectGroup(picked)
+                                        scope.launch { pager.scrollToPage(0) }
+                                    }
+                                },
+                                Modifier.weight(1f),
+                            )
                             else Row(Modifier.weight(1f)) {}
                             if (pageCount > 1) {
                                 // Announced when a swipe changes the page.

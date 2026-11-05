@@ -35,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import au.howesthat.whirl.core.data.NewsRepository
 import au.howesthat.whirl.core.model.NewsItem
+import au.howesthat.whirl.core.ui.rememberNow
 import au.howesthat.whirl.core.ui.ErrorState
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
@@ -171,7 +172,7 @@ fun NewsScreen(navIcon: NavIcon, viewModel: NewsViewModel = hiltViewModel()) {
                 val today = LocalDate.now()
                 LazyColumn(Modifier.fillMaxSize()) {
                     item(key = "updated") {
-                        UpdatedAgo(state.updatedAt, Instant.now(), Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                        UpdatedAgo(state.updatedAt, rememberNow(), Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
                         failed?.let { Text(errorMessage(it), Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error) }
                     }
                     if (days != null && days.isEmpty() && !query.isNullOrBlank()) {
