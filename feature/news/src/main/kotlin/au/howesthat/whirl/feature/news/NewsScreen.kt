@@ -35,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import au.howesthat.whirl.core.data.NewsRepository
 import au.howesthat.whirl.core.model.NewsItem
+import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.ui.rememberNow
 import au.howesthat.whirl.core.ui.ErrorState
 import au.howesthat.whirl.core.ui.NavIcon
@@ -66,7 +67,9 @@ import java.time.format.TextStyle
 import javax.inject.Inject
 
 /** Where a news item opens: Whirlpool's redirect to the article. */
-fun newsUrl(item: NewsItem) = "https://whirlpool.net.au/news/go.cfm?article=${item.id}"
+private val urls = WhirlpoolUrls()
+
+fun newsUrl(item: NewsItem) = urls.newsArticle(item.id).toString()
 
 /** A day's news, newest day first, as 2.14.12 grouped it. */
 data class NewsDay(val date: LocalDate, val items: List<NewsItem>)
@@ -167,7 +170,7 @@ fun NewsScreen(navIcon: NavIcon, viewModel: NewsViewModel = hiltViewModel()) {
             val failed = error
             val days = state.days
             if (days == null && failed != null) {
-                ErrorState(failed, onRetry = { viewModel.refresh() }, modifier = Modifier.fillMaxWidth(), onOpenInBrowser = { browser("https://whirlpool.net.au/news/") })
+                ErrorState(failed, onRetry = { viewModel.refresh() }, modifier = Modifier.fillMaxWidth(), onOpenInBrowser = { browser(urls.news().toString()) })
             } else {
                 val today = LocalDate.now()
                 LazyColumn(Modifier.fillMaxSize()) {

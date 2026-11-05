@@ -18,7 +18,6 @@ import au.howesthat.whirl.core.data.WhirlpoolLink
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.Post
 import au.howesthat.whirl.core.model.PostBody
-import au.howesthat.whirl.core.model.PostFilter
 import au.howesthat.whirl.core.model.TextQuery
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.model.searchText
@@ -45,6 +44,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import java.time.Instant
@@ -52,8 +52,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * A thread, opened at [page] (1-based, or -1 for the last page, at its newest post). [scrollToPost] is a post number, [scrollToReply] a
- * reply id; [userId] opens it filtered to one user's posts (`ux=`); [fromWatched] when opened from Watched;
- * [lastReadPost] the last post read when it was opened, for the "New posts" marker.
+ * reply id; [fromWatched] when opened from Watched; [lastReadPost] the last post read when it was opened, for the
+ * "New posts" marker.
  */
 @Serializable
 data class ThreadRoute(
@@ -62,7 +62,6 @@ data class ThreadRoute(
     val scrollToPost: Int? = null,
     val scrollToReply: Long? = null,
     val forumId: Int? = null,
-    val userId: Long? = null,
     val fromWatched: Boolean = false,
     val lastReadPost: Int? = null,
 ) : NavKey
@@ -71,6 +70,18 @@ data class ThreadRoute(
 data class UiPost(val post: Post, val body: PostBody)
 
 data class UiPage(val page: ThreadPage, val posts: List<UiPost>, val note: PostBody?, val updatedAt: Instant?)
+
+/**
+ * The thread as a whole: the first page to show (null until known, from the cache or the first fetch), its page count
+ * and title, the last failure for the page on screen (or for opening the thread), and whether a load is running.
+ */
+data class ThreadUiState(
+    val startPage: Int? = null,
+    val pageCount: Int = 1,
+    val title: String? = null,
+    val error: Throwable? = null,
+    val refreshing: Boolean = false,
+)
 
 /** A post to bring into view once its page is showing: by number, by reply id, or the page's last. */
 data class ScrollTarget(val page: Int, val postNumber: Int? = null, val replyId: Long? = null, val lastPost: Boolean = false)
@@ -107,18 +118,8 @@ class ThreadViewModel @AssistedInject constructor(
     val settings: StateFlow<Settings> = settingsRepo.settings.stateIn(viewModelScope, SharingStarted.Eagerly, Settings())
     val myUserId: StateFlow<Long?> = settingsRepo.account.map { it?.userId }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    private val _filter = MutableStateFlow<PostFilter>(route.userId?.let(PostFilter::ByUser) ?: PostFilter.All)
-    val filter: StateFlow<PostFilter> = _filter.asStateFlow()
-
-    /** The first page to show; null until it is known (from the cache or the first fetch). */
-    private val _startPage = MutableStateFlow<Int?>(null)
-    val startPage: StateFlow<Int?> = _startPage.asStateFlow()
-
-    private val _pageCount = MutableStateFlow(1)
-    val pageCount: StateFlow<Int> = _pageCount.asStateFlow()
-
-    private val _title = MutableStateFlow<String?>(null)
-    val title: StateFlow<String?> = _title.asStateFlow()
+    private val _state = MutableStateFlow(ThreadUiState())
+    val state: StateFlow<ThreadUiState> = _state.asStateFlow()
 
     /** Set when the pager should move (a quote on another page, "last page" turning out to be later). */
     private val _jumpTo = MutableStateFlow<Int?>(null)
@@ -140,13 +141,6 @@ class ThreadViewModel @AssistedInject constructor(
     private var toLastPost = route.page == LAST_PAGE && route.scrollToReply == null && route.scrollToPost == null
 
     private val currentPage = MutableStateFlow<Int?>(null)
-
-    private val _refreshing = MutableStateFlow(false)
-    val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
-
-    private val _error = MutableStateFlow<Throwable?>(null)
-    /** The last failure for the page on screen (or for opening the thread). */
-    val error: StateFlow<Throwable?> = _error.asStateFlow()
 
     private val events = Channel<ThreadEvent>(Channel.BUFFERED)
     val navigation: Flow<ThreadEvent> = events.receiveAsFlow()
@@ -203,16 +197,15 @@ class ThreadViewModel @AssistedInject constructor(
         _scrollTarget.value = ScrollTarget(page, replyId = replyId)
     }
 
-    /** The page holding the first unread post, in the unfiltered thread. */
+    /** The page holding the first unread post. */
     fun firstUnreadPage(): Int? = _firstUnread.value?.let { pageOfPost(it) }
 
-    /** Shows the first unread post; only offered without a filter, where pages follow post numbers. */
+    /** Shows the first unread post. */
     fun goToFirstUnread() {
         val post = _firstUnread.value ?: return
-        if (_filter.value != PostFilter.All) return
         val page = pageOfPost(post)
         _scrollTarget.value = ScrollTarget(page, postNumber = post)
-        _jumpTo.value = page.coerceAtMost(_pageCount.value)
+        _jumpTo.value = page.coerceAtMost(_state.value.pageCount)
     }
 
     /**
@@ -239,31 +232,26 @@ class ThreadViewModel @AssistedInject constructor(
     private val pages = ConcurrentHashMap<Int, Flow<UiPage?>>()
 
     /**
-     * Pages of the current filter, with their bodies parsed off the main thread. One shared flow per page, so the
-     * pager and find on page parse each page once; it stops (and forgets the page) 5 s after the page leaves the screen.
+     * Pages with their bodies parsed off the main thread. One shared flow per page, so the pager and find on page
+     * parse each page once; it stops (and forgets the page) 5 s after the page leaves the screen.
      */
     fun page(page: Int): Flow<UiPage?> = pages.getOrPut(page) {
-        _filter.flatMapLatest { filter ->
-            repo.page(threadId, page, filter).map { cached ->
-                cached?.let { c ->
-                    UiPage(
-                        page = c.value,
-                        posts = c.value.posts.map { UiPost(it, PostBodyParser.parse(it.bodyHtml)) },
-                        note = c.value.moderatorNoteHtml?.let(PostBodyParser::parse),
-                        updatedAt = c.updatedAt,
-                    )
-                }
-            }.flowOn(parsing)
-        }.shareIn(viewModelScope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), replay = 1)
+        repo.page(threadId, page).map { cached ->
+            cached?.let { c ->
+                UiPage(
+                    page = c.value,
+                    posts = c.value.posts.map { UiPost(it, PostBodyParser.parse(it.bodyHtml)) },
+                    note = c.value.moderatorNoteHtml?.let(PostBodyParser::parse),
+                    updatedAt = c.updatedAt,
+                )
+            }
+        }.flowOn(parsing).shareIn(viewModelScope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), replay = 1)
     }
 
     /** Resolves the start page (cache first, then the network) and loads it. */
     private fun open(page: Int) {
-        _startPage.value = null
-        currentPage.value = null
         viewModelScope.launch {
-            val filter = _filter.value
-            val known = repo.lastKnownPage(threadId, filter)
+            val known = repo.lastKnownPage(threadId)
             if (page == LAST_PAGE) {
                 known?.let {
                     start(it, it)
@@ -273,14 +261,15 @@ class ThreadViewModel @AssistedInject constructor(
                 start(page, maxOf(page, known ?: 1))
             }
             // Offline, the fetch below fails; the cached page still knows the thread's title.
-            _startPage.value?.let { start -> repo.page(threadId, start, filter).first()?.value?.title?.let { _title.value = it } }
+            _state.value.startPage?.let { start ->
+                repo.page(threadId, start).first()?.value?.title?.let { title -> _state.update { it.copy(title = title) } }
+            }
             load(page, force = false)
         }
     }
 
     private fun start(page: Int, count: Int) {
-        _pageCount.value = count
-        if (_startPage.value == null) _startPage.value = page
+        _state.update { it.copy(pageCount = count, startPage = it.startPage ?: page) }
         currentPage.value = currentPage.value ?: page
     }
 
@@ -288,7 +277,7 @@ class ThreadViewModel @AssistedInject constructor(
     fun showPage(page: Int) {
         if (currentPage.value == page) return
         currentPage.value = page
-        _error.value = null
+        _state.update { it.copy(error = null) }
         load(page, force = false)
     }
 
@@ -298,37 +287,33 @@ class ThreadViewModel @AssistedInject constructor(
 
     private fun load(page: Int, force: Boolean) {
         loadJob?.cancel()
-        _refreshing.value = true
+        _state.update { it.copy(refreshing = true) }
         val job = viewModelScope.launch {
             try {
-                val filter = _filter.value
-                val resolved = repo.load(threadId, page, filter, route.forumId, force)
-                val loaded = repo.page(threadId, resolved, filter).first()?.value
-                if (loaded != null) {
-                    _pageCount.value = loaded.pageCount
-                    _title.value = loaded.title
-                }
+                val resolved = repo.load(threadId, page, route.forumId, force)
+                val loaded = repo.page(threadId, resolved).first()?.value
+                if (loaded != null) _state.update { it.copy(pageCount = loaded.pageCount, title = loaded.title) }
                 if (page == LAST_PAGE && toLastPost) {
                     toLastPost = false
                     _scrollTarget.value = ScrollTarget(resolved, lastPost = true)
                 }
-                if (_startPage.value == null) {
+                if (_state.value.startPage == null) {
                     start(resolved, loaded?.pageCount ?: resolved)
                 } else if (page == LAST_PAGE && resolved != currentPage.value) {
                     // The cached "last page" was stale: move to the real one.
                     currentPage.value = resolved
                     _jumpTo.value = resolved
                 }
-                _error.value = null
+                _state.update { it.copy(error = null) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _error.value = e
+                _state.update { it.copy(error = e) }
             }
         }
         loadJob = job
         // Only the newest load clears the indicator, not one it cancelled.
-        job.invokeOnCompletion { if (loadJob === job) _refreshing.value = false }
+        job.invokeOnCompletion { if (loadJob === job) _state.update { it.copy(refreshing = false) } }
     }
 
     fun jumpHandled() {
@@ -340,7 +325,7 @@ class ThreadViewModel @AssistedInject constructor(
     }
 
     fun goToPage(page: Int) {
-        _jumpTo.value = page.coerceIn(1, _pageCount.value)
+        _jumpTo.value = page.coerceIn(1, _state.value.pageCount)
     }
 
     /** Loads `?p=-1`; [load] then moves the pager to the page it resolves to, at its newest post. */
@@ -355,13 +340,13 @@ class ThreadViewModel @AssistedInject constructor(
 
     /** "Posts by OP": the thread starter wrote the first post on page 1, which is fetched if it is not cached. */
     fun showOpPosts() {
-        _opUserId.value?.let { setFilter(PostFilter.ByUser(it)); return }
+        _opUserId.value?.let { showUsersPosts(it); return }
         viewModelScope.launch {
             try {
-                repo.load(threadId, 1, PostFilter.All, route.forumId)
+                repo.load(threadId, 1, route.forumId)
                 val op = repo.page(threadId, 1).first()?.value?.posts?.firstOrNull()?.author?.id ?: return@launch
                 _opUserId.value = op
-                setFilter(PostFilter.ByUser(op))
+                showUsersPosts(op)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -371,19 +356,29 @@ class ThreadViewModel @AssistedInject constructor(
     }
 
     /**
-     * Whirlpool shows filtered views (one user's posts, moderators', reps') only to signed-in users ("You must be
-     * registered and signed in", checked 2026-10-23), and Whirl has no web session, so they open in the browser, which
-     * has the user's login. All posts reloads in the app.
+     * One user's posts, in the browser. Whirlpool shows filtered views (one user's posts, moderators', reps') only to
+     * signed-in users ("You must be registered and signed in", checked 2026-10-23), and Whirl has no web session, so
+     * they open in the browser, which has the user's login. (v1.8 filters the archive's posts in the app instead.)
      */
-    fun setFilter(filter: PostFilter) {
-        if (filter != PostFilter.All) {
-            viewModelScope.launch { events.send(ThreadEvent.Browser(filterUrl(filter))) }
-            return
-        }
-        if (_filter.value == filter) return
-        _filter.value = filter
-        _scrollTarget.value = null
-        open(1)
+    fun showUsersPosts(userId: Long) = browse(urls.thread(threadId, userId = userId).toString())
+
+    /** Moderators' posts, in the browser (see [showUsersPosts]). */
+    fun showModeratorPosts() = browse(urls.thread(threadId, moderatorsOnly = true).toString())
+
+    /** Reps' posts, in the browser (see [showUsersPosts]). */
+    fun showRepPosts() = browse(urls.thread(threadId, repsOnly = true).toString())
+
+    private fun browse(url: String) {
+        viewModelScope.launch { events.send(ThreadEvent.Browser(url)) }
+    }
+
+    fun openUser(userId: Long) {
+        viewModelScope.launch { events.send(ThreadEvent.OpenUser(userId)) }
+    }
+
+    /** Another part of a multi-part thread. */
+    fun openPart(id: ThreadId) {
+        viewModelScope.launch { showPost(id, 1, null) }
     }
 
     /** A quote attribution: scroll if the quoted post is on [onPage], else find its page through the site. */
@@ -410,8 +405,8 @@ class ThreadViewModel @AssistedInject constructor(
 
     /** Moves within this thread when possible, otherwise opens the other thread. */
     private suspend fun showPost(id: ThreadId, page: Int, target: ScrollTarget?) {
-        if (id == threadId && _filter.value == PostFilter.All) {
-            if (page > _pageCount.value) _pageCount.value = page
+        if (id == threadId) {
+            _state.update { it.copy(pageCount = maxOf(it.pageCount, page)) }
             _scrollTarget.value = target
             _jumpTo.value = page
         } else {
@@ -464,18 +459,12 @@ class ThreadViewModel @AssistedInject constructor(
     }
 
     fun threadUrl(page: Int? = currentPage.value): String = urls.thread(threadId, page ?: 1).toString()
-    fun filterUrl(filter: PostFilter): String = urls.thread(
-        threadId,
-        userId = (filter as? PostFilter.ByUser)?.userId,
-        moderatorsOnly = filter == PostFilter.Moderators,
-        repsOnly = filter == PostFilter.Reps,
-    ).toString()
     fun postUrl(post: Post, page: Int): String = urls.thread(threadId, page).newBuilder().fragment("r${post.number}").build().toString()
     fun replyToThreadUrl(): String = urls.replyToThread(threadId).toString()
     fun replyToPostUrl(post: Post): String = urls.replyToPost(post.replyId).toString()
     fun editPostUrl(post: Post): String = urls.editPost(post.replyId).toString()
 
-    /** Whirlpool's "alert moderators" form; its page is the post's page in the unfiltered thread. */
+    /** Whirlpool's "alert moderators" form. */
     fun reportPostUrl(post: Post): String =
         urls.reportPost(post.replyId, threadId, pageOfPost(post.number), post.number).toString()
 }

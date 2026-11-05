@@ -231,24 +231,24 @@ interface NotifiedDao {
 
 @Dao
 interface ThreadPageDao {
-    @Query("SELECT * FROM thread_pages WHERE thread_id = :threadId AND filter = :filter AND page = :page")
-    fun observePage(threadId: String, filter: String, page: Int): Flow<ThreadPageEntity?>
+    @Query("SELECT * FROM thread_pages WHERE thread_id = :threadId AND page = :page")
+    fun observePage(threadId: String, page: Int): Flow<ThreadPageEntity?>
 
-    @Query("SELECT * FROM posts WHERE thread_id = :threadId AND filter = :filter AND page = :page ORDER BY reply_num")
-    fun observePosts(threadId: String, filter: String, page: Int): Flow<List<PostEntity>>
+    @Query("SELECT * FROM posts WHERE thread_id = :threadId AND page = :page ORDER BY reply_num")
+    fun observePosts(threadId: String, page: Int): Flow<List<PostEntity>>
 
-    @Query("SELECT * FROM posts WHERE thread_id = :threadId AND filter = :filter AND page = :page ORDER BY reply_num")
-    suspend fun posts(threadId: String, filter: String, page: Int): List<PostEntity>
+    @Query("SELECT * FROM posts WHERE thread_id = :threadId AND page = :page ORDER BY reply_num")
+    suspend fun posts(threadId: String, page: Int): List<PostEntity>
 
-    @Query("SELECT fetched_at FROM thread_pages WHERE thread_id = :threadId AND filter = :filter AND page = :page")
-    suspend fun fetchedAt(threadId: String, filter: String, page: Int): Long?
+    @Query("SELECT fetched_at FROM thread_pages WHERE thread_id = :threadId AND page = :page")
+    suspend fun fetchedAt(threadId: String, page: Int): Long?
 
     /** The page count seen most recently for a thread, to open its last page from the cache. */
-    @Query("SELECT page_count FROM thread_pages WHERE thread_id = :threadId AND filter = :filter ORDER BY fetched_at DESC LIMIT 1")
-    suspend fun lastKnownPageCount(threadId: String, filter: String): Int?
+    @Query("SELECT page_count FROM thread_pages WHERE thread_id = :threadId ORDER BY fetched_at DESC LIMIT 1")
+    suspend fun lastKnownPageCount(threadId: String): Int?
 
-    @Query("UPDATE thread_pages SET accessed_at = :at WHERE thread_id = :threadId AND filter = :filter AND page = :page")
-    suspend fun touch(threadId: String, filter: String, page: Int, at: Long)
+    @Query("UPDATE thread_pages SET accessed_at = :at WHERE thread_id = :threadId AND page = :page")
+    suspend fun touch(threadId: String, page: Int, at: Long)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPage(page: ThreadPageEntity)
@@ -256,8 +256,8 @@ interface ThreadPageDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPosts(posts: List<PostEntity>)
 
-    @Query("DELETE FROM posts WHERE thread_id = :threadId AND filter = :filter AND page = :page")
-    suspend fun deletePosts(threadId: String, filter: String, page: Int)
+    @Query("DELETE FROM posts WHERE thread_id = :threadId AND page = :page")
+    suspend fun deletePosts(threadId: String, page: Int)
 
     /** Deletes all but the [keep] most recently opened pages; their posts go with them. */
     @Query(
@@ -273,7 +273,7 @@ interface ThreadPageDao {
     @Transaction
     suspend fun store(page: ThreadPageEntity, posts: List<PostEntity>, keep: Int) {
         // REPLACE on the page row would cascade-delete its posts anyway; delete explicitly so the intent is visible.
-        deletePosts(page.threadId, page.filter, page.page)
+        deletePosts(page.threadId, page.page)
         insertPage(page)
         insertPosts(posts)
         evict(keep)

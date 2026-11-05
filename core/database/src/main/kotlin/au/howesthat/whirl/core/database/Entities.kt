@@ -133,14 +133,10 @@ data class FetchLogEntity(
     @ColumnInfo(name = "fetched_at") val fetchedAt: Long,
 )
 
-/**
- * A cached thread page: the page's metadata, with its posts in [PostEntity]. [filter] is "" for all posts, or the
- * post filter the page was fetched with (`u<userid>`, `m`, `r`). Pages are evicted least-recently-opened first.
- */
-@Entity(tableName = "thread_pages", primaryKeys = ["thread_id", "filter", "page"])
+/** A cached thread page: the page's metadata, with its posts in [PostEntity]. Evicted least-recently-opened first. */
+@Entity(tableName = "thread_pages", primaryKeys = ["thread_id", "page"])
 data class ThreadPageEntity(
     @ColumnInfo(name = "thread_id") val threadId: String,
-    val filter: String,
     val page: Int,
     @ColumnInfo(name = "page_count") val pageCount: Int,
     val title: String,
@@ -157,19 +153,18 @@ data class ThreadPageEntity(
 /** A post on a cached [ThreadPageEntity]; deleted with its page. Times are epoch milliseconds. */
 @Entity(
     tableName = "posts",
-    primaryKeys = ["thread_id", "filter", "page", "reply_id"],
+    primaryKeys = ["thread_id", "page", "reply_id"],
     foreignKeys = [
         ForeignKey(
             entity = ThreadPageEntity::class,
-            parentColumns = ["thread_id", "filter", "page"],
-            childColumns = ["thread_id", "filter", "page"],
+            parentColumns = ["thread_id", "page"],
+            childColumns = ["thread_id", "page"],
             onDelete = ForeignKey.CASCADE,
         ),
     ],
 )
 data class PostEntity(
     @ColumnInfo(name = "thread_id") val threadId: String,
-    val filter: String,
     val page: Int,
     @ColumnInfo(name = "reply_id") val replyId: Long,
     @ColumnInfo(name = "reply_num") val replyNum: Int,

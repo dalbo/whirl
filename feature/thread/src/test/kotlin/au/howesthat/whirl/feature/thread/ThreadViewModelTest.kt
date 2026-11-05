@@ -15,7 +15,6 @@ import au.howesthat.whirl.core.database.RoomTransactor
 import au.howesthat.whirl.core.database.WatchedThreadColumns
 import au.howesthat.whirl.core.database.WhirlDatabase
 import au.howesthat.whirl.core.model.ForumRef
-import au.howesthat.whirl.core.model.PostFilter
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.network.RetryPolicy
 import au.howesthat.whirl.core.network.WhirlpoolApi
@@ -30,12 +29,15 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.job
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
@@ -44,6 +46,7 @@ import okhttp3.Dns
 import mockwebserver3.MockWebServer
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import org.junit.After
@@ -86,10 +89,17 @@ class ThreadViewModelTest {
     // Cleared after each test, which cancels the view models' work: left running, it could reach Dispatchers.Main
     // while the next test sets it, failing that test.
     private val viewModels = ViewModelStore()
+    private val created = mutableListOf<ThreadViewModel>()
 
     @After
     fun tearDown() {
         viewModels.clear()
+        // Cancelled is not finished: work on another thread (a fetch, a parse) still resumes on Main once. Wait for
+        // it here, while Main is still this test's; otherwise it can land as the next test swaps Main, and
+        // UnconfinedTestDispatcher throws UnsupportedOperationException in that test (seen once on CI).
+        runBlocking {
+            withTimeout(5_000) { created.forEach { it.viewModelScope.coroutineContext.job.join() } }
+        }
         Dispatchers.resetMain()
         appScope.cancel()
         server.close()
@@ -101,7 +111,7 @@ class ThreadViewModelTest {
 
     private fun viewModel(route: ThreadRoute, saved: SavedStateHandle = SavedStateHandle()): ThreadViewModel {
         val factory = viewModelFactory { initializer { ThreadViewModel(route, repo, settings, watched, saved, Dispatchers.Default) } }
-        return ViewModelProvider.create(viewModels, factory)["vm${viewModelCount++}", ThreadViewModel::class]
+        return ViewModelProvider.create(viewModels, factory)["vm${viewModelCount++}", ThreadViewModel::class].also { created += it }
     }
 
     private var viewModelCount = 0
@@ -129,9 +139,9 @@ class ThreadViewModelTest {
     fun `the last page resolves through the server`() = runTest {
         enqueueHtml("thread_97r5wzn3_last.html")
         val vm = viewModel(ThreadRoute("97r5wzn3", -1))
-        assertEquals(2290, await { vm.startPage.filterNotNull().first() })
+        assertEquals(2290, await { vm.state.mapNotNull { it.startPage }.first() })
         assertEquals("/thread/97r5wzn3?p=-1", server.takeRequest().target)
-        assertEquals(2290, vm.pageCount.value)
+        assertEquals(2290, vm.state.value.pageCount)
         assertEquals(17, await { vm.page(2290).filterNotNull().first() }.posts.size)
     }
 
@@ -143,7 +153,7 @@ class ThreadViewModelTest {
 
         enqueueHtml("thread_97r5wzn3_last.html")
         val toPost = viewModel(ThreadRoute("97r5wzn3", -1, scrollToPost = 45795))
-        await { toPost.startPage.filterNotNull().first() }
+        await { toPost.state.mapNotNull { it.startPage }.first() }
         assertEquals(ScrollTarget(-1, postNumber = 45795), toPost.scrollTarget.value)
     }
 
@@ -151,7 +161,7 @@ class ThreadViewModelTest {
     fun `the first unread post comes from Watched and can be jumped to`() = runTest {
         enqueueHtml("thread_3pxj858k_p2.html")
         val vm = viewModel(ThreadRoute("3pxj858k", 1, lastReadPost = 30, fromWatched = true))
-        await { vm.pageCount.first { it >= 2 } }
+        await { vm.state.first { it.pageCount >= 2 } }
         assertEquals(31, vm.firstUnread.value)
         assertEquals(2, vm.firstUnreadPage())
         vm.goToFirstUnread()
@@ -180,7 +190,7 @@ class ThreadViewModelTest {
     fun `an unwatched thread has no new-posts marker`() = runTest {
         enqueueHtml("thread_3pxj858k_p2.html")
         val vm = viewModel(ThreadRoute("3pxj858k", 2))
-        await { vm.startPage.filterNotNull().first() }
+        await { vm.state.mapNotNull { it.startPage }.first() }
         assertEquals(null, vm.firstUnread.value)
         assertEquals(null, vm.firstUnreadPage())
     }
@@ -200,7 +210,7 @@ class ThreadViewModelTest {
     fun `links route in the app or to the browser`() = runTest {
         enqueueHtml("thread_3pxj858k_p2.html")
         val vm = viewModel(ThreadRoute("3pxj858k", 2))
-        await { vm.startPage.filterNotNull().first() }
+        await { vm.state.mapNotNull { it.startPage }.first() }
         vm.navigation.test {
             vm.openLink("https://forums.whirlpool.net.au/thread/97r5wzn3?p=4#r61")
             assertEquals(ThreadEvent.OpenThread(ThreadRoute("97r5wzn3", 4, scrollToPost = 61)), awaitItem())
@@ -219,7 +229,7 @@ class ThreadViewModelTest {
     fun `a link into the same thread moves the pager`() = runTest {
         enqueueHtml("thread_3pxj858k_p2.html")
         val vm = viewModel(ThreadRoute("3pxj858k", 2))
-        await { vm.startPage.filterNotNull().first() }
+        await { vm.state.mapNotNull { it.startPage }.first() }
         vm.openLink("https://forums.whirlpool.net.au/thread/3pxj858k?p=7#r130")
         assertEquals(7, await { vm.jumpTo.filterNotNull().first() })
         assertEquals(ScrollTarget(7, postNumber = 130), vm.scrollTarget.value)
@@ -229,7 +239,7 @@ class ThreadViewModelTest {
     fun `a quote on another page is located through the site`() = runTest {
         enqueueHtml("thread_3pxj858k_p2.html")
         val vm = viewModel(ThreadRoute("3pxj858k", 1))
-        await { vm.startPage.filterNotNull().first() }
+        await { vm.state.mapNotNull { it.startPage }.first() }
         server.takeRequest()
         enqueueHtml("thread_3pxj858k_p2.html")
         vm.openQuote(75543951, onPage = null)
@@ -242,7 +252,7 @@ class ThreadViewModelTest {
     fun `a short link that cannot be followed opens in the browser`() = runTest {
         enqueueHtml("thread_3pxj858k_p2.html")
         val vm = viewModel(ThreadRoute("3pxj858k", 2))
-        await { vm.startPage.filterNotNull().first() }
+        await { vm.state.mapNotNull { it.startPage }.first() }
         vm.navigation.test {
             // The test client cannot resolve whrl.pl, so following the link fails.
             vm.openLink("https://whrl.pl/RgPkJ5")
@@ -259,9 +269,9 @@ class ThreadViewModelTest {
         val later = Clock.offset(clock, Duration.ofMinutes(2))
         val staleRepo = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, later, Dispatchers.Default)
         val vm = ThreadViewModel(ThreadRoute("3pxj858k", 2), staleRepo, settings, watched, SavedStateHandle(), Dispatchers.Default)
-        assertEquals(2, await { vm.startPage.filterNotNull().first() })
-        assertEquals("Simple, ad-free NBN plan comparison tool I built", await { vm.title.filterNotNull().first() })
-        await { vm.error.filterNotNull().first() }
+        assertEquals(2, await { vm.state.mapNotNull { it.startPage }.first() })
+        assertEquals("Simple, ad-free NBN plan comparison tool I built", await { vm.state.mapNotNull { it.title }.first() })
+        await { vm.state.mapNotNull { it.error }.first() }
     }
 
     @Test
@@ -286,7 +296,7 @@ class ThreadViewModelTest {
     fun `posts by OP reads the thread starter from page 1 and opens the filtered view in the browser`() = runTest {
         enqueueHtml("thread_97r5wzn3_last.html")
         val vm = viewModel(ThreadRoute("97r5wzn3", -1))
-        await { vm.startPage.filterNotNull().first() }
+        await { vm.state.mapNotNull { it.startPage }.first() }
         server.takeRequest()
         enqueueHtml("thread_97r5wzn3_p1.html")
         vm.navigation.test {
@@ -296,7 +306,6 @@ class ThreadViewModelTest {
             assertEquals(op, repo.page(ThreadId("97r5wzn3"), 1).first()!!.value.posts.first().author.id)
         }
         assertEquals("/thread/97r5wzn3", server.takeRequest().target)
-        assertEquals(PostFilter.All, vm.filter.value, "the app stays on all posts")
     }
 
     @Test
@@ -305,14 +314,28 @@ class ThreadViewModelTest {
         val vm = viewModel(ThreadRoute("3pxj858k", 2))
         await { vm.page(2).filterNotNull().first() }
         vm.navigation.test {
-            vm.setFilter(PostFilter.Moderators)
+            vm.showModeratorPosts()
             assertEquals(ThreadEvent.Browser("https://forums.whirlpool.net.au/thread/3pxj858k?um=1"), awaitItem())
-            vm.setFilter(PostFilter.Reps)
+            vm.showRepPosts()
             assertEquals(ThreadEvent.Browser("https://forums.whirlpool.net.au/thread/3pxj858k?ur=1"), awaitItem())
-            vm.setFilter(PostFilter.ByUser(30703))
+            vm.showUsersPosts(30703)
             assertEquals(ThreadEvent.Browser("https://forums.whirlpool.net.au/thread/3pxj858k?ux=30703"), awaitItem())
         }
         assertEquals(1, server.requestCount, "nothing filtered is fetched")
+    }
+
+    @Test
+    fun `a poster and another part of the thread open directly, without a link to parse`() = runTest {
+        enqueueHtml("thread_3pxj858k_p2.html")
+        val vm = viewModel(ThreadRoute("3pxj858k", 2))
+        await { vm.page(2).filterNotNull().first() }
+        vm.navigation.test {
+            vm.openUser(30703)
+            assertEquals(ThreadEvent.OpenUser(30703), awaitItem())
+            vm.openPart(ThreadId("9yvx1663"))
+            assertEquals(ThreadEvent.OpenThread(ThreadRoute("9yvx1663", 1)), awaitItem())
+        }
+        assertEquals(1, server.requestCount)
     }
 
     @Test
@@ -371,7 +394,7 @@ class ThreadViewModelTest {
         enqueueHtml("thread_9244p8v1_whirlcode.html")
         val saved = SavedStateHandle()
         val vm = viewModel(ThreadRoute("9244p8v1", 2), saved)
-        await { vm.startPage.filterNotNull().first() }
+        await { vm.state.mapNotNull { it.startPage }.first() }
         val page = await { vm.page(2).filterNotNull().first() }
         backgroundScope.launch { vm.findMatches.collect {} }
 
