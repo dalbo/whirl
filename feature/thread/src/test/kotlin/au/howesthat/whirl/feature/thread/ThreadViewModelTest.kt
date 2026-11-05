@@ -36,6 +36,8 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.job
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
@@ -44,6 +46,7 @@ import okhttp3.Dns
 import mockwebserver3.MockWebServer
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import org.junit.After
@@ -86,10 +89,17 @@ class ThreadViewModelTest {
     // Cleared after each test, which cancels the view models' work: left running, it could reach Dispatchers.Main
     // while the next test sets it, failing that test.
     private val viewModels = ViewModelStore()
+    private val created = mutableListOf<ThreadViewModel>()
 
     @After
     fun tearDown() {
         viewModels.clear()
+        // Cancelled is not finished: work on another thread (a fetch, a parse) still resumes on Main once. Wait for
+        // it here, while Main is still this test's; otherwise it can land as the next test swaps Main, and
+        // UnconfinedTestDispatcher throws UnsupportedOperationException in that test (seen once on CI).
+        runBlocking {
+            withTimeout(5_000) { created.forEach { it.viewModelScope.coroutineContext.job.join() } }
+        }
         Dispatchers.resetMain()
         appScope.cancel()
         server.close()
@@ -101,7 +111,7 @@ class ThreadViewModelTest {
 
     private fun viewModel(route: ThreadRoute, saved: SavedStateHandle = SavedStateHandle()): ThreadViewModel {
         val factory = viewModelFactory { initializer { ThreadViewModel(route, repo, settings, watched, saved, Dispatchers.Default) } }
-        return ViewModelProvider.create(viewModels, factory)["vm${viewModelCount++}", ThreadViewModel::class]
+        return ViewModelProvider.create(viewModels, factory)["vm${viewModelCount++}", ThreadViewModel::class].also { created += it }
     }
 
     private var viewModelCount = 0
