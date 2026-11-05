@@ -251,6 +251,7 @@ class WatchedNotifier @Inject constructor(
             .putExtra(EXTRA_FORUM_ID, thread.forumId)
             .putExtra(EXTRA_LAST_PAGE, thread.lastPage)
             .putExtra(EXTRA_LAST_READ_POST, thread.lastReadPost)
+            .putExtra(EXTRA_UNREAD_COUNT, thread.unreadCount)
         return PendingIntent.getActivity(
             context, thread.id.value.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
@@ -282,6 +283,7 @@ class WatchedNotifier @Inject constructor(
         const val EXTRA_FORUM_ID = "au.howesthat.whirl.FORUM_ID"
         const val EXTRA_LAST_PAGE = "au.howesthat.whirl.LAST_PAGE"
         const val EXTRA_LAST_READ_POST = "au.howesthat.whirl.LAST_READ_POST"
+        const val EXTRA_UNREAD_COUNT = "au.howesthat.whirl.UNREAD_COUNT"
 
         private const val MAX_LINES = 6
     }

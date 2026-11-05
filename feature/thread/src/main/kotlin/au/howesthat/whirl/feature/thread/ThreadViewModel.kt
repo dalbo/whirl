@@ -14,6 +14,7 @@ import au.howesthat.whirl.core.data.ThreadPageRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository.Companion.LAST_PAGE
 import au.howesthat.whirl.core.model.WatchAction
 import au.howesthat.whirl.core.data.WatchQueue
+import au.howesthat.whirl.core.data.pageOfPost
 import au.howesthat.whirl.core.data.WatchedRepository
 import au.howesthat.whirl.core.data.WhirlpoolLink
 import au.howesthat.whirl.core.model.ForumRef
@@ -478,8 +479,3 @@ data class FindMatches(val page: Int, val query: TextQuery, val replyIds: List<L
 internal fun matchesFind(post: UiPost, query: TextQuery): Boolean = query.matches(post.post.author.name, post.body.searchText())
 
 private const val FIND_KEY = "findOnPage"
-
-/** Whirlpool shows 20 posts per thread page. */
-private const val POSTS_PER_PAGE = 20
-
-private fun pageOfPost(number: Int) = (number - 1) / POSTS_PER_PAGE + 1

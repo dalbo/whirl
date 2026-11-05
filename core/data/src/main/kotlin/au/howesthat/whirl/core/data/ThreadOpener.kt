@@ -24,8 +24,23 @@ sealed interface OpenThread {
 /** The list a thread was opened from, which decides the opening position. */
 enum class OpenedFrom { WATCHED, RECENT, LIST }
 
-/** Read position of a watched thread (`LASTPAGE`, `LASTREAD`). */
-data class WatchedPosition(val lastPage: Int, val lastReadPost: Int)
+/** Read position of a watched thread (`LASTPAGE`, `LASTREAD`, `UNREAD`). */
+data class WatchedPosition(val lastPage: Int, val lastReadPost: Int, val unreadCount: Int = 0) {
+    /** The first post not read yet; null with nothing unread, or nothing read yet (the thread opens at its start). */
+    val firstUnread: Int? get() = (lastReadPost + 1).takeIf { lastReadPost > 0 && unreadCount > 0 }
+
+    /** Where a watched thread opens: the first unread post (on the next page if the last read one ends a page), else the last read one. */
+    val openAt: Int? get() = firstUnread ?: lastReadPost.takeIf { it > 0 }
+
+    /** The page of [openAt]; `LASTPAGE` is the page of the last read post. */
+    val openPage: Int get() = firstUnread?.let(::pageOfPost) ?: lastPage
+}
+
+/** Whirlpool shows 20 posts per thread page. */
+const val POSTS_PER_PAGE = 20
+
+/** The thread page holding post [number] (1-based). */
+fun pageOfPost(number: Int): Int = (number - 1) / POSTS_PER_PAGE + 1
 
 /**
  * The opening rules of 2.14.12 `ForumPageFragment.openThread` (PLAN.md §1.1):
@@ -53,7 +68,7 @@ class ThreadOpener(private val urls: WhirlpoolUrls = WhirlpoolUrls()) {
         if (isPrivateForum || settings.openThreadsInBrowser) {
             val url = when {
                 watched != null && from == OpenedFrom.WATCHED ->
-                    urls.thread(id, watched.lastPage).newBuilder().fragment("r${watched.lastReadPost}").build()
+                    urls.thread(id, watched.openPage).newBuilder().fragment("r${watched.openAt ?: watched.lastReadPost}").build()
                 atLastPage -> urls.thread(id, ThreadPageRepository.LAST_PAGE).newBuilder().fragment("bottom").build()
                 else -> urls.thread(id)
             }
@@ -62,8 +77,9 @@ class ThreadOpener(private val urls: WhirlpoolUrls = WhirlpoolUrls()) {
         return when {
             from == OpenedFrom.WATCHED && watched != null -> OpenThread.InApp(
                 id,
-                page = watched.lastPage,
-                scrollToPost = watched.lastReadPost.takeIf { it > 0 && !settings.loadWatchedAtTop },
+                page = watched.openPage,
+                // The first unread post at the top of the screen, under its "New posts" marker.
+                scrollToPost = watched.openAt.takeIf { !settings.loadWatchedAtTop },
                 forumId = forumId,
                 fromWatched = true,
                 lastReadPost = watched.lastReadPost.takeIf { it > 0 },
