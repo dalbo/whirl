@@ -8,6 +8,7 @@ import au.howesthat.whirl.core.database.ThreadDao
 import au.howesthat.whirl.core.database.ThreadEntity
 import au.howesthat.whirl.core.database.ThreadSource
 import au.howesthat.whirl.core.database.ThreadSourceEntity
+import au.howesthat.whirl.core.database.Transactor
 import au.howesthat.whirl.core.database.WatchedThreadColumns
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.model.UserRef
@@ -99,23 +100,29 @@ class WatchedRepository @Inject constructor(
     private val dao: ThreadDao,
     private val log: FetchLogDao,
     private val queue: PendingWatchDao,
+    private val transactor: Transactor,
+    private val account: AccountGeneration,
     private val scheduler: WatchSendScheduler,
     private val clock: Clock,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     private val refresher = Refresher(log, clock)
 
-    /** Serialises local edits, list replacements and the queue. Always taken before any database transaction. */
+    /**
+     * Serialises local edits, list replacements and the queue. Always taken before any database transaction; each
+     * section under it is one transaction, so observers (screens, the notification check) never see a list replaced
+     * without the actions still waiting to be sent.
+     */
     private val mutex = Mutex()
 
     /** Actions made in this process, by row id, for Undo and rollback. */
     private val live = mutableMapOf<Long, PendingWatch>()
 
-    /** Changes when the account does, so a send that was in flight does not store the old account's lists. */
-    private var generation = 0
-
-    /** One sender at a time, in the app or in the worker. */
+    /** One sender at a time, in the app or in the worker. Taken before [mutex]. */
     private val sending = Mutex()
+
+    /** Set while an account switch waits for [sending]: the sender stops after the row it is sending. */
+    @Volatile private var switching = false
 
     internal var undoWindow: Duration = UNDO_WINDOW
 
@@ -141,13 +148,16 @@ class WatchedRepository @Inject constructor(
         return t.lastReadPost?.takeIf { it > 0 && (t.unreadCount ?: 0) > 0 }
     }
 
-    suspend fun refresh(unreadOnly: Boolean, force: Boolean = false): Boolean {
+    suspend fun refresh(unreadOnly: Boolean, force: Boolean = false): Boolean = refresh(unreadOnly, MaxAge.THREAD_LISTS, force)
+
+    private suspend fun refresh(unreadOnly: Boolean, maxAge: Duration, force: Boolean): Boolean {
         val key = key(unreadOnly)
-        return refresher.refresh(logKey(key), MaxAge.THREAD_LISTS, force) {
-            val list = api.watched(unreadOnly).map { it.toColumns() }
-            mutex.withLock {
-                dao.replaceWatchedList(key, list)
-                reapplyPending()
+        return refresher.refresh(logKey(key), maxAge, force, lastFetched = { log.fetchedAt(logKey(key)) }) {
+            account.fetchAndStore({ api.watched(unreadOnly).map { it.toColumns() } }) { gen, list ->
+                storeLists(gen) {
+                    dao.replaceWatchedList(key, list)
+                    log.put(FetchLogEntity(logKey(key), clock.millis()))
+                }
             }
         }
     }
@@ -157,14 +167,28 @@ class WatchedRepository @Inject constructor(
      * Returns what Whirlpool sent, less the threads with a Mark as read or Unwatch still waiting to be sent.
      */
     suspend fun fetchUnread(): List<WatchedThread> {
-        val list = api.watched(unreadOnly = true)
-        val queued = mutex.withLock {
-            dao.replaceWatchedList(key(unreadOnly = true), list.map { it.toColumns() })
-            log.put(FetchLogEntity(logKey(key(unreadOnly = true)), clock.millis()))
-            reapplyPending()
-            queue.all().filter { it.action != WatchAction.WATCH.name }.flatMapTo(mutableSetOf()) { it.ids }
-        }
+        val (list, queued) = account.fetchAndStore({ api.watched(unreadOnly = true) }) { gen, list ->
+            storeLists(gen) {
+                dao.replaceWatchedList(key(unreadOnly = true), list.map { it.toColumns() })
+                log.put(FetchLogEntity(logKey(key(unreadOnly = true)), clock.millis()))
+                list to queue.all().filter { it.action != WatchAction.WATCH.name }.flatMapTo(mutableSetOf()) { it.ids }
+            }
+        } ?: return emptyList() // the account changed twice while it was fetched
         return list.filterNot { it.id.value in queued }
+    }
+
+    /**
+     * Runs [block] under [mutex] in one transaction, then re-applies the actions not yet sent and drops threads no list
+     * refers to. Null, with nothing written, if the account changed since [gen] was read (before the fetch).
+     */
+    private suspend fun <R : Any> storeLists(gen: Int, block: suspend () -> R): R? = mutex.withLock {
+        transactor.run {
+            if (account.current != gen) return@run null
+            val result = block()
+            reapplyPending()
+            dao.deleteOrphans()
+            result
+        }
     }
 
     /** Fetches the All list if it is stale, so screens outside Watched know what is watched. Errors are ignored. */
@@ -190,12 +214,15 @@ class WatchedRepository @Inject constructor(
         val now = clock.millis()
         val wait = if (undoable) undoWindow else Duration.ZERO
         val p = mutex.withLock {
-            val p = PendingWatch(action, ids, dao.getAll(raw), dao.sourceRows(ThreadSource.WATCHED.name, raw))
-            p.rowId = queue.insert(
-                PendingWatchEntity(action = action.name, threadIds = raw.joinToString(","), sendAfter = now + wait.inWholeMilliseconds, createdAt = now),
-            )
+            val p = transactor.run {
+                val p = PendingWatch(action, ids, dao.getAll(raw), dao.sourceRows(ThreadSource.WATCHED.name, raw))
+                p.rowId = queue.insert(
+                    PendingWatchEntity(action = action.name, threadIds = raw.joinToString(","), sendAfter = now + wait.inWholeMilliseconds, createdAt = now),
+                )
+                applyLocal(action, raw)
+                p
+            }
             live[p.rowId] = p
-            applyLocal(action, raw)
             p
         }
         // The backstop, should the app not be around to send it.
@@ -225,11 +252,16 @@ class WatchedRepository @Inject constructor(
 
     /** Puts things back as they were. Nothing was sent yet; returns false if it is too late (being sent or sent). */
     suspend fun undo(p: PendingWatch): Boolean = mutex.withLock {
-        if (queue.deleteWaiting(p.rowId) == 0) return false
-        p.go.cancel()
-        live -= p.rowId
-        rollBack(p)
-        true
+        val undone = transactor.run {
+            if (queue.deleteWaiting(p.rowId) == 0) return@run false
+            rollBack(p)
+            true
+        }
+        if (undone) {
+            p.go.cancel()
+            live -= p.rowId
+        }
+        undone
     }
 
     /** The Undo offer went away: send now rather than at the end of [UNDO_WINDOW]. */
@@ -258,6 +290,8 @@ class WatchedRepository @Inject constructor(
         // Nothing is being sent now, so a row still marked as sending was cut off when its process ended.
         queue.resetSending()
         while (true) {
+            // Signing out: the queue is about to be forgotten; stop after the row just sent.
+            if (switching) return Drain.Empty
             val rows = queue.all()
             if (rows.isEmpty()) return Drain.Empty
             val now = clock.millis()
@@ -285,20 +319,18 @@ class WatchedRepository @Inject constructor(
     private suspend fun send(row: PendingWatchEntity, now: Long): Boolean {
         val action = WatchAction.valueOf(row.action)
         val ids = row.ids.map(::ThreadId)
-        val gen = mutex.withLock { generation }
+        val gen = account.current
         try {
             val list = when (action) {
                 WatchAction.WATCH -> api.updateWatched(watch = ids)
                 WatchAction.MARK_READ -> api.updateWatched(markRead = ids)
                 WatchAction.UNWATCH -> api.updateWatched(unwatch = ids)
             }.map { it.toColumns() }
-            mutex.withLock {
-                if (gen != generation) return true
+            storeLists(gen) {
                 queue.delete(row.id)
-                live.remove(row.id)?.done?.complete(null)
                 store(list)
-                reapplyPending()
-            }
+                listOfNotNull(live.remove(row.id))
+            }?.forEach { it.done.complete(null) }
             return true
         } catch (e: CancellationException) {
             throw e
@@ -316,27 +348,45 @@ class WatchedRepository @Inject constructor(
                 val keep = if (action == WatchAction.WATCH) row.ids else row.ids.filter { it in still }
                 if (keep.size < row.ids.size) {
                     queue.release(row.id, keep.joinToString(","))
-                    if (keep.isEmpty()) mutex.withLock { finish(row.id, null) }
+                    if (keep.isEmpty()) finish(row.id, null)
                     return true
                 }
             } else if (!giveUp && e.isTransient()) {
                 queue.release(row.id, row.threadIds)
                 return false
             }
-            val rolledBack = mutex.withLock { finish(row.id, e) }
-            if (!rolledBack) refreshQuietly()
+            finish(row.id, e)
+            // The action may be hours old: Whirlpool's lists, not what was cached then, say how things are now. Not
+            // after giving up on the network, which the lists would not get through either.
+            if (!e.isTransient()) refreshQuietly()
             _events.emit(WatchEvent.Failed(action, e))
             return true
         }
     }
 
-    /** Removes a row that is done with, rolling back with [error]; true if this process could roll it back itself. */
-    private suspend fun finish(rowId: Long, error: Throwable?): Boolean {
-        queue.delete(rowId)
-        val p = live.remove(rowId)
-        if (p != null && error != null) rollBack(p)
+    /**
+     * Removes a row that is done with. With an [error], the threads go back on the lists they were on when the action
+     * was made, if this process made it. Their details stay as fetched since (the snapshot is used only for a thread
+     * no longer cached, which an Unwatch can cause), and [refreshQuietly] corrects the rest.
+     */
+    private suspend fun finish(rowId: Long, error: Throwable?) {
+        val p = mutex.withLock {
+            transactor.run {
+                queue.delete(rowId)
+                val p = live[rowId]
+                if (p != null && error != null) {
+                    val cached = dao.getAll(p.ids.map { it.value }).mapTo(mutableSetOf()) { it.id }
+                    dao.upsert(p.threads.filterNot { it.id in cached })
+                    // While the action waited, every refresh re-applied Mark as read, so these columns are still ours.
+                    if (p.action == WatchAction.MARK_READ) {
+                        p.threads.filter { it.id in cached }.forEach { dao.setReadState(it.id, it.unreadCount, it.lastReadPost, it.isUnread) }
+                    }
+                    restoreMembership(p)
+                }
+            }
+            live.remove(rowId)
+        }
         p?.done?.complete(error)
-        return p != null
     }
 
     private suspend fun stillWatched(): Set<String>? = try {
@@ -347,11 +397,12 @@ class WatchedRepository @Inject constructor(
         null
     }
 
-    /** After a failure this process has no record of: Whirlpool's lists show what really happened. */
+    /** After a failure: Whirlpool's lists show what really happened. Fetched however recently they were. */
     private suspend fun refreshQuietly() {
+        if (switching) return
         try {
-            refresh(unreadOnly = false, force = true)
-            refresh(unreadOnly = true, force = true)
+            refresh(unreadOnly = false, maxAge = Duration.ZERO, force = false)
+            refresh(unreadOnly = true, maxAge = Duration.ZERO, force = false)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -364,13 +415,34 @@ class WatchedRepository @Inject constructor(
         if (queue.all().isNotEmpty()) scheduler.schedule(Duration.ZERO)
     }
 
-    /** Signing out or into another account: nothing queued may be sent with the next account's key. */
-    suspend fun forgetPending() = mutex.withLock {
-        generation++
-        scheduler.cancel()
-        queue.clear()
-        live.values.forEach { it.go.cancel() }
-        live.clear()
+    /**
+     * Signing out or into another account. [change] stores the new key (or removes it) and [clear] deletes the old
+     * account's data. Nothing queued may be sent with the next key, so this waits for the row being sent (the sender
+     * stops after it) and forgets the queue first; nothing fetched with the old key may be stored after [clear], so the
+     * account generation moves on in the same transaction, after [change].
+     */
+    suspend fun switchAccount(change: suspend () -> Unit, clear: suspend () -> Unit) {
+        switching = true
+        try {
+            sending.withLock {
+                mutex.withLock {
+                    scheduler.cancel()
+                    queue.clear()
+                    live.values.forEach {
+                        it.go.cancel()
+                        it.done.complete(CancellationException("The account changed before it was sent"))
+                    }
+                    live.clear()
+                    change()
+                    transactor.run {
+                        account.next()
+                        clear()
+                    }
+                }
+            }
+        } finally {
+            switching = false
+        }
     }
 
     /** Both lists from one `watchedmode=1` answer: Unread is All filtered, in the same order (as the fixtures show). */
@@ -382,10 +454,15 @@ class WatchedRepository @Inject constructor(
         log.put(FetchLogEntity(logKey(key(unreadOnly = true)), now))
     }
 
+    /** Undo: everything as it was when the action was made, minutes ago at most. */
     private suspend fun rollBack(p: PendingWatch) {
-        val raw = p.ids.map { it.value }
         dao.upsert(p.threads)
-        dao.removeFromSource(ThreadSource.WATCHED.name, raw)
+        restoreMembership(p)
+    }
+
+    /** The threads back on the watched lists they were on when the action was made. */
+    private suspend fun restoreMembership(p: PendingWatch) {
+        dao.removeFromSource(ThreadSource.WATCHED.name, p.ids.map { it.value })
         dao.insertSource(p.sources)
         reapplyPending()
     }

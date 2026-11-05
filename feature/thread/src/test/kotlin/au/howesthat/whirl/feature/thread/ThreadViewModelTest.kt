@@ -4,12 +4,14 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
+import au.howesthat.whirl.core.data.AccountGeneration
 import au.howesthat.whirl.core.data.ForumRepository
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository
 import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.data.WatchSendScheduler
 import au.howesthat.whirl.core.data.WatchedRepository
+import au.howesthat.whirl.core.database.RoomTransactor
 import au.howesthat.whirl.core.database.WatchedThreadColumns
 import au.howesthat.whirl.core.database.WhirlDatabase
 import au.howesthat.whirl.core.model.ForumRef
@@ -76,7 +78,7 @@ class ThreadViewModelTest {
     private val settings = SettingsRepository(ApplicationProvider.getApplicationContext())
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     // No key: watch actions apply locally and their sends fail without a request.
-    private val watched = WatchedRepository(WhirlpoolApi(client, { null }, server.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, clock, appScope)
+    private val watched = WatchedRepository(WhirlpoolApi(client, { null }, server.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, clock, appScope)
 
     @Before
     fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -327,7 +329,7 @@ class ThreadViewModelTest {
             }
             start()
         }
-        val keyed = WatchedRepository(WhirlpoolApi(client, { "k" }, api.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, clock, appScope)
+        val keyed = WatchedRepository(WhirlpoolApi(client, { "k" }, api.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, clock, appScope)
         val pages = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(api.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock, Dispatchers.Default)
         settings.update { it.copy(watchedAutoMarkAsRead = true) }
         ThreadViewModel(ThreadRoute("9yvx1663", 1), pages, settings, keyed, SavedStateHandle(), Dispatchers.Default)
@@ -350,7 +352,7 @@ class ThreadViewModelTest {
             }
             start()
         }
-        val keyed = WatchedRepository(WhirlpoolApi(client, { "k" }, api.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, clock, appScope)
+        val keyed = WatchedRepository(WhirlpoolApi(client, { "k" }, api.url("/api/"), RetryPolicy.NONE), db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, clock, appScope)
         val pages = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(api.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, clock, Dispatchers.Default)
         settings.update { it.copy(watchUndo = false) }
         // Nothing commits it: with Undo on it would wait out the window instead.

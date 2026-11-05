@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import au.howesthat.whirl.core.data.AccountGeneration
 import au.howesthat.whirl.core.data.OpenThread
 import au.howesthat.whirl.core.data.AppVisits
 import au.howesthat.whirl.core.data.ForumRepository
@@ -18,6 +19,7 @@ import au.howesthat.whirl.core.data.WatchEvent
 import au.howesthat.whirl.core.data.WatchedPosition
 import au.howesthat.whirl.core.data.WatchSendScheduler
 import au.howesthat.whirl.core.data.WatchedRepository
+import au.howesthat.whirl.core.database.RoomTransactor
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.database.FetchLogEntity
@@ -70,7 +72,7 @@ class ListViewModelTest {
         .allowMainThreadQueries().build()
     private val api = WhirlpoolApi(WhirlpoolHttp.client("t"), { null })
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val watched = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, clock, appScope)
+    private val watched = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, clock, appScope)
     private val deps = ListDeps(
         SettingsRepository(ApplicationProvider.getApplicationContext()),
         ForumRepository(api, db.forumDao(), db.fetchLogDao(), clock),

@@ -2,10 +2,13 @@ package au.howesthat.whirl.core.data
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import au.howesthat.whirl.core.database.FetchLogEntity
+import au.howesthat.whirl.core.database.RoomTransactor
 import au.howesthat.whirl.core.database.WhirlDatabase
 import au.howesthat.whirl.core.model.WhirlpoolError
 import au.howesthat.whirl.core.network.RetryPolicy
@@ -15,10 +18,17 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import mockwebserver3.RecordedRequest
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -30,9 +40,12 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -73,7 +86,7 @@ class RepositoryTest {
 
     @Test
     fun `sign in stores the key and account, bad key stores nothing`() = runTest {
-        val account = AccountRepository(api, settings, db, WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, Clock.systemUTC(), backgroundScope))
+        val account = AccountRepository(api, settings, db, WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, Clock.systemUTC(), backgroundScope))
         enqueue("api_badkey.json", 403)
         assertFailsWith<WhirlpoolError.BadKey> { account.signIn("bad") }
         assertNull(settings.apiKey())
@@ -158,7 +171,7 @@ class RepositoryTest {
     @Test
     fun `watched list refreshes and respects max age`() = runTest {
         settings.signIn("k", Account(216903, "d@llin"))
-        val repo = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, clock, backgroundScope)
+        val repo = WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, clock, backgroundScope)
         enqueue("api_watched_mode0.json")
         assertTrue(repo.refresh(unreadOnly = true))
         val cached = repo.watched(unreadOnly = true).first()
@@ -226,5 +239,77 @@ class RepositoryTest {
         assertEquals(2, calls)
         db.fetchLogDao().put(FetchLogEntity("k", 0))
         assertTrue(refresher.refresh("k", MaxAge.THREAD_LISTS, force = false) { calls++ })
+    }
+
+    @Test
+    fun `settings changed at the same time all take effect`() = runTest {
+        withContext(Dispatchers.Default) {
+            repeat(20) { launch { settings.update { it.copy(undoSeconds = it.undoSeconds + 1) } } }
+        }
+        assertEquals(Settings().undoSeconds + 20, settings.settings.first().undoSeconds)
+    }
+
+    @Test
+    fun `only settings changed from their default are stored`() = runTest {
+        suspend fun stored() = store.data.first().asMap().keys.map { it.name }.toSet()
+        settings.update { it.copy(theme = ThemeMode.DARK) }
+        assertEquals(setOf("theme"), stored())
+        settings.update { it.copy(theme = Settings().theme) }
+        assertEquals(emptySet(), stored(), "back to the default, so a new default would reach this user")
+
+        // v1.0's wallpaper switch turns into the palette it chose.
+        store.edit { it[booleanPreferencesKey("dynamic_color")] = false }
+        settings.update { it.copy(theme = ThemeMode.DARK) }
+        assertEquals(setOf("theme", "palette"), stored())
+        assertEquals("whirl", settings.settings.first().palette)
+    }
+
+    @Test
+    fun `signing out while Recent is being fetched stores nothing`() = runTest {
+        val generation = AccountGeneration()
+        val watched = WatchedRepository(
+            api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), generation, WatchSendScheduler.None, clock, backgroundScope,
+        )
+        val account = AccountRepository(api, settings, db, watched)
+        val recent = RecentRepository(api, db.threadDao(), db.fetchLogDao(), RoomTransactor(db), generation, clock)
+        settings.signIn("k", Account(216903, "d@llin"))
+        val release = CountDownLatch(1)
+        // get=recent has only been seen empty; this assumes the THREADS shape, as ThreadListRepositoryTest does.
+        val body = File(System.getProperty("whirl.fixtures"), "api/api_threads_forum92.json").readText().replace("\"THREADS\"", "\"RECENT\"")
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                release.await(5, TimeUnit.SECONDS)
+                return MockResponse.Builder().body(body).build()
+            }
+        }
+        val refresh = async(Dispatchers.IO) { runCatching { recent.refresh(7) } }
+        server.takeRequest(5, TimeUnit.SECONDS)!!
+        account.signOut()
+        release.countDown()
+        // Dropped, and fetched again for the next account: there is none.
+        assertIs<WhirlpoolError.BadKey>(refresh.await().exceptionOrNull())
+        assertEquals(1, server.requestCount)
+        assertEquals(emptyList(), recent.threads(7).first().value)
+        assertNull(db.fetchLogDao().fetchedAt("recent:7"))
+    }
+
+    @Test
+    fun `settings stored at their defaults before v1_7 are dropped once`() = runTest {
+        // What v1.6 stored after a change of theme: every setting, the rest at their defaults.
+        val oldScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        val file = File(tmp.root, "old.preferences_pb")
+        val old = PreferenceDataStoreFactory.create(scope = oldScope) { file }
+        SettingsRepository(old).update { it.copy(theme = ThemeMode.DARK) }
+        old.edit { p ->
+            p[stringPreferencesKey("homepage")] = Settings().homepage.name
+            p[intPreferencesKey("undo_seconds")] = Settings().undoSeconds
+            p[booleanPreferencesKey("watch_undo")] = Settings().watchUndo
+        }
+        oldScope.coroutineContext.job.cancelAndJoin() // one DataStore per file at a time
+
+        val migrated = PreferenceDataStoreFactory.create(scope = dataStoreScope, migrations = listOf(DropStoredDefaults)) { file }
+        val settings = SettingsRepository(migrated)
+        assertEquals(Settings(theme = ThemeMode.DARK), settings.settings.first())
+        assertEquals(setOf("theme", "stored_defaults_dropped"), migrated.data.first().asMap().keys.map { it.name }.toSet())
     }
 }

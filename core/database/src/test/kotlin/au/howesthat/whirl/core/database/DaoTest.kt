@@ -41,6 +41,26 @@ class DaoTest {
     }
 
     @Test
+    fun `a thread that drops off every list is deleted`() = runTest {
+        threads.replaceWatchedList("all", listOf(watched("3rvvvlwj", unread = 5)))
+        threads.replaceApiList(ThreadSource.LATEST, "", listOf(api("3rvvvlwj"), api("988lwp10")))
+        threads.replaceApiList(ThreadSource.LATEST, "", listOf(api("1000422")))
+        assertNull(threads.get("988lwp10"), "on no list any more")
+        assertEquals(5, threads.get("3rvvvlwj")?.unreadCount, "still watched")
+        assertEquals("Thread 1000422", threads.get("1000422")?.title)
+    }
+
+    @Test
+    fun `a thread named by a queued action is kept while it is on no list`() = runTest {
+        // An Unwatch queued by an earlier run of the app: its thread is on no list until it is sent or fails.
+        threads.replaceApiList(ThreadSource.LATEST, "", listOf(api("3rvvvlwj"), api("988lwp10")))
+        db.pendingWatchDao().insert(PendingWatchEntity(action = "UNWATCH", threadIds = "x1,988lwp10", sendAfter = 0, createdAt = 0))
+        threads.replaceApiList(ThreadSource.LATEST, "", listOf(api("1000422")))
+        assertEquals("Thread 988lwp10", threads.get("988lwp10")?.title)
+        assertNull(threads.get("3rvvvlwj"))
+    }
+
+    @Test
     fun `sources merge into one thread row without clobbering each other`() = runTest {
         threads.replaceWatchedList("all", listOf(watched("3rvvvlwj", unread = 5)))
         threads.replaceApiList(ThreadSource.LATEST, "", listOf(api("3rvvvlwj", unread = true)))

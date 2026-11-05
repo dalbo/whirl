@@ -120,12 +120,18 @@ interface ThreadDao {
         insertSource(ids.mapIndexed { i, id -> ThreadSourceEntity(source.name, key, id, i) })
     }
 
+    /** Replaces one list; threads that dropped off every list go too. */
     @Transaction
     suspend fun replaceApiList(source: ThreadSource, key: String, threads: List<ApiThreadColumns>) {
         upsertApi(threads)
         replaceSource(source, key, threads.map { it.id })
+        deleteOrphans()
     }
 
+    /**
+     * Replaces one watched list. Orphans are left for the caller, which may still re-add pending actions to it in the
+     * same transaction ([deleteOrphans] after).
+     */
     @Transaction
     suspend fun replaceWatchedList(key: String, threads: List<WatchedThreadColumns>) {
         upsertWatched(threads)
@@ -158,9 +164,19 @@ interface ThreadDao {
     @Query("SELECT DISTINCT thread_id FROM thread_source WHERE source = 'WATCHED'")
     fun observeWatchedIds(): Flow<List<String>>
 
-    /** Drops threads no list refers to any more. */
-    @Query("DELETE FROM threads WHERE id NOT IN (SELECT thread_id FROM thread_source)")
+    /**
+     * Drops threads no list refers to any more, except those a queued watch action names: an Unwatch takes its thread
+     * off every list until it is sent, and Undo or a failure puts it back.
+     */
+    @Query(
+        """DELETE FROM threads WHERE id NOT IN (SELECT thread_id FROM thread_source)
+           AND NOT EXISTS (SELECT 1 FROM pending_watch p WHERE ',' || p.thread_ids || ',' LIKE '%,' || threads.id || ',%')""",
+    )
     suspend fun deleteOrphans()
+
+    /** Puts back a thread's read position (a Mark as read that failed). */
+    @Query("UPDATE threads SET unread_count = :unreadCount, last_read_post = :lastReadPost, is_unread = :isUnread WHERE id = :id")
+    suspend fun setReadState(id: String, unreadCount: Int?, lastReadPost: Int?, isUnread: Boolean?)
 }
 
 @Dao

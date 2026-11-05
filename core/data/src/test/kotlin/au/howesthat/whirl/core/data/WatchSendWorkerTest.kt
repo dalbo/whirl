@@ -8,6 +8,7 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import au.howesthat.whirl.core.database.PendingWatchEntity
+import au.howesthat.whirl.core.database.RoomTransactor
 import au.howesthat.whirl.core.database.WhirlDatabase
 import au.howesthat.whirl.core.network.RetryPolicy
 import au.howesthat.whirl.core.network.WhirlpoolApi
@@ -37,7 +38,7 @@ class WatchSendWorkerTest {
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val api = WhirlpoolApi(WhirlpoolHttp.client("Whirl/test"), { "k" }, server.url("/api/"), RetryPolicy.NONE)
     private val watched =
-        WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), WatchSendScheduler.None, Clock.systemUTC(), appScope)
+        WatchedRepository(api, db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), WatchSendScheduler.None, Clock.systemUTC(), appScope)
 
     private val factory = object : WorkerFactory() {
         override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters) =

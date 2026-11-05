@@ -25,16 +25,12 @@ class AccountRepository @Inject constructor(
         val account = Account(user.id, user.name)
         val previous = settings.account.first()
         if (previous != null && previous.userId != account.userId) {
-            watched.forgetPending()
-            db.clearAccountData()
+            watched.switchAccount(change = { settings.signIn(trimmed, account) }, clear = db::clearAccountData)
+        } else {
+            settings.signIn(trimmed, account)
         }
-        settings.signIn(trimmed, account)
         return account
     }
 
-    suspend fun signOut() {
-        watched.forgetPending()
-        settings.signOut()
-        db.clearAccountData()
-    }
+    suspend fun signOut() = watched.switchAccount(change = settings::signOut, clear = db::clearAccountData)
 }

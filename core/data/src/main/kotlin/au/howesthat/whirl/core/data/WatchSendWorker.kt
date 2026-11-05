@@ -7,6 +7,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import dagger.Binds
@@ -17,6 +18,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlin.time.Duration
@@ -25,26 +27,28 @@ import kotlin.time.Duration
 interface WatchSendScheduler {
     /**
      * Makes sure a send runs after [delay] once there is a network. Work already waiting or running is kept, never
-     * replaced: replacing cancels a running send part way, which could send an action twice.
+     * replaced: replacing cancels a running send part way, which could send an action twice ([policyFor]).
      */
-    fun schedule(delay: Duration)
+    suspend fun schedule(delay: Duration)
 
     fun cancel()
 
     /** For tests: schedules nothing. */
     object None : WatchSendScheduler {
-        override fun schedule(delay: Duration) = Unit
+        override suspend fun schedule(delay: Duration) = Unit
         override fun cancel() = Unit
     }
 }
 
 internal class WorkWatchSendScheduler @Inject constructor(@ApplicationContext private val context: Context) : WatchSendScheduler {
-    override fun schedule(delay: Duration) {
+    override suspend fun schedule(delay: Duration) {
         val request = OneTimeWorkRequestBuilder<WatchSendWorker>()
             .setInitialDelay(delay.inWholeMilliseconds, TimeUnit.MILLISECONDS)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
+        val workManager = WorkManager.getInstance(context)
+        val states = workManager.getWorkInfosForUniqueWorkFlow(WORK_NAME).first().map { it.state }
+        workManager.enqueueUniqueWork(WORK_NAME, policyFor(states), request)
     }
 
     override fun cancel() {
@@ -55,6 +59,15 @@ internal class WorkWatchSendScheduler @Inject constructor(@ApplicationContext pr
         const val WORK_NAME = "watch-send"
     }
 }
+
+/**
+ * How a new run joins the unique work, given its runs' [states]. One still to start will send what is queued now, so it
+ * is kept. A running one may be finishing having found nothing to send, so the new run is queued after it (KEEP would
+ * drop it). So the chain is never longer than a running send and one waiting.
+ */
+internal fun policyFor(states: List<WorkInfo.State>): ExistingWorkPolicy =
+    if (states.any { it == WorkInfo.State.ENQUEUED || it == WorkInfo.State.BLOCKED }) ExistingWorkPolicy.KEEP
+    else ExistingWorkPolicy.APPEND_OR_REPLACE
 
 @Module
 @InstallIn(SingletonComponent::class)
