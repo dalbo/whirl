@@ -65,7 +65,7 @@ class ThreadItemTest {
     @Test
     fun `watched threads carry their read position and unread count`() {
         val w = WatchedThread(ThreadId("3pxj858k"), "NBN", 250, 92, "ISP", date, UserRef(1, "a"), date, UserRef(2, "b"), 4, 247, 13).toItem()
-        assertEquals(WatchedPosition(13, 247), w.watched)
+        assertEquals(WatchedPosition(13, 247, 4), w.watched)
         assertEquals(4, w.unreadCount)
         assertTrue(w.isUnread)
         assertEquals(ForumRef(92, "ISP"), w.forum)

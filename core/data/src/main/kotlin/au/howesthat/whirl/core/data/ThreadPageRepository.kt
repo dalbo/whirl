@@ -24,6 +24,12 @@ import java.time.LocalDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** Whirlpool shows 20 posts per thread page. */
+const val POSTS_PER_PAGE = 20
+
+/** The thread page holding post [number] (1-based). */
+fun pageOfPost(number: Int): Int = (number - 1) / POSTS_PER_PAGE + 1
+
 /**
  * Thread pages, scraped from `/thread/<id>?p=N` and cached in Room (the last [KEEP_PAGES] pages opened).
  * Screens observe [page] and call [load]; the cache renders at once and is refetched when older than

@@ -251,6 +251,7 @@ class WatchedNotifierTest {
         assertEquals(listOf(ThreadId("9yvx1663")), ids)
         val open = shadowOf(bike.contentIntent).savedIntent
         assertEquals("9yvx1663", open.getStringExtra(WatchedNotifier.EXTRA_THREAD_ID))
+        assertEquals(683, open.getIntExtra(WatchedNotifier.EXTRA_UNREAD_COUNT, -1), "so it opens at the first unread post")
         assertNotNull(thread("9q684xp3"))
 
         val summary = assertNotNull(groupSummary())

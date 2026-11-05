@@ -96,7 +96,7 @@ fun WatchedThread.toItem() = ThreadItem(
     // LASTPAGE is the page of the last read post, not the thread's length.
     lastPoster = lastPoster.name,
     lastPostedAt = lastDate.toInstant(),
-    watched = WatchedPosition(lastPage, lastReadPost),
+    watched = WatchedPosition(lastPage, lastReadPost, unreadCount),
 )
 
 /** Groups rows under forum headers, forums in order of first appearance (so the most active forum leads). */
