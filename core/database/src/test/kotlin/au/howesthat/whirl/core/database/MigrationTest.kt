@@ -90,7 +90,7 @@ class MigrationTest {
     }
 
     @Test
-    fun `v4 to v5 empties the page cache without its filter and keeps the rest`() = runTest {
+    fun `v4 to v5 keeps the plain cached pages, drops filtered ones, and keeps the rest`() = runTest {
         helper.createDatabase(name, 4).use { db ->
             db.execSQL("INSERT INTO fetch_log (`key`, fetched_at) VALUES ('forums', 123)")
             db.execSQL("INSERT INTO threads (id, title, forum_id, forum_name, replies, unread_count) VALUES ('3pxj858k', 'NBN', 92, 'Choosing an ISP', 250, 4)")
@@ -99,11 +99,11 @@ class MigrationTest {
             for (filter in listOf("", "m")) {
                 db.execSQL(
                     "INSERT INTO thread_pages (thread_id, filter, page, page_count, title, parts, fetched_at, accessed_at) " +
-                        "VALUES ('3pxj858k', '$filter', 1, 13, 'NBN', '', 1, 1)",
+                        "VALUES ('3pxj858k', '$filter', 1, ${if (filter == "") 13 else 1}, 'NBN', '', 1, 1)",
                 )
                 db.execSQL(
                     "INSERT INTO posts (thread_id, filter, page, reply_id, reply_num, user_id, user_name, is_op, is_deleted, body_html) " +
-                        "VALUES ('3pxj858k', '$filter', 1, 10, 1, 1, 'a', 1, 0, '<p>hi</p>')",
+                        "VALUES ('3pxj858k', '$filter', 1, ${if (filter == "") 10 else 99}, 1, 1, 'a', 1, 0, '<p>hi</p>')",
                 )
             }
         }
@@ -114,7 +114,9 @@ class MigrationTest {
             .allowMainThreadQueries()
             .build()
         try {
-            assertEquals(0, db.threadPageDao().pageCount(), "a cache: pages refetch when opened")
+            assertEquals(1, db.threadPageDao().pageCount(), "the plain page, which still opens offline")
+            assertEquals(listOf(10L), db.threadPageDao().posts("3pxj858k", 1).map { it.replyId })
+            assertEquals(13, db.threadPageDao().lastKnownPageCount("3pxj858k"))
             assertEquals(123L, db.fetchLogDao().fetchedAt("forums"))
             assertEquals(4, db.threadDao().get("3pxj858k")?.unreadCount)
             assertEquals(listOf("UNWATCH"), db.pendingWatchDao().all().map { it.action })

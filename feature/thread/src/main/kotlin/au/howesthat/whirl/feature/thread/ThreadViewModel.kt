@@ -355,13 +355,17 @@ class ThreadViewModel @AssistedInject constructor(
         }
     }
 
-    /*
-     * Whirlpool shows filtered views (one user's posts, moderators', reps') only to signed-in users ("You must be
-     * registered and signed in", checked 2026-10-23), and Whirl has no web session, so they open in the browser, which
-     * has the user's login. (v1.8 filters the archive's posts in the app instead.)
+    /**
+     * One user's posts, in the browser. Whirlpool shows filtered views (one user's posts, moderators', reps') only to
+     * signed-in users ("You must be registered and signed in", checked 2026-10-23), and Whirl has no web session, so
+     * they open in the browser, which has the user's login. (v1.8 filters the archive's posts in the app instead.)
      */
     fun showUsersPosts(userId: Long) = browse(urls.thread(threadId, userId = userId).toString())
+
+    /** Moderators' posts, in the browser (see [showUsersPosts]). */
     fun showModeratorPosts() = browse(urls.thread(threadId, moderatorsOnly = true).toString())
+
+    /** Reps' posts, in the browser (see [showUsersPosts]). */
     fun showRepPosts() = browse(urls.thread(threadId, repsOnly = true).toString())
 
     private fun browse(url: String) {

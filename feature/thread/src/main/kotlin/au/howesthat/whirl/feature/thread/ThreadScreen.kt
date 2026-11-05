@@ -169,7 +169,6 @@ private fun ThreadPager(
     val pageCount = state.pageCount
     val pager = rememberPagerState(initialPage = (start - 1).coerceAtLeast(0)) { pageCount }
     val jumpTo by viewModel.jumpTo.collectAsStateWithLifecycle()
-    val target by viewModel.scrollTarget.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val myUserId by viewModel.myUserId.collectAsStateWithLifecycle()
     val firstUnread by viewModel.firstUnread.collectAsStateWithLifecycle()
@@ -255,7 +254,6 @@ private fun ThreadPager(
                 page = index + 1,
                 viewModel = viewModel,
                 context = context,
-                target = target,
                 error = state.error.takeIf { current },
                 refreshing = state.refreshing && current,
             )
@@ -281,8 +279,10 @@ private fun ThreadPager(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PageContent(page: Int, viewModel: ThreadViewModel, context: PageContext, target: ScrollTarget?, error: Throwable?, refreshing: Boolean) {
+private fun PageContent(page: Int, viewModel: ThreadViewModel, context: PageContext, error: Throwable?, refreshing: Boolean) {
     val ui by remember(page, viewModel) { viewModel.page(page) }.collectAsStateWithLifecycle(null)
+    // Read per page: a quote tap or find step moves it, and only the page on screen needs to recompose.
+    val target by viewModel.scrollTarget.collectAsStateWithLifecycle()
     val browser = rememberOpenInBrowser()
     val list = rememberLazyListState()
     val base = MaterialTheme.typography.bodyMedium

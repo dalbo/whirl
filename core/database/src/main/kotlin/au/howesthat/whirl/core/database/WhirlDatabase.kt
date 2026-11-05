@@ -66,17 +66,24 @@ abstract class WhirlDatabase : RoomDatabase() {
 
 /**
  * v5: `thread_pages` and `posts` lose their `filter` column (v1.7; in-app post filters were gone since v1.1.2). It is
- * part of both primary keys, so the tables are recreated; they are a cache, and pages refetch when opened.
+ * part of both primary keys, so the tables are rebuilt. The plain pages (`filter = ''`) are kept, so a thread cached
+ * before the update still opens offline; filtered copies from before v1.1.2 are dropped.
  */
 val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL("DROP TABLE posts")
-        db.execSQL("DROP TABLE thread_pages")
+        // Renaming the parent first carries posts' foreign key along to the old table.
+        db.execSQL("ALTER TABLE thread_pages RENAME TO thread_pages_v4")
+        db.execSQL("ALTER TABLE posts RENAME TO posts_v4")
         db.execSQL(
             "CREATE TABLE IF NOT EXISTS `thread_pages` (`thread_id` TEXT NOT NULL, `page` INTEGER NOT NULL, " +
                 "`page_count` INTEGER NOT NULL, `title` TEXT NOT NULL, `forum_id` INTEGER, `forum_title` TEXT, `group_id` INTEGER, " +
                 "`moderator_note_html` TEXT, `parts` TEXT NOT NULL, `fetched_at` INTEGER NOT NULL, `accessed_at` INTEGER NOT NULL, " +
                 "PRIMARY KEY(`thread_id`, `page`))",
+        )
+        db.execSQL(
+            "INSERT INTO thread_pages (thread_id, page, page_count, title, forum_id, forum_title, group_id, moderator_note_html, " +
+                "parts, fetched_at, accessed_at) SELECT thread_id, page, page_count, title, forum_id, forum_title, group_id, " +
+                "moderator_note_html, parts, fetched_at, accessed_at FROM thread_pages_v4 WHERE filter = ''",
         )
         db.execSQL(
             "CREATE TABLE IF NOT EXISTS `posts` (`thread_id` TEXT NOT NULL, `page` INTEGER NOT NULL, `reply_id` INTEGER NOT NULL, " +
@@ -86,6 +93,14 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
                 "PRIMARY KEY(`thread_id`, `page`, `reply_id`), FOREIGN KEY(`thread_id`, `page`) REFERENCES `thread_pages`(`thread_id`, `page`) " +
                 "ON UPDATE NO ACTION ON DELETE CASCADE )",
         )
+        db.execSQL(
+            "INSERT INTO posts (thread_id, page, reply_id, reply_num, user_id, user_name, user_group, quip, post_count, " +
+                "posted_text, posted_at, edited_text, is_op, hidden_reason, is_deleted, short_url, body_html) " +
+                "SELECT thread_id, page, reply_id, reply_num, user_id, user_name, user_group, quip, post_count, posted_text, " +
+                "posted_at, edited_text, is_op, hidden_reason, is_deleted, short_url, body_html FROM posts_v4 WHERE filter = ''",
+        )
+        db.execSQL("DROP TABLE posts_v4")
+        db.execSQL("DROP TABLE thread_pages_v4")
     }
 }
 
