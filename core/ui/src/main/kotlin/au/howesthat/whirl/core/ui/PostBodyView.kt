@@ -21,8 +21,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -55,7 +57,7 @@ import au.howesthat.whirl.core.model.TextQuery
 
 private val BULLETS = listOf("•", "◦", "▪")
 
-private class BodyColors(val repliedUser: Color, val other: Color, val alternate: Color, val link: Color, val spoiler: Color, val codeBackground: Color) {
+private data class BodyColors(val repliedUser: Color, val other: Color, val alternate: Color, val link: Color, val spoiler: Color, val codeBackground: Color) {
     fun quote(kind: QuoteKind): Color = when (kind) {
         QuoteKind.REPLIED_USER -> repliedUser
         QuoteKind.OTHER -> other
@@ -93,10 +95,9 @@ fun PostBodyView(
 ) {
     val colors = bodyColors()
     val marks = highlight?.let { it.query to it.style() }
-    // Spoilers are numbered in body order; this holds the revealed ones.
-    val revealed = remember(body) { mutableStateListOf<Int>() }
-    val reveal: (Int) -> Unit = { if (it !in revealed) revealed += it }
-    val counter = SpoilerCounter()
+    // The revealed spoilers, by their index in the body.
+    val revealed = remember(body) { mutableStateOf(emptySet<Int>()) }
+    val reveal: (Int) -> Unit = remember(revealed) { { revealed.value += it } }
     val boxedQuotes = LocalAppStyle.current.layout.quotes == Quotes.BOXED
     // A quote's blocks are drawn inside it; boxed quotes box a whole quote once, not each paragraph in it.
     @Composable
@@ -112,7 +113,7 @@ fun PostBodyView(
                         color = colors.repliedUser,
                     )
                     is Block.Paragraph -> {
-                        val text = annotate(block.inlines, colors, onLink, revealed, reveal, counter, marks)
+                        val text = rememberAnnotated(block.inlines, colors, onLink, revealed.value, reveal, marks)
                         val quote = if (boxedQuotes && !inQuote) wholeQuote(block.inlines) else null
                         if (quote == null) {
                             Text(text, style = textStyle)
@@ -143,7 +144,7 @@ fun PostBodyView(
                                         val marker = if (list.ordered) "${i + 1}." else BULLETS[depth % BULLETS.size]
                                         if (item.inlines.isEmpty()) Box(Modifier.width(16.dp)) else Text(marker, style = textStyle)
                                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            if (item.inlines.isNotEmpty()) Text(annotate(item.inlines, colors, onLink, revealed, reveal, counter, marks), style = textStyle)
+                                            if (item.inlines.isNotEmpty()) Text(rememberAnnotated(item.inlines, colors, onLink, revealed.value, reveal, marks), style = textStyle)
                                             item.sublists.forEach { ListView(it, depth + 1) }
                                         }
                                     }
@@ -175,7 +176,7 @@ fun PostBodyView(
                     Block.Rule -> HorizontalDivider(Modifier.padding(vertical = 4.dp))
                     is Block.Table -> TableView(block) { cell ->
                         Text(
-                            annotate(cell.inlines, colors, onLink, revealed, reveal, counter, marks),
+                            rememberAnnotated(cell.inlines, colors, onLink, revealed.value, reveal, marks),
                             style = textStyle,
                             textAlign = when (cell.align) {
                                 CellAlign.START -> TextAlign.Start
@@ -264,18 +265,28 @@ fun highlighted(text: String, marks: Pair<TextQuery, SpanStyle>?): AnnotatedStri
     marks?.let { (query, style) -> query.ranges(text).forEach { addStyle(style, it.first, it.last + 1) } }
 }
 
-/** Numbers spoilers in the order they are rendered, so reveal state survives recomposition. */
-private class SpoilerCounter {
-    var next = 0
+/** [annotate], rebuilt only when the inlines, the revealed spoilers, the find marks or the colours change. */
+@Composable
+private fun rememberAnnotated(
+    inlines: List<Inline>,
+    colors: BodyColors,
+    onLink: (String) -> Unit,
+    revealed: Set<Int>,
+    reveal: (Int) -> Unit,
+    marks: Pair<TextQuery, SpanStyle>?,
+): AnnotatedString {
+    val currentOnLink by rememberUpdatedState(onLink)
+    return remember(inlines, colors, revealed, reveal, marks) {
+        annotate(inlines, colors, { currentOnLink(it) }, revealed, reveal, marks)
+    }
 }
 
 private fun annotate(
     inlines: List<Inline>,
     colors: BodyColors,
     onLink: (String) -> Unit,
-    revealed: List<Int>,
+    revealed: Set<Int>,
     reveal: (Int) -> Unit,
-    counter: SpoilerCounter,
     marks: Pair<TextQuery, SpanStyle>?,
 ): AnnotatedString = buildAnnotatedString {
     // Spoiler text, revealed or not, is never marked: a mark over hidden text would show where the word is.
@@ -296,7 +307,7 @@ private fun annotate(
                 }
                 is Inline.Spoiler -> {
                     val from = length
-                    val index = counter.next++
+                    val index = inline.index
                     if (index in revealed) {
                         append(inline.inlines, hidden)
                     } else {

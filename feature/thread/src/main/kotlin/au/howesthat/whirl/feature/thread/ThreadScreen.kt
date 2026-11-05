@@ -74,6 +74,7 @@ import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.Post
 import au.howesthat.whirl.core.model.PostFilter
+import au.howesthat.whirl.core.ui.rememberNow
 import au.howesthat.whirl.core.ui.ActionsMenu
 import au.howesthat.whirl.core.ui.ErrorState
 import au.howesthat.whirl.core.ui.LocalAppStyle
@@ -101,7 +102,6 @@ import au.howesthat.whirl.core.ui.timeAgo
 import au.howesthat.whirl.core.ui.topBarSubtleColor
 import au.howesthat.whirl.core.ui.whirlTopBarColors
 import kotlinx.coroutines.launch
-import java.time.Instant
 
 /** The Scaffold already pads for the sides (display cutout in landscape); the bars add only the status bar. */
 private val TopBarInsets: WindowInsets
@@ -142,7 +142,8 @@ fun ThreadScreen(
                 is ThreadEvent.OpenForum -> nav.openForum(event.forum)
                 is ThreadEvent.OpenUser -> nav.openUser(event.userId)
                 is ThreadEvent.Browser -> browser(event.url)
-                is ThreadEvent.Failed -> snackbar.showSnackbar(failedText)
+                // Launched: showSnackbar suspends until the snackbar goes, which would hold back the next event.
+                is ThreadEvent.Failed -> launch { snackbar.showSnackbar(failedText) }
                 ThreadEvent.Back -> nav.back()
             }
         }
@@ -396,7 +397,7 @@ private fun PostList(
     val filter by viewModel.filter.collectAsStateWithLifecycle()
     // With "Mark as read when opened" the thread was marked as it opened: nothing left for the button to do.
     val autoMarkRead = viewModel.settings.collectAsStateWithLifecycle().value.watchedAutoMarkAsRead
-    val now = Instant.now()
+    val now = rememberNow()
     LazyColumn(Modifier.fillMaxSize(), state = list) {
         item(key = "updated") {
             Column {

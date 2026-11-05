@@ -135,4 +135,17 @@ class TopLevelBackStackTest {
         assertEquals(null, s.above(UserRoute(1)))
         assertEquals(null, s.listBelow(ForumsRoute, isList))
     }
+
+    @Test
+    fun `the drawer highlights the stack on screen, or Settings and About when they are on top`() {
+        val s = stack()
+        s.select(WatchedRoute)
+        s.push(ThreadRoute("3pxj858k"))
+        assertEquals(WatchedRoute::class, selectedEntry(s.visible.last(), s.current), "a thread opened from Watched")
+        s.push(SettingsRoute)
+        assertEquals(SettingsRoute::class, selectedEntry(s.visible.last(), s.current))
+        s.pop()
+        s.pop()
+        assertEquals(WatchedRoute::class, selectedEntry(s.visible.last(), s.current))
+    }
 }

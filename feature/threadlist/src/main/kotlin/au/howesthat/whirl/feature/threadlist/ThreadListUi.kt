@@ -25,6 +25,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -49,6 +50,7 @@ import au.howesthat.whirl.core.data.WatchAction
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.RowKind
 import au.howesthat.whirl.core.model.ThreadId
+import au.howesthat.whirl.core.ui.rememberNow
 import au.howesthat.whirl.core.ui.ActionsMenu
 import au.howesthat.whirl.core.ui.EmptyState
 import au.howesthat.whirl.core.ui.LocalAppStyle
@@ -63,6 +65,7 @@ import au.howesthat.whirl.core.ui.errorMessage
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 import au.howesthat.whirl.core.ui.timeAgo
 import au.howesthat.whirl.core.ui.topBarSubtleColor
+import kotlinx.coroutines.launch
 import java.time.Instant
 
 /** Navigation out of a thread list, implemented by the app's NavHost. */
@@ -121,9 +124,10 @@ fun ThreadListBody(
     /** "Nothing here matches “%1\$s”", or a forum page's "on this page". */
     @StringRes findNoneText: Int = au.howesthat.whirl.core.ui.R.string.find_none,
 ) {
-    val launch = rememberThreadLauncher(nav)
+    val openThread = rememberThreadLauncher(nav)
+    val scope = rememberCoroutineScope()
     val browser = rememberOpenInBrowser()
-    val now = Instant.now()
+    val now = rememberNow()
     // Read so rows recompose when a watch action changes what they offer.
     val watchedIds by viewModel.watchedIds.collectAsStateWithLifecycle()
     val selected = LocalSelectedThread.current
@@ -169,8 +173,8 @@ fun ThreadListBody(
                             ThreadRowItem(
                                 item = item,
                                 now = now,
-                                onOpen = { launch(viewModel.open(item)) },
-                                onLastPost = { launch(viewModel.lastPost(item)) },
+                                onOpen = { scope.launch { openThread(viewModel.open(item)) } },
+                                onLastPost = { scope.launch { openThread(viewModel.lastPost(item)) } },
                                 onOpenInBrowser = { browser(viewModel.browserUrl(item)) },
                                 onOpenForum = item.forum?.takeIf { showForum }?.let { forum -> { nav.openForum(forum.copy(groupId = null)) } },
                                 watchActions = remember(item, watchedIds) { viewModel.watchActions(item) },
@@ -324,4 +328,4 @@ fun ListTitle(title: String, updatedAt: Instant?, subtitle: String? = null) {
 }
 
 @Composable
-private fun timeAgoUpdated(at: Instant): String = stringResource(R.string.updated_ago, timeAgo(at, Instant.now()))
+private fun timeAgoUpdated(at: Instant): String = stringResource(R.string.updated_ago, timeAgo(at, rememberNow()))

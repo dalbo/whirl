@@ -230,8 +230,9 @@ class ThreadViewModel @AssistedInject constructor(
      */
     fun perform(action: WatchAction) {
         viewModelScope.launch {
-            watchedRepo.perform(action, listOf(threadId), undoable = settingsRepo.settings.first().watchUndo, announce = true)
-            if (action == WatchAction.MARK_READ && route.fromWatched && settings.value.watchedBackToList) events.send(ThreadEvent.Back)
+            val current = settingsRepo.settings.first()
+            watchedRepo.perform(action, listOf(threadId), undoable = current.watchUndo, announce = true)
+            if (action == WatchAction.MARK_READ && route.fromWatched && current.watchedBackToList) events.send(ThreadEvent.Back)
         }
     }
 

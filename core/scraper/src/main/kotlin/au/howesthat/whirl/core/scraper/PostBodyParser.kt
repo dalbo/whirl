@@ -27,7 +27,27 @@ object PostBodyParser {
         val out = Builder()
         blocks(root, out, Style())
         out.flush()
-        return PostBody(out.blocks)
+        return PostBody(numberSpoilers(out.blocks))
+    }
+
+    /** Gives each spoiler its index in body order (block by block; list items before their sublists; cells by row). */
+    private fun numberSpoilers(blocks: List<Block>): List<Block> {
+        var next = 0
+        fun inlines(list: List<Inline>): List<Inline> = list.map { inline ->
+            if (inline is Inline.Spoiler) Inline.Spoiler(inlines(inline.inlines), index = next++) else inline
+        }
+        fun list(block: Block.ListBlock): Block.ListBlock =
+            block.copy(items = block.items.map { item -> ListItem(inlines(item.inlines), item.sublists.map(::list)) })
+        fun blocks(list: List<Block>): List<Block> = list.map { block ->
+            when (block) {
+                is Block.Paragraph -> Block.Paragraph(inlines(block.inlines))
+                is Block.Quote -> block.copy(blocks = blocks(block.blocks))
+                is Block.ListBlock -> list(block)
+                is Block.Table -> Block.Table(block.rows.map { row -> row.map { it.copy(inlines = inlines(it.inlines)) } })
+                is Block.QuoteAttribution, is Block.Code, is Block.Image, Block.Rule -> block
+            }
+        }
+        return blocks(blocks)
     }
 
     private class Builder {

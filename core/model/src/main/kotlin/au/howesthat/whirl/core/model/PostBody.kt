@@ -32,8 +32,11 @@ sealed interface Inline {
     data class Text(val text: String, val style: Style = Style()) : Inline
     data class Link(val href: String, val text: String, val style: Style = Style()) : Inline
     data object LineBreak : Inline
-    /** `span.wcspoil`: hidden until tapped. */
-    data class Spoiler(val inlines: List<Inline>) : Inline
+    /**
+     * `span.wcspoil`: hidden until tapped. [index] numbers the spoilers of a body (the parser numbers them in body
+     * order), so the view knows which one was revealed however it composes them.
+     */
+    data class Spoiler(val inlines: List<Inline>, val index: Int = 0) : Inline
 }
 
 data class Style(

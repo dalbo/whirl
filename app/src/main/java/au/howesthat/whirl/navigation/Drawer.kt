@@ -50,6 +50,12 @@ private val SECONDARY = listOf(
     DrawerEntry(AboutRoute, R.string.nav_about, Icons.Default.Info),
 )
 
+/**
+ * The drawer entry to highlight: the screen on top when it is one (Settings, About), otherwise the drawer destination
+ * whose stack is on screen ([current]), so a thread opened from Watched keeps Watched highlighted.
+ */
+fun selectedEntry(top: NavKey, current: NavKey): KClass<*> = if (SECONDARY.any { it.route == top }) top::class else current::class
+
 @Composable
 fun DrawerContent(account: Account?, alert: String, isSelected: (KClass<*>) -> Boolean, onSelect: (DrawerEntry) -> Unit) {
     ModalDrawerSheet {

@@ -247,7 +247,7 @@ fun WhirlApp(
                 DrawerContent(
                     account = account,
                     alert = alert,
-                    isSelected = { route -> top::class == route },
+                    isSelected = { route -> selectedEntry(top, backStack.current) == route },
                     onSelect = { entry ->
                         scope.launch { drawerState.close() }
                         // Settings and About push on top; drawer destinations switch stacks.

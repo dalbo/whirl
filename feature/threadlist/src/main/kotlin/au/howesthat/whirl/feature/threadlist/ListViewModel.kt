@@ -95,17 +95,19 @@ abstract class ListViewModel(private val deps: ListDeps, private val from: Opene
         job.invokeOnCompletion { if (refreshJob === job) _refreshing.value = false }
     }
 
-    fun open(item: ThreadItem): OpenThread? {
+    /** How to open [item]; waits for the settings on the first tap after launch, so it never decides on the defaults. */
+    suspend fun open(item: ThreadItem): OpenThread? {
         val id = item.openId ?: return null
         val forumId = item.forum?.id
+        val current = deps.settings.settings.first()
         // 2.14.12 "auto mark as read": opening a watched thread from Watched marks it read, with no Undo. Not only when
         // the cached row shows unread posts: the list can be minutes old, and reading in Whirl does not move
         // Whirlpool's read position (no web session), so a thread opened on a stale "0" stayed unread on the site.
         // Threads opened from other lists or links are marked by the thread screen.
-        if (from == OpenedFrom.WATCHED && settings.value.watchedAutoMarkAsRead) {
+        if (from == OpenedFrom.WATCHED && current.watchedAutoMarkAsRead) {
             viewModelScope.launch { deps.watched.perform(WatchAction.MARK_READ, listOf(id), undoable = false) }
         }
-        return opener.open(id, forumId, forumId in privateIds.value, from, settings.value, item.watched)
+        return opener.open(id, forumId, forumId in privateIds.value, from, current, item.watched)
     }
 
     /** The watch actions a row's menu offers. */
@@ -124,10 +126,10 @@ abstract class ListViewModel(private val deps: ListDeps, private val from: Opene
         viewModelScope.launch { deps.watched.perform(action, listOf(id), undoable = deps.settings.settings.first().watchUndo, announce = true) }
     }
 
-    fun lastPost(item: ThreadItem): OpenThread? {
+    suspend fun lastPost(item: ThreadItem): OpenThread? {
         val id = item.openId ?: return null
         val forumId = item.forum?.id
-        return opener.lastPost(id, forumId, forumId in privateIds.value, settings.value)
+        return opener.lastPost(id, forumId, forumId in privateIds.value, deps.settings.settings.first())
     }
 
     fun browserUrl(item: ThreadItem): String = opener.browserUrl(item.openId ?: item.id)

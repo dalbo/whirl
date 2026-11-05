@@ -67,7 +67,7 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, onCheckHistory: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val loaded by viewModel.settings.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val layouts = remember(context) { Styles.layouts(context) }
     val palettes = remember(context) { Styles.palettes(context) }
@@ -85,6 +85,8 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, onCheckHistory: 
             )
         },
     ) { padding ->
+        // Shown once read from disk (a moment): toggles drawn from the defaults would act on the wrong values.
+        val settings = loaded ?: return@Scaffold
         Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {
             Group(stringResource(R.string.settings_account)) {
                 account?.let { SettingRow(stringResource(R.string.settings_logged_in_as, it.userName, it.userId)) }

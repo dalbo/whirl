@@ -13,6 +13,11 @@ class TextQuery(text: String?) {
 
     val isBlank: Boolean get() = words.isEmpty()
 
+    /** Equal when the words are: the same search typed again. */
+    override fun equals(other: Any?): Boolean = other is TextQuery && other.words == words
+
+    override fun hashCode(): Int = words.hashCode()
+
     fun matches(vararg fields: String?): Boolean {
         if (words.isEmpty()) return true
         val haystack = fields.mapNotNull { it?.let { f -> Folded(f).text } }
