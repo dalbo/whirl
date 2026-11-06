@@ -1,0 +1,4 @@
+Whirl 1.7.1
+- Watched-thread notifications arrive on time while the phone is idle, instead of when you next pick it up
+- Watched › All opens at the top again
+- New searches and search pages, forum groups and Recent's days start at the top of the list

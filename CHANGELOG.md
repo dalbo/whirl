@@ -2,6 +2,12 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.7.1
+Watched-thread notifications on time, and lists that start at the top.
+- Watched-thread notifications arrive close to the interval you chose, even while the phone sits idle. Android's Doze used to hold the check back for an hour or more, so a notification often turned up only when you picked the phone up or opened Whirl. The check is now started by an alarm Android lets through Doze, with the old schedule kept as a backup.
+- Watched › All opens at the top again, instead of partway down where the Unread tab was.
+- A new search, a search's next or previous page, another group of a forum, and another number of days in Recent all start at the top of the list.
+
 ## v1.7.0
 Fixes and speed-ups, before the archive reader in v1.8.
 - Watched threads with new posts open with the first unread post at the top of the screen, just under the "New posts" line, as asked for by a tester (it used to be a little further down). When the last post you read ended a page, the thread opens on the next page.

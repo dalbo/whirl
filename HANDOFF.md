@@ -9,7 +9,7 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 |---|---|
 | `PLAN.md` | Target features (from Whirldroid 2.14.12), verified Whirlpool behaviour, architecture, decisions (§5) |
 | `docs/plans/` | The plans since v1.3 (`v1.3.md` also covers v1.4; v1.5 had none) |
-| `docs/history.md` | How each phase and release was built and what it decided, up to v1.7 |
+| `docs/history.md` | How each phase and release was built and what it decided, up to v1.7.1 |
 | `fixtures/api/`, `fixtures/html/` | Real API responses and **raw** pages (no key inside); `fixtures/README.md` |
 | `tools/capture/` | Headed Playwright captures, the only way past Cloudflare from this machine |
 | `docs/device-checklist.md` | The phone pass before each release |
