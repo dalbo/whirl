@@ -29,6 +29,8 @@ import au.howesthat.whirl.core.network.WhirlpoolHttp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -357,6 +359,13 @@ class WatchedNotifierTest {
         assertEquals(1, history.records.first().size)
         assertEquals(firstCheck.plusSeconds(240 * 60), alarm.next())
 
+        // The alarm's run and an overdue fallback run starting together: the second waits, then is skipped.
+        clock.advanceMinutes(240)
+        enqueue(unreadTwo)
+        enqueue(unreadTwo)
+        listOf(async(Dispatchers.Default) { worker().doWork() }, async(Dispatchers.Default) { worker().doWork() }).awaitAll()
+        assertEquals(2, history.records.first().size, "one check, not two")
+
         clock.advanceMinutes(240)
         server.close()
         assertIs<ListenableWorker.Result.Retry>(worker().doWork())
@@ -364,8 +373,8 @@ class WatchedNotifierTest {
 
         // Newest first.
         val records = history.records.first()
-        assertEquals(listOf(CheckResult.NETWORK, CheckResult.NETWORK, CheckResult.OK), records.map { it.outcome.result })
-        assertEquals(listOf(3, 0, 0), records.map { it.attempt })
+        assertEquals(listOf(CheckResult.NETWORK, CheckResult.NETWORK, CheckResult.OK, CheckResult.OK), records.map { it.outcome.result })
+        assertEquals(listOf(3, 0, 0, 0), records.map { it.attempt })
         assertEquals(CheckOutcome(CheckResult.OK, unreadThreads = 2, newThreads = 2), records.last().outcome)
         assertEquals("Network", records.first().outcome.detail)
         assertEquals(240, records.first().intervalMinutes)

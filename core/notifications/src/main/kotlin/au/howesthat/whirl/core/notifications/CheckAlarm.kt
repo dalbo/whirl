@@ -16,6 +16,7 @@ import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import au.howesthat.whirl.core.database.CheckLogDao
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.sync.Mutex
 import java.time.Clock
 import java.time.Instant
 import java.util.concurrent.TimeUnit
@@ -41,6 +42,9 @@ class CheckAlarm @Inject constructor(
 ) {
     private val alarms = context.getSystemService(AlarmManager::class.java)
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    /** Held for each check, from the [tooSoon] test to its record, so two that fall due together run one after the other. */
+    val checking = Mutex()
 
     /** The last check's start, in epoch milliseconds. */
     suspend fun lastCheck(): Long? = log.latestStartedAt()

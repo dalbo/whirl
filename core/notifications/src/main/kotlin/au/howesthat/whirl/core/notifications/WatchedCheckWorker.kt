@@ -12,6 +12,7 @@ import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -29,7 +30,13 @@ class WatchedCheckWorker @AssistedInject constructor(
     private val settings: SettingsRepository,
 ) : CoroutineWorker(context, params) {
 
-    override suspend fun doWork(): Result {
+    /**
+     * One check at a time: an alarm briefly lifts Doze for the whole app, so an overdue fallback run starts alongside
+     * the alarm's, and each would see no recent check unless the second waits for the first to record its own.
+     */
+    override suspend fun doWork(): Result = alarm.checking.withLock { checkOrSkip() }
+
+    private suspend fun checkOrSkip(): Result {
         val started = history.now()
         val s = settings.settings.first()
         // Retries are never skipped: their failed attempt is the last check.
