@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -123,7 +125,14 @@ fun ThreadListBody(
     findEmptyAction: (@Composable () -> Unit)? = null,
     /** "Nothing here matches “%1\$s”", or a forum page's "on this page". */
     @StringRes findNoneText: Int = au.howesthat.whirl.core.ui.R.string.find_none,
+    /**
+     * Which list this is ([ListState.listKey]). Row keys are the same in every list (a forum's heading, a thread), so
+     * one scroll state shared by two lists would keep the first list's top row in view in the second; a new key starts
+     * at the top instead.
+     */
+    listKey: Any? = null,
 ) {
+    val listState = rememberSaveable(listKey, saver = LazyListState.Saver) { LazyListState() }
     val openThread = rememberThreadLauncher(nav)
     val scope = rememberCoroutineScope()
     val browser = rememberOpenInBrowser()
@@ -139,7 +148,7 @@ fun ThreadListBody(
                 modifier = Modifier.fillMaxWidth(),
                 onOpenInBrowser = browserUrl?.let { url -> { browser(url) } },
             )
-            else -> LazyColumn(Modifier.fillMaxSize()) {
+            else -> LazyColumn(Modifier.fillMaxSize(), state = listState) {
                 header?.invoke(this)
                 if (error != null) {
                     item(key = "error") {
@@ -184,7 +193,8 @@ fun ThreadListBody(
                         }
                     }
                 }
-                footer?.invoke(this)
+                // Not while the list loads: alone in the list, the footer would be the row a new list keeps in view.
+                if (sections != null) footer?.invoke(this)
             }
         }
     }

@@ -31,8 +31,11 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.Instant
 
-/** Sections plus when they were fetched (null = never). */
-data class ListState(val sections: List<Section>?, val updatedAt: Instant?)
+/**
+ * Sections plus when they were fetched (null = never). [listKey] names which list this is when one screen shows several
+ * in turn (Watched's Unread and All): a new key starts the list at the top.
+ */
+data class ListState(val sections: List<Section>?, val updatedAt: Instant?, val listKey: Any? = null)
 
 internal fun <T> Flow<Cached<T>?>.toListState(sections: (T) -> List<Section>): Flow<ListState> =
     map { cached -> ListState(cached?.takeIf { it.updatedAt != null }?.value?.let(sections), cached?.updatedAt) }
@@ -100,6 +103,7 @@ fun ThreadListScaffold(
             header = header,
             findQuery = findQuery,
             findEmptyAction = findEmptyAction,
+            listKey = state.listKey,
         )
     }
 }
