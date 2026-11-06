@@ -41,8 +41,8 @@ class CheckHistoryViewModel @Inject constructor(
             records = records,
             scheduled = work != null,
             intervalMinutes = s.notifyIntervalMinutes,
-            // Long.MAX_VALUE while it waits on a constraint (no network) rather than a time.
-            nextRun = work?.nextScheduleTimeMillis?.takeIf { it != Long.MAX_VALUE }?.let(Instant::ofEpochMilli),
+            // The alarm, else the fallback work's time: Long.MAX_VALUE while it waits on a constraint (no network).
+            nextRun = history.nextAlarm() ?: work?.nextScheduleTimeMillis?.takeIf { it != Long.MAX_VALUE }?.let(Instant::ofEpochMilli),
             lastStop = work?.let { stopReasonName(it.stopReason) },
             device = history.device(),
         )

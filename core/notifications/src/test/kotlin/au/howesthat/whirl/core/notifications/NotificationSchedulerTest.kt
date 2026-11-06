@@ -34,6 +34,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import au.howesthat.whirl.core.data.WatchedStore
 import au.howesthat.whirl.core.data.WatchQueue
@@ -50,7 +51,8 @@ class NotificationSchedulerTest {
     private val store = WatchedStore(db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), clock)
     private val watched = WatchedRepository(api, store)
     private val notifier = WatchedNotifier(context, settings, watched, WatchQueue(api, store, watched, WatchSendScheduler.None, Dispatchers.Default, appScope), db.notifiedDao())
-    private val scheduler = NotificationScheduler(context, settings, notifier, appScope)
+    private val alarm = CheckAlarm(context, db.checkLogDao(), clock)
+    private val scheduler = NotificationScheduler(context, settings, notifier, alarm, appScope)
 
     @Before
     fun setUp() = WorkManagerTestInitHelper.initializeTestWorkManager(context)
@@ -64,8 +66,9 @@ class NotificationSchedulerTest {
     private fun work(): List<WorkInfo> = WorkManager.getInstance(context).getWorkInfosForUniqueWork(NotificationScheduler.WORK_NAME).get()
 
     @Test
-    fun `scheduled at the interval, never under 15 minutes, and cancelled`() {
+    fun `scheduled at the interval, never under 15 minutes, and cancelled`() = runTest {
         scheduler.apply(60)
+        assertEquals(clock.instant().plusSeconds(60 * 60), alarm.next(), "the alarm too")
         val info = work().single()
         assertEquals(WorkInfo.State.ENQUEUED, info.state)
         assertEquals(TimeUnit.MINUTES.toMillis(60), info.periodicityInfo!!.repeatIntervalMillis)
@@ -82,6 +85,7 @@ class NotificationSchedulerTest {
 
         scheduler.apply(null)
         assertTrue(work().all { it.state == WorkInfo.State.CANCELLED })
+        assertNull(alarm.next())
     }
 
     @Test
