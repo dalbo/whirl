@@ -63,7 +63,7 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 | `:core:database` | Room **v6**, schemas in `core/database/schemas/` |
 | `:core:data` | Repositories, `SettingsRepository` (DataStore), `Refresher`, `WatchedRepository` + `WatchQueue`, dispatchers |
 | `:core:ui` | Theme, styles, `PostBodyView`, find bar, `ListScreenState`, `ListPaneRoute` |
-| `:core:notifications` | Watched-thread check (WorkManager), `WatchedNotifier`, notification buttons |
+| `:core:notifications` | Watched-thread check (`CheckAlarm` during Doze, WorkManager fallback), `WatchedNotifier`, notification buttons |
 | `:feature:*` | `setup`, `settings`, `threadlist` (all thread lists, search), `forums`, `thread`, `news`, `user`; each owns its routes |
 | `:app` | Hilt, `MainActivity` (setup until `setupDone`), Navigation 3 (`TopLevelBackStack`, `WhirlApp`), snackbars |
 
