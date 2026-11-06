@@ -29,6 +29,8 @@ import au.howesthat.whirl.core.network.WhirlpoolHttp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -332,12 +334,15 @@ class WatchedNotifierTest {
     }
 
     @Test
-    fun `the worker retries network failures, gives up on the rest, and records every run`() = runTest {
-        val history = CheckHistory(context, db.checkLogDao(), settings, Clock.systemUTC())
+    fun `the worker retries network failures, gives up on the rest, records every run and sets the alarm`() = runTest {
+        val clock = TestClock()
+        val alarm = CheckAlarm(context, db.checkLogDao(), clock)
+        val history = CheckHistory(context, db.checkLogDao(), settings, clock, alarm)
+        settings.setSetupDone()
         settings.update { it.copy(notifyIntervalMinutes = 240) }
         val factory = object : WorkerFactory() {
             override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters) =
-                WatchedCheckWorker(appContext, workerParameters, notifier, history)
+                WatchedCheckWorker(appContext, workerParameters, notifier, history, alarm, settings)
         }
         // WorkManager counts a scheduled run as attempt 0; the test builder starts at 1 unless told.
         fun worker(attempt: Int = 0) = TestListenableWorkerBuilder<WatchedCheckWorker>(context).setWorkerFactory(factory).setRunAttemptCount(attempt).build()
@@ -345,18 +350,41 @@ class WatchedNotifierTest {
         val ok = worker().doWork()
         assertIs<ListenableWorker.Result.Success>(ok)
         assertNotNull(shown())
+        val firstCheck = clock.now
+        assertEquals(firstCheck.plusSeconds(240 * 60), alarm.next(), "the alarm, an interval after the check")
 
+        // The fallback falling due just after the alarm's check: skipped, not recorded, and the alarm stays.
+        clock.advanceMinutes(3)
+        assertIs<ListenableWorker.Result.Success>(worker().doWork())
+        assertEquals(1, history.records.first().size)
+        assertEquals(firstCheck.plusSeconds(240 * 60), alarm.next())
+
+        // The alarm's run and an overdue fallback run starting together: the second waits, then is skipped.
+        clock.advanceMinutes(240)
+        enqueue(unreadTwo)
+        enqueue(unreadTwo)
+        listOf(async(Dispatchers.Default) { worker().doWork() }, async(Dispatchers.Default) { worker().doWork() }).awaitAll()
+        assertEquals(2, history.records.first().size, "one check, not two")
+
+        clock.advanceMinutes(240)
         server.close()
         assertIs<ListenableWorker.Result.Retry>(worker().doWork())
         assertIs<ListenableWorker.Result.Success>(worker(attempt = 3).doWork(), "the next period tries again")
 
         // Newest first.
         val records = history.records.first()
-        assertEquals(listOf(CheckResult.NETWORK, CheckResult.NETWORK, CheckResult.OK), records.map { it.outcome.result })
-        assertEquals(listOf(3, 0, 0), records.map { it.attempt })
+        assertEquals(listOf(CheckResult.NETWORK, CheckResult.NETWORK, CheckResult.OK, CheckResult.OK), records.map { it.outcome.result })
+        assertEquals(listOf(3, 0, 0, 0), records.map { it.attempt })
         assertEquals(CheckOutcome(CheckResult.OK, unreadThreads = 2, newThreads = 2), records.last().outcome)
         assertEquals("Network", records.first().outcome.detail)
         assertEquals(240, records.first().intervalMinutes)
+        assertEquals(clock.now.plusSeconds(240 * 60), alarm.next(), "from the retry, the last check")
+
+        settings.update { it.copy(watchedNotify = false) }
+        alarm.cancel()
+        clock.advanceMinutes(240)
+        worker().doWork()
+        assertNull(alarm.next(), "not set again once the alerts are off")
     }
 
     @Test
@@ -371,7 +399,7 @@ class WatchedNotifierTest {
 
     @Test
     fun `the history keeps the most recent checks`() = runTest {
-        val history = CheckHistory(context, db.checkLogDao(), settings, Clock.systemUTC())
+        val history = CheckHistory(context, db.checkLogDao(), settings, Clock.systemUTC(), CheckAlarm(context, db.checkLogDao(), Clock.systemUTC()))
         repeat(CheckHistory.KEEP + 5) { i -> history.record(Instant.ofEpochSecond(i * 3600L), attempt = 0, CheckOutcome(CheckResult.OK, unreadThreads = i)) }
         val records = history.records.first()
         assertEquals(CheckHistory.KEEP, records.size)

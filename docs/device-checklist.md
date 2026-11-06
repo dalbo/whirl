@@ -33,8 +33,8 @@ Run on a real phone before tagging a release (PLAN.md §8). Debug builds install
 - [ ] With unread watched threads, a check posts one notification (title, "N new replies in M threads" or the thread's title, inbox lines, Mark read / Unwatch). Tapping opens Watched.
 - [ ] The same replies do not alert again; a new reply does. Nothing unread cancels it.
 - [ ] Mark read / Unwatch buttons remove the notification and update Watched.
-- [ ] Dozing: app in the background, screen off, `adb shell dumpsys deviceidle force-idle`; the check is deferred and runs in the next maintenance window (`dumpsys deviceidle step`), WorkManager's periodic run survives a reboot.
-- [ ] Changing the interval keeps one scheduled job (`dumpsys jobscheduler | grep WatchedCheckWorker`).
+- [ ] Dozing (v1.7.1): app in the background, screen off, `adb shell dumpsys deviceidle force-idle deep`; the alarm still starts a check about one interval after the last (`dumpsys batterystats --history | grep WatchedCheckWorker` shows an expedited `*job*e/` run while `device_idle=full`), and only one check runs. `dumpsys deviceidle unforce` afterwards. After a reboot the fallback's first run sets the alarm again.
+- [ ] Changing the interval keeps one scheduled job and one alarm (`dumpsys jobscheduler | grep WatchedCheckWorker`, `dumpsys alarm | grep CHECK_WATCHED`).
 
 **Other**
 - [ ] Forum overflow → New thread in browser opens the new-thread form (logged in to Whirlpool in the browser).

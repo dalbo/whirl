@@ -124,7 +124,7 @@ From 1.8.12 and 2.14.12 code:
 - Thread view loads `/thread/<id>?p=N`, reads the inline vars for page count/current page, parses posts, caches the page; page spinner and swipe use `thread_pages`; "last page" uses `?p=-1`; watched threads open at `LASTPAGE` and scroll to `((LASTREAD − 1) % 20)`.
 - Unread state: watched lists use `WATCHED.UNREAD` (int); forum lists may overlay `THREADS.UNREAD` (bool) for the first 100 threads of that forum via `get=threads&forumids=&threadcount=100`; scraped rows are always `.read` because there is no web session, so never derive unread from HTML.
 - Private forums (1, 35, 85, 134 or any page returning "Not signed in"): list via `get=threads`, open in Custom Tabs.
-- Notifications: WorkManager periodic (≥15 min), `POST_NOTIFICATIONS` runtime permission, one channel for watched threads, actions Mark read / Unwatch via API, de-dup on `(thread_id, LAST_DATE)`.
+- Notifications: an allow-while-idle alarm each interval (≥15 min) starts the check as expedited work, because Doze holds periodic work until its next maintenance window (an hour or more); WorkManager periodic work stays as the fallback (re-armed after a reboot), `POST_NOTIFICATIONS` runtime permission, one channel for watched threads, actions Mark read / Unwatch via API, de-dup on `(thread_id, LAST_DATE)`.
 - Links in posts: `/thread/`, `/archive/`, `/forum/`, `/user/`, `whrl.pl` short codes (resolve by following the redirect) handled in-app; everything else via Custom Tabs.
 
 **Secrets**: API key in Preferences DataStore, excluded from Auto Backup (`EncryptedSharedPreferences` is deprecated). Never logged.

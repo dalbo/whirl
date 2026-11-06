@@ -285,6 +285,10 @@ interface CheckLogDao {
     @Query("SELECT * FROM check_log ORDER BY started_at DESC, id DESC")
     fun observe(): Flow<List<CheckLogEntity>>
 
+    /** When the most recent check started (epoch milliseconds), or null before the first. */
+    @Query("SELECT MAX(started_at) FROM check_log")
+    suspend fun latestStartedAt(): Long?
+
     @Insert
     suspend fun insert(entry: CheckLogEntity)
 
