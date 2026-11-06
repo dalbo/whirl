@@ -193,7 +193,8 @@ fun ThreadListBody(
                         }
                     }
                 }
-                footer?.invoke(this)
+                // Not while the list loads: alone in the list, the footer would be the row a new list keeps in view.
+                if (sections != null) footer?.invoke(this)
             }
         }
     }

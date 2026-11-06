@@ -1,11 +1,16 @@
 package au.howesthat.whirl.feature.threadlist
 
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollToNode
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelProvider
@@ -94,28 +99,63 @@ class ThreadListScrollTest {
         // All: twelve forums of four threads, far taller than the screen. Unread: one thread in the last forum.
         val all = forums.map { f -> Section(f, (1..4).map { thread("t${f.id}x$it", f) }) }
         val unread = listOf(Section(forums.last(), listOf(thread("t12x1", forums.last()))))
-        val viewModel = ViewModelProvider.create(viewModels, viewModelFactory { initializer { Plain(deps) } })["list", Plain::class]
 
         var state by mutableStateOf(ListState(unread, clock.instant(), listKey = "unread"))
-        compose.setContent {
-            WhirlTheme(darkTheme = false) {
-                ThreadListBody(
-                    sections = state.sections,
-                    refreshing = false,
-                    error = null,
-                    onRefresh = {},
-                    viewModel = viewModel,
-                    nav = nav,
-                    emptyText = "",
-                    listKey = state.listKey,
-                )
-            }
-        }
+        show { state }
         compose.onNodeWithText("Thread t12x1").assertIsDisplayed()
 
         // The same forum heading and thread are in All: the list must not stay on them.
         state = ListState(all, clock.instant(), listKey = "all")
         compose.onNodeWithText("Forum 1").assertIsDisplayed()
         compose.onNodeWithText("Thread t1x1").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the next page of results starts at the top, not at the page buttons`() {
+        val forum = ForumRef(1, "Forum 1")
+        fun page(n: Int) = listOf(Section(forum, (1..40).map { thread("p${n}x$it", forum) }))
+        var state by mutableStateOf(ListState(page(1), clock.instant(), listKey = 1))
+        show(footer = { item(key = "pages") { Text("Next page") } }) { state }
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Next page"))
+        compose.onNodeWithText("Next page").assertIsDisplayed()
+
+        // Search's Next: the new page loads (nothing cached), then arrives.
+        state = ListState(null, null, listKey = 2)
+        compose.waitForIdle()
+        state = ListState(page(2), clock.instant(), listKey = 2)
+        compose.onNodeWithText("Thread p2x1").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a refresh of the same list keeps its place`() {
+        val forum = ForumRef(1, "Forum 1")
+        val threads = (1..40).map { thread("r$it", forum) }
+        var state by mutableStateOf(ListState(listOf(Section(forum, threads)), clock.instant(), listKey = "all"))
+        show { state }
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Thread r30"))
+
+        // A new reply moves r40 to the top; the list stays where it was.
+        state = ListState(listOf(Section(forum, listOf(threads.last()) + threads.dropLast(1))), clock.instant(), listKey = "all")
+        compose.onNodeWithText("Thread r30").assertIsDisplayed()
+    }
+
+    private fun show(footer: (LazyListScope.() -> Unit)? = null, state: () -> ListState) {
+        val viewModel = ViewModelProvider.create(viewModels, viewModelFactory { initializer { Plain(deps) } })["list", Plain::class]
+        compose.setContent {
+            val current = state()
+            WhirlTheme(darkTheme = false) {
+                ThreadListBody(
+                    sections = current.sections,
+                    refreshing = false,
+                    error = null,
+                    onRefresh = {},
+                    viewModel = viewModel,
+                    nav = nav,
+                    emptyText = "",
+                    footer = footer,
+                    listKey = current.listKey,
+                )
+            }
+        }
     }
 }
