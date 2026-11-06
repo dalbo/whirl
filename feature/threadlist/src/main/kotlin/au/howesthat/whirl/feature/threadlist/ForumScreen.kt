@@ -128,9 +128,13 @@ class ForumViewModel @AssistedInject constructor(
         .filtered(matchForum = false)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ListState(null, null))
 
+    /**
+     * One page of the forum, or of the group picked. Each group is its own list ([ListState.listKey]): picking another
+     * shows it from the top, not at a thread the two lists share.
+     */
     fun page(page: Int): Flow<ListState> = _group.flatMapLatest { group ->
         combine(scraped.observe(ScrapedList.ForumPage(forumId, page, group)), unreadIds) { cached, unread ->
-            ListState(cached?.value?.rows?.map { it.toItem(cached.value.forum, unread) }?.let { listOf(Section(null, it)) }, cached?.updatedAt)
+            ListState(cached?.value?.rows?.map { it.toItem(cached.value.forum, unread) }?.let { listOf(Section(null, it)) }, cached?.updatedAt, listKey = group)
         }
     }.filtered(matchForum = false)
 
@@ -271,9 +275,11 @@ fun ForumScreen(
             )
         } else {
             HorizontalPager(pager, Modifier.padding(padding).fillMaxSize(), key = { it }) { index ->
-                val pageState by remember(index, viewModel) { viewModel.page(index + 1) }.collectAsStateWithLifecycle(ListState(null, null))
+                // Starts with the group's key, so coming back from a thread keeps the restored scroll position.
+                val pageState by remember(index, viewModel) { viewModel.page(index + 1) }.collectAsStateWithLifecycle(ListState(null, null, listKey = group))
                 val current = index == pager.settledPage
                 ThreadListBody(
+                    listKey = pageState.listKey,
                     sections = pageState.sections,
                     refreshing = refreshing && current,
                     // Errors belong to the page being shown.

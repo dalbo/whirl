@@ -90,10 +90,14 @@ class SearchViewModel @AssistedInject constructor(
     private val _search = MutableStateFlow(route.query.takeIf(String::isNotBlank)?.let { list(it, 1) })
     val search: StateFlow<ScrapedList.Search?> = _search.asStateFlow()
 
+    /** Each search (words, scope, page) is its own list ([ListState.listKey]), so a new one is shown from the top. */
     val state: StateFlow<ListState> = _search.flatMapLatest { search ->
-        search?.let { s -> repo.observe(s).map { cached -> ListState(cached?.value?.rows?.let { rows -> sectionsOf(rows.map { it.toItem(null) }, sectioned = true) }, cached?.updatedAt) } }
-            ?: flowOf(ListState(null, null))
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ListState(null, null))
+        search?.let { s ->
+            repo.observe(s).map { cached ->
+                ListState(cached?.value?.rows?.let { rows -> sectionsOf(rows.map { it.toItem(null) }, sectioned = true) }, cached?.updatedAt, listKey = s)
+            }
+        } ?: flowOf(ListState(null, null))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ListState(null, null, listKey = _search.value))
 
     /** True when the page shown is full, so there may be another. */
     val hasNext: StateFlow<Boolean> = state.map { s -> (s.sections?.sumOf { it.items.size } ?: 0) >= PAGE_SIZE }
@@ -202,6 +206,7 @@ fun SearchScreen(
     ) { padding ->
         if (search == null) return@Scaffold
         ThreadListBody(
+            listKey = state.listKey,
             sections = state.sections,
             refreshing = refreshing,
             error = error,
