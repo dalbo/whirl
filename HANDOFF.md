@@ -106,6 +106,12 @@ unit tests. Per-release checks: `docs/device-checklist.md`.
 ## Open ideas
 - **v1.8: the archive reader** (decided; docs/plans/v1.7.md §8): whole-thread reading from `/archive/<id>`, find in
   the whole thread, posts by a user filtered in the app. First step: raw fixtures of a multi-page archive.
+- **Next release: Data Saver note.** With Data Saver on and Whirl not set to unrestricted data, Android blocks the
+  background check on mobile data until Wi-Fi returns (debug app, 2026-11-07: a 1h38m gap while out; the check history
+  header showed "data saver ON"). Show a note under the notification settings when
+  `ConnectivityManager.restrictBackgroundStatus` is `ENABLED`, linking to the app's data usage setting
+  (`Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS`).
+- **Guest mode** (idea, `docs/plans/guest.md`): browse public pages with no API key. Ask the moderators first.
 - Waiting on others: Whirlpool's moderators (gates the community posts, `docs/community.md`, and the F-Droid merge
   request, `docs/fdroid/`); Play's closed test (12+ testers for 14 days, then production; `docs/play-console.md`).
 - Housekeeping: targetSdk 37 before August 2027; Google developer verification (2027); re-check reproducibility when
