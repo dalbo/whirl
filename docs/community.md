@@ -26,7 +26,7 @@ The wiki is edited by staff or trusted members; ask in the API thread (in the po
 moderator, whichever they suggested:
 > Could Whirl be added to the 3rd Party Clients and Extensions page? Suggested entry: **Whirl** (Android) – free,
 > open-source reader with watched-thread notifications; uses your API key; posting opens in the browser.
-> https://github.com/dalbo/whirl (Google Play/F-Droid links to follow).
+> https://play.google.com/store/apps/details?id=au.howesthat.whirl (Google Play), https://github.com/dalbo/whirl (source and APKs; F-Droid to follow).
 
 ## 3. Courtesy note to gregdev in the Whirldroid thread
 > Hi Greg, thanks for Whirldroid; I used it for years. Since it hasn't been updated since 2021 I've written a new

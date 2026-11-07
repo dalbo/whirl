@@ -91,6 +91,8 @@ Google Play's Data safety section", read 2026-10-21).
 - 2026-10-21: account verified; app created; `v1.0.0` (10000) released to **Internal testing** (testers must be on the
   internal list for the opt-in link to work). Internal testing does not count towards the 14-day requirement: next,
   promote the same build to **Closed testing → Alpha**.
+- 2026-11-08: **production access granted**; v1.7.1 submitted for review on production and open testing; the service
+  account has "Release to production". From then on tags upload to open testing (§8).
 
 ## 6. Closed testing (personal accounts: 12 testers for 14 days)
 1. **Testing → Closed testing**: use the built-in track (**Closed testing – Alpha**, API name `alpha`, which the release
@@ -127,8 +129,8 @@ Google Play's Data safety section", read 2026-10-21).
 > thread in Android to find testers? I'd also like it listed on the 3rd Party Clients page once it's out.
 
 ## 7. Automating later releases (keyless)
-Each tag's AAB is uploaded by `release.yml` to the `alpha` track (`PLAY_TRACK`; switch it to `production` after Play
-grants production access), with the R8 mapping file and `fastlane/metadata/android/en-AU/changelogs/<versionCode>.txt`
+Each tag's AAB is uploaded by `release.yml` to the `beta` (open testing) track (`PLAY_TRACK`; it was `alpha` until
+production access, 2026-11-08), with the R8 mapping file and `fastlane/metadata/android/en-AU/changelogs/<versionCode>.txt`
 as release notes. A tag without that file fails before anything reaches Play. The workflow signs in to Google Cloud with
 GitHub's OIDC token (**Workload Identity Federation**): there is no service-account key anywhere. (Dallin's Cloud
 organisation blocks key creation, `iam.managed.disableServiceAccountKeyCreation`, 2026-10-22; keyless is better anyway.)
@@ -158,9 +160,25 @@ Without the two repository variables below, the Play steps are skipped.
    Only GitHub Actions runs of `dalbo/whirl` on a `v…` tag can obtain a token, and only for this service account.
 4. Set the two printed values as repository **variables** (not secrets; neither is sensitive):
    `gh variable set PLAY_WIF_PROVIDER --body "<value>"` and `gh variable set PLAY_SERVICE_ACCOUNT --body "<value>"`.
-5. The next tag (a new versionCode; Play refuses one it already has) uploads to Alpha. A failure at "Sign in to Google
+5. The next tag (a new versionCode; Play refuses one it already has) uploads to the `PLAY_TRACK` track. A failure at "Sign in to Google
    Cloud" is the federation; at "Upload to Google Play" with 403, the Play Console permission; "Google Play Android
    Developer API has not been used in project … or it is disabled", step 1's API (v1.1.0 hit this, 2026-10-23).
 6. **Re-running a failed release**: "Re-run failed jobs" on the tag's run. "Publish GitHub Release" skips a release that
    already exists, so the run goes on to Play. (Tags before v1.1.1 lack that skip: delete the GitHub release first, as
    for v1.1.0, whose rebuild had identical checksums.) Keyless upload first worked on v1.1.0.
+
+## 8. Releasing: open testing, then production
+Each tag lands on **open testing** (`beta`), where anyone can opt in from the store listing. After Google approves it,
+it waits there a few days, so the people who opted in (and Dallin, if his phone is on the beta) meet any regression
+before everyone does. Then **Testing → Open testing → Promote release → Production**, keeping the release notes.
+Production also goes through Google's review, usually quicker for an update.
+
+- **How long on open testing**: about 3 days for a feature release; same day for a fix to something broken in
+  production. Notification or background changes deserve a full day of normal phone use (check history).
+- **Halt**: if a problem shows up on production, Publishing overview → **Halt rollout** and ship a fix as a new tag.
+  Play cannot roll back to an older versionCode.
+- **Staged rollout** (optional): promote to production at a percentage and raise it later. Hardly worth it at Whirl's size.
+- **Closed testing (Alpha)** gets nothing new now: its testers get production builds unless they also opt in to open
+  testing (a device gets the highest versionCode of the tracks it is on). Point them at the open-testing opt-in.
+- **Straight to production**, if open testing proves pointless: set `PLAY_TRACK: production` in `release.yml`; the
+  service account already has the permission.

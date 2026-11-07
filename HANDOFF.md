@@ -113,7 +113,7 @@ unit tests. Per-release checks: `docs/device-checklist.md`.
   (`Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS`).
 - **Guest mode** (idea, `docs/plans/guest.md`): browse public pages with no API key. Ask the moderators first.
 - Waiting on others: Whirlpool's moderators (gates the community posts, `docs/community.md`, and the F-Droid merge
-  request, `docs/fdroid/`); Play's closed test (12+ testers for 14 days, then production; `docs/play-console.md`).
+  request, `docs/fdroid/`); Google's review of each Play release.
 - Housekeeping: targetSdk 37 before August 2027; Google developer verification (2027); re-check reproducibility when
   the build changes (`docs/fdroid/README.md`).
 - Small: the poster's name is a tap target under 48 dp; draggable scroll thumb; find scrolls to the post, not the
