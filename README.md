@@ -3,7 +3,7 @@
 An Android client for the [Whirlpool](https://forums.whirlpool.net.au) forums: a modern Kotlin/Compose
 rewrite with the features of the abandoned Whirldroid. Not affiliated with Whirlpool or with Whirldroid.
 
-**Status:** released: v1.x on [GitHub Releases](https://github.com/dalbo/whirl/releases) and in Google Play's closed test.
+**Status:** released: v1.x on [Google Play](https://play.google.com/store/apps/details?id=au.howesthat.whirl) and [GitHub Releases](https://github.com/dalbo/whirl/releases).
 See [PLAN.md](PLAN.md) for what it is for and [HANDOFF.md](HANDOFF.md) for working on it.
 
 ## Building
