@@ -170,6 +170,8 @@ class ScrollThreadViewModelTest {
         enqueue("archive_97r5wzn3_last.html")
         val vm = viewModel(ThreadRoute("97r5wzn3", -1))
         val opened = await { vm.state.first { it.window.isNotEmpty() } }
+        // The opening request is set just after the window: wait for it, so it cannot replace the filter's.
+        await { vm.scrollTo.filterNotNull().first() }
         val poster = opened.posts.first().post.author
         vm.filterTo(ReaderFilter.User(poster.id, poster.name))
         val filtered = await { vm.state.first { it.filtered?.posts?.isNotEmpty() == true } }.filtered!!
