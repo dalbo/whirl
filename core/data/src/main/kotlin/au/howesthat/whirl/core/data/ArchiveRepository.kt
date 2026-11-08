@@ -78,7 +78,21 @@ class ArchiveRepository internal constructor(
         val offline: Boolean,
         /** From the normal last page: the archive has none. */
         val moderatorNoteHtml: String? = null,
+        /** The page at [path] was fetched or had new posts added: what a reader showing it from the cache must update. */
+        val changed: Boolean = true,
     )
+
+    /**
+     * The archive page holding post [number] (null: the newest cached), from the cache alone, for showing at once
+     * while [open] checks for newer posts; null when it is not cached whole.
+     */
+    suspend fun openCached(id: ThreadId, number: Int? = null): Opened? {
+        val thread = cachedThread(id) ?: return null
+        val pages = dao.pages(id.value).filter { it.complete && thread.indexOf(it.path) >= 0 }.ifEmpty { return null }
+        val page = if (number == null) pages.maxBy { it.first } else pages.firstOrNull { number in it.first..it.last } ?: return null
+        val note = threadPages.lastKnownPage(id)?.let { threadPages.page(id, it).first()?.value?.moderatorNoteHtml }
+        return Opened(thread, page.path, number, offline = false, note, changed = false)
+    }
 
     /**
      * Makes the archive page holding post [number] (null: the newest post) available and returns where it is.
@@ -101,7 +115,13 @@ class ArchiveRepository internal constructor(
             val stored = path?.let { dao.page(id.value, it) }?.takeIf { it.complete }
             if (cached != null && stored != null && (path != cached.pages.last().path || stored.last >= newest)) {
                 dao.touch(id.value, stored.path, clock.millis())
-                return Opened(cached, stored.path, number, offline = false, tail.moderatorNoteHtml)
+                return Opened(cached, stored.path, number, offline = false, tail.moderatorNoteHtml, changed = false)
+            }
+            // The cached last page is a few posts behind: the thread's last page has them, so add them rather than
+            // fetching the whole archive page again (about 230 KB for a handful of posts).
+            if (cached != null && stored != null && appendable(cached, stored, tail.posts, newest)) {
+                append(id, stored, tail.posts)
+                return Opened(cached, stored.path, number, offline = false, tail.moderatorNoteHtml, changed = true)
             }
             val page = when {
                 path != null -> fetch(id, path)
@@ -124,6 +144,35 @@ class ArchiveRepository internal constructor(
             val page = number?.let { n -> pages.firstOrNull { n in it.first..it.last } } ?: pages.last()
             return Opened(cached, page.path, number, offline = true)
         }
+    }
+
+    /**
+     * Whether [newest] can be reached by adding [tailPosts] (the thread's last page) to the cached last archive page
+     * [stored]: few enough new posts, all on that page, and still within the same archive page.
+     */
+    private fun appendable(thread: ArchiveThread, stored: ArchivePageEntity, tailPosts: List<Post>, newest: Int): Boolean {
+        if (stored.path != thread.pages.last().path || newest <= stored.last) return false
+        if (newest - stored.last > APPEND_MAX) return false
+        // A post past this archive page starts a new one, and the list with it: fetch.
+        if (newest > thread.pages.size * ArchivePage.POSTS_PER_PAGE) return false
+        val first = tailPosts.minOfOrNull { it.number } ?: return false
+        return first <= stored.last + 1
+    }
+
+    /** Adds [tailPosts] newer than [stored]'s last post to it, their times made absolute as the archive writes them. */
+    private suspend fun append(id: ThreadId, stored: ArchivePageEntity, tailPosts: List<Post>) {
+        val now = java.time.ZonedDateTime.now(clock).withZoneSameInstant(WhirlpoolTime.SYDNEY)
+        // Hidden posts are left out, as the archive leaves them out.
+        val added = tailPosts.filter { it.number > stored.last && !it.isHidden }.map { post ->
+            val at = post.postedAt ?: post.postedText?.let { WhirlpoolTime.parse(it, now)?.toLocalDateTime() }
+            post.copy(postedAt = at, postedText = at?.let(WhirlpoolTime::format) ?: post.postedText)
+        }
+        val newest = tailPosts.maxOf { it.number }
+        dao.append(
+            stored.copy(last = maxOf(stored.last, newest), fetchedAt = clock.millis(), accessedAt = clock.millis()),
+            added.map { it.toEntity(id, stored.path) },
+            added.map { ArchiveIndexEntity(id.value, it.replyId, stored.path, it.number, it.author.id, it.author.name, it.userGroup, it.repOf, it.isOp) },
+        )
     }
 
     /** The cached posts of [path], oldest first; empty unless the whole page is cached. */
@@ -332,6 +381,8 @@ class ArchiveRepository internal constructor(
     private fun entryPath(id: ThreadId) = "/archive/${id.value}"
 
     companion object {
+        /** New posts added from the thread's last page rather than refetching the archive page: one thread page. */
+        const val APPEND_MAX = POSTS_PER_PAGE
         /** Archive pages kept with their bodies (each up to 800 posts), besides the open thread's. */
         const val KEEP_PAGES = 12
         /** Earlier pages one thread may fetch in a day through [loadPages]. */

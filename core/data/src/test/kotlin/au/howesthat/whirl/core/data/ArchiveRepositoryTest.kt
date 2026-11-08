@@ -234,4 +234,65 @@ class ArchiveRepositoryTest {
         val posts = repo.postsByIds(rtx, found.matches)
         assertEquals(found.matches, posts.map { it.replyId })
     }
+
+    /** The RTX archive page cut after post [last], as a cached copy from before the newer posts arrived. */
+    private fun archiveUpTo(last: Int): String {
+        val html = html("archive_97r5wzn3_last.html")
+        val next = html.indexOf("data-replynum=\"${last + 1}\"")
+        return html.substring(0, html.lastIndexOf("<div id=\"rr", next)) + "</div></body></html>"
+    }
+
+    @Test
+    fun `a few new posts are added from the thread's last page, not fetched with the archive page`() = runTest {
+        // The thread's last page ends at 45797; the archive page fetched earlier ended at 45790.
+        enqueue("thread_97r5wzn3_last.html")
+        server.enqueue(MockResponse.Builder().body(archiveUpTo(45790)).build())
+        repo.open(rtx)
+        requests()
+        assertEquals(45790, repo.posts(rtx, "/archive/97r5wzn3-58").last().number)
+
+        // Shown from the cache at once, unchanged...
+        val cached = repo.openCached(rtx)!!
+        assertEquals("/archive/97r5wzn3-58", cached.path)
+        assertFalse(cached.changed)
+        assertEquals(emptyList(), requests())
+
+        // ...then the check finds seven new posts on the thread's last page and adds them.
+        clock.now = clock.now.plusSeconds(20)
+        enqueue("thread_97r5wzn3_last.html")
+        val opened = repo.open(rtx, force = true)
+        assertTrue(opened.changed)
+        assertEquals(listOf("/thread/97r5wzn3?p=-1"), requests(), "no archive page fetched")
+        val posts = repo.posts(rtx, "/archive/97r5wzn3-58")
+        assertEquals((45791..45797).toList(), posts.map { it.number }.filter { it > 45790 })
+        assertTrue(posts.takeLast(7).all { it.postedAt != null && it.bodyHtml.isNotEmpty() })
+        assertEquals(posts.map { it.number }.sorted(), posts.map { it.number })
+        // The new posts are in the index too, for filters.
+        val newest = posts.last()
+        assertTrue(repo.filter(rtx, PostFilter.User(newest.author.id)).any { it.replyId == newest.replyId })
+
+        // Up to date now: nothing to add, nothing fetched.
+        val again = repo.open(rtx)
+        assertFalse(again.changed)
+        assertEquals(emptyList(), requests())
+    }
+
+    @Test
+    fun `more new posts than a thread page holds fetch the archive page again`() = runTest {
+        enqueue("thread_97r5wzn3_last.html")
+        server.enqueue(MockResponse.Builder().body(archiveUpTo(45770)).build())
+        repo.open(rtx)
+        requests()
+        clock.now = clock.now.plusSeconds(20)
+        enqueue("thread_97r5wzn3_last.html")
+        enqueue("archive_97r5wzn3_last.html")
+        assertTrue(repo.open(rtx, force = true).changed)
+        assertEquals(listOf("/thread/97r5wzn3?p=-1", "/archive/97r5wzn3-58"), requests())
+        assertEquals(46125, repo.posts(rtx, "/archive/97r5wzn3-58").last().number)
+    }
+
+    @Test
+    fun `nothing cached, nothing to show at once`() = runTest {
+        assertNull(repo.openCached(rtx))
+    }
 }

@@ -149,7 +149,7 @@ class ScrollThreadViewModelTest {
     }
 
     @Test
-    fun `refresh stays at the post at the top of the screen`() = runTest {
+    fun `refresh with nothing new leaves the reader where it is`() = runTest {
         enqueue("thread_97r5wzn3_last.html")
         enqueue("archive_97r5wzn3_last.html")
         val vm = viewModel(ThreadRoute("97r5wzn3", -1))
@@ -157,11 +157,28 @@ class ScrollThreadViewModelTest {
         assertEquals(ScrollRequest(last = true), await { vm.scrollTo.filterNotNull().first() })
         vm.scrollHandled()
         vm.setTopPost(45700)
+        val before = vm.state.value.window
 
         vm.refresh()
-        assertEquals(ScrollRequest(number = 45700), await { vm.scrollTo.filterNotNull().first() })
+        await { vm.state.first { it.loading == null } }
+        assertEquals(null, vm.scrollTo.value, "the page on screen is updated in place, with no scroll")
+        assertEquals(before, vm.state.value.window)
         // The cached archive page still holds the newest post, so it is not fetched again.
         assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `a cached thread opens from the cache`() = runTest {
+        enqueue("thread_97r5wzn3_last.html")
+        enqueue("archive_97r5wzn3_last.html")
+        val first = viewModel(ThreadRoute("97r5wzn3", -1))
+        await { first.state.first { it.window.isNotEmpty() } }
+
+        val again = viewModel(ThreadRoute("97r5wzn3", -1))
+        val state = await { again.state.first { it.window.isNotEmpty() && it.loading == null } }
+        assertEquals(524, state.posts.size)
+        assertEquals(ScrollRequest(last = true), again.scrollTo.value)
+        assertEquals(2, server.requestCount, "nothing fetched for the second open")
     }
 
     @Test
