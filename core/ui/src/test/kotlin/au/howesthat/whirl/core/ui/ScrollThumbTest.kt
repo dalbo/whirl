@@ -36,15 +36,23 @@ class ScrollThumbTest {
     }
 
     @Test
-    fun `a drag maps back to the position the thumb shows, part way into an item`() {
-        // 20 posts of 100 px; the screen shows 4.5 of them, so 15.5 are out of view wherever the list is.
-        val at = { f: Float -> positionFor(f, span = 15.5f, count = 20) { 100 } }
-        assertEquals(ScrollPosition(0, 0), at(0f))
-        assertEquals(ScrollPosition(15, 50), at(1f), "the end: the last post at the bottom, not at the top")
-        assertEquals(ScrollPosition(7, 75), at(0.5f))
-        // Small moves of the finger move the list a little, not a post at a time.
-        val steps = (0..20).map { at(it / 20f) }.map { it.index * 100 + it.offset }
-        assertTrue(steps.zipWithNext().all { (a, b) -> b - a in 70..85 }, steps.toString())
-        assertEquals(ScrollPosition(0, 0), positionFor(0.7f, 0f, 0) { 0 })
+    fun `the rest of the track is the rest of the list, in small steps`() {
+        // 1,000 px above and 3,000 px below, the thumb 100 px down a 400 px track.
+        assertEquals(3_000f, dragDelta(100f, 400f, 400f, above = 1_000f, below = 3_000f), "to the end of the track: the end of the list")
+        assertEquals(-1_000f, dragDelta(100f, 0f, 400f, above = 1_000f, below = 3_000f), "to the top: the top")
+        assertEquals(100f, dragDelta(100f, 110f, 400f, above = 1_000f, below = 3_000f), "10 px of track, a 30th of the rest")
+        assertEquals(-100f, dragDelta(100f, 90f, 400f, above = 1_000f, below = 3_000f))
+        assertEquals(0f, dragDelta(100f, 100f, 400f, above = 1_000f, below = 3_000f))
+        // Steps add up to the same as one move: no drift, whatever the finger's speed.
+        var at = 100f
+        var below = 3_000f
+        var moved = 0f
+        for (to in listOf(150f, 220f, 300f, 400f)) {
+            val d = dragDelta(at, to, 400f, 0f, below)
+            moved += d
+            below -= d
+            at = to
+        }
+        assertEquals(3_000f, moved, 0.01f)
     }
 }

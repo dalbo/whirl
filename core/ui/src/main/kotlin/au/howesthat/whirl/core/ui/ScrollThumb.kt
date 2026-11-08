@@ -23,7 +23,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,8 +41,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
@@ -161,12 +158,11 @@ fun ScrollThumb(thumb: ScrollThumbState, modifier: Modifier = Modifier) {
  */
 @Composable
 fun Modifier.scrollThumbDrag(thumb: ScrollThumbState): Modifier {
-    val scope = rememberCoroutineScope()
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    return pointerInput(thumb, rtl) { thumbDrags(thumb, scope, rtl) }
+    return pointerInput(thumb, rtl) { thumbDrags(thumb, rtl) }
 }
 
-private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.thumbDrags(thumb: ScrollThumbState, scope: CoroutineScope, rtl: Boolean) {
+private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.thumbDrags(thumb: ScrollThumbState, rtl: Boolean) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         val p = thumb.progress
@@ -182,6 +178,9 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.thumbDra
         down.consume()
         // Where on the thumb it was grabbed, so the thumb does not jump to the finger.
         val grab = down.position.y - top
+        val travel = (thumb.track - length).coerceAtLeast(1f)
+        // The thumb's top on the track, 0 … travel.
+        var at = (top - margin).coerceIn(0f, travel)
         thumb.dragging = true
         try {
             while (true) {
@@ -193,11 +192,14 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.thumbDra
                 }
                 if (change.positionChange() != Offset.Zero) {
                     change.consume()
-                    val fraction = ((change.position.y - grab - margin) / (thumb.track - length)).coerceIn(0f, 1f)
-                    thumb.dragFraction = fraction
-                    val target = thumb.list.layoutInfo.positionFor(fraction) ?: continue
-                    thumb.dragIndex = target.index
-                    scope.launch { thumb.list.scrollToItem(target.index, target.offset) }
+                    val to = (change.position.y - grab - margin).coerceIn(0f, travel)
+                    val info = thumb.list.layoutInfo
+                    val (above, below) = info.pixelsOutOfView() ?: continue
+                    val delta = dragDelta(at, to, travel, above, below)
+                    at = to
+                    thumb.dragFraction = to / travel
+                    thumb.list.dispatchRawDelta(delta)
+                    thumb.dragIndex = thumb.list.firstVisibleItemIndex
                 }
             }
         } finally {
@@ -208,34 +210,30 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.thumbDra
     }
 }
 
-/** Where to scroll: [index] at the top, [offset] pixels of it scrolled out of view. */
-internal data class ScrollPosition(val index: Int, val offset: Int)
-
 /**
- * Where a drag to [fraction] (0 top … 1 bottom) puts the list: the inverse of [scrollProgress], so the thumb the list
- * then shows is where the finger is. Progress counts items out of view above and below (whole and part); their sum is
- * the same wherever the list is, give or take items of different heights, so [fraction] of it is how much to have
- * above: that many whole items, and the rest a part of the next one. Moving within an item, not item by item, is what
- * keeps a short list (20 posts) smooth.
+ * The list's pixels out of view above and below, as far as it can tell: the hidden parts of the first and last visible
+ * items, and the items beyond them at the visible items' average height. Null before the list is laid out.
  */
-internal fun LazyListLayoutInfo.positionFor(fraction: Float): ScrollPosition? {
+internal fun LazyListLayoutInfo.pixelsOutOfView(): Pair<Float, Float>? {
     val visible = visibleItemsInfo.ifEmpty { return null }
     val first = visible.first()
     val last = visible.last()
-    fun hidden(px: Int, size: Int) = if (size <= 0) 0f else (px.toFloat() / size).coerceIn(0f, 1f)
-    val above = first.index + hidden(viewportStartOffset - first.offset, first.size)
-    val below = (totalItemsCount - 1 - last.index) + hidden(last.offset + last.size - viewportEndOffset, last.size)
-    val average = visible.sumOf { it.size } / visible.size
-    return positionFor(fraction, above + below, totalItemsCount) { index -> visible.firstOrNull { it.index == index }?.size ?: average }
+    val average = visible.sumOf { it.size }.toFloat() / visible.size
+    val above = (viewportStartOffset - first.offset).coerceAtLeast(0) + first.index * average
+    val below = (last.offset + last.size - viewportEndOffset).coerceAtLeast(0) + (totalItemsCount - 1 - last.index) * average
+    return above to below
 }
 
-/** [positionFor] over a [span] of items out of view, with [sizeOf] an item's height (or a guess). */
-internal fun positionFor(fraction: Float, span: Float, count: Int, sizeOf: (Int) -> Int): ScrollPosition {
-    if (count <= 0) return ScrollPosition(0, 0)
-    val target = (fraction.coerceIn(0f, 1f) * span).coerceAtLeast(0f)
-    val index = target.toInt().coerceAtMost(count - 1)
-    val offset = ((target - index) * sizeOf(index)).roundToInt()
-    return ScrollPosition(index, offset)
+/**
+ * How far to scroll the list, in pixels, for the thumb moving from [from] to [to] on a track of [travel] pixels with
+ * [above] and [below] pixels of the list out of view: in proportion to what is left in that direction, so the rest of
+ * the track is the rest of the list, exactly, however long or short its posts. Relative moves, not an absolute
+ * position, so estimates that change as posts of other heights come into view cannot make it jitter.
+ */
+internal fun dragDelta(from: Float, to: Float, travel: Float, above: Float, below: Float): Float = when {
+    to > from -> if (travel - from <= 0f) below else (to - from) * below / (travel - from)
+    to < from -> if (from <= 0f) -above else (to - from) * above / from
+    else -> 0f
 }
 
 private val ThumbWidth = 4.dp
