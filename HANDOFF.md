@@ -124,9 +124,25 @@ unit tests. Per-release checks: `docs/device-checklist.md`.
   "settings":{…},"favouriteForums":[…],"mutedThreads":[…]}`, thread ids as strings. Import validates each value, ignores
   unknown keys (a newer export into an older app) and keeps the current value for missing ones; show what changed.
   Re-arm the alarm after import (notification interval). Tests: round trip, a file from a later format, bad values.
-  Related: Android's own backup skips settings today (`res/xml/data_extraction_rules.xml` excludes `datastore/` and
-  shared prefs, because the key lives there). Moving the key to its own store would let settings ride Google's backup
-  to a new phone automatically: worth doing alongside.
+- **Settings and key restored on a new phone** (idea, Dallin 2026-11-08; do before export/import, it covers the common
+  case with no user steps). Today Android's backup skips all settings (`res/xml/data_extraction_rules.xml` and
+  `backup_rules.xml` exclude `datastore/` and shared prefs) because the API key lives in the settings DataStore.
+  - Move the key to its own DataStore file (migrate on upgrade). Back up the settings file everywhere (cloud and
+    device transfer). Back up the key file in the cloud only with `requireFlags="clientSideEncryption"` (Android 9+:
+    end-to-end encrypted with the screen lock; Google cannot read it), and always in `<device-transfer>` (never
+    leaves the phones).
+  - minSdk is 26 and API 26–27 ignore `requireFlags` (the key would go up unencrypted): `res/xml/backup_rules.xml`
+    excludes the key, `res/xml-v28/backup_rules.xml` includes it with the flag; `data_extraction_rules.xml` (API 31+)
+    carries the flag in `<cloud-backup>`.
+  - Re-arm the check alarm after a restore (alarms do not survive; `NotificationScheduler` on app start already
+    does via `ensure`, check it). A restored key that fails (`Bad API key?`) goes back to the key screen with a message.
+  - Mark the key field on setup as a password (`ContentType.Password` / autofill hint) so password managers offer to
+    save and fill it: covers people with backup off.
+  - Not used: Android Keystore encryption (hardware-bound, so it blocks restore), `EncryptedSharedPreferences`
+    (deprecated, same problem), Google Block Store (Play services: F-Droid would reject it), Google Drive (OAuth,
+    Drive scope, app verification).
+  - Test on the phone with `adb shell bmgr backupnow au.howesthat.whirl.debug`, uninstall, reinstall, and
+    `bmgr restore`; unit-test the rules files' contents and the key migration.
 - **Guest mode** (idea, `docs/plans/guest.md`): browse public pages with no API key. Ask the moderators first.
 - Waiting on others: Whirlpool's moderators (gates the community posts, `docs/community.md`, and the F-Droid merge
   request, `docs/fdroid/`); Play's closed test (12+ testers for 14 days, then production; `docs/play-console.md`).
