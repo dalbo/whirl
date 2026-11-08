@@ -115,7 +115,8 @@ fun ThreadScreen(
     // After a switch: how many so far (a fresh view model each time) and the post to open at (null: the newest).
     var switches by rememberSaveable(route) { mutableIntStateOf(0) }
     var switchedAt by rememberSaveable(route) { mutableStateOf<Int?>(null) }
-    val opened = if (switches == 0) route else route.switchedTo(switchedAt)
+    var switchedFilter by rememberSaveable(route) { mutableStateOf<String?>(null) }
+    val opened = if (switches == 0) route else route.switchedTo(switchedAt).copy(filter = switchedFilter)
     val snackbar = remember { SnackbarHostState() }
     val key = "${if (scroll) "scroll" else "pages"}:$switches"
 
@@ -129,14 +130,21 @@ fun ThreadScreen(
             ThreadEvents(viewModel.navigation, nav, snackbar)
             ScrollThread(viewModel, navIcon, nav.openWatched, onReadInPages = { top ->
                 switchedAt = top
+                switchedFilter = null
                 switches++
                 scroll = false
             }, Modifier.padding(outer))
         } else {
             val viewModel = hiltViewModel<ThreadViewModel, ThreadViewModel.Factory>(key = key) { it.create(opened) }
-            ThreadEvents(viewModel.navigation, nav, snackbar)
+            ThreadEvents(viewModel.navigation, nav, snackbar, onReadFiltered = { filter ->
+                switchedAt = viewModel.topPost()
+                switchedFilter = filter.code
+                switches++
+                scroll = true
+            })
             PagedThread(viewModel, navIcon, nav, onReadAsScroll = { top ->
                 switchedAt = top
+                switchedFilter = null
                 switches++
                 scroll = true
             }, Modifier.padding(outer))
@@ -150,7 +158,12 @@ internal fun ThreadRoute.switchedTo(post: Int?): ThreadRoute =
     else copy(page = pageOfPost(post), scrollToPost = post, scrollToReply = null)
 
 @Composable
-private fun ThreadEvents(events: kotlinx.coroutines.flow.Flow<ThreadEvent>, nav: ThreadNav, snackbar: SnackbarHostState) {
+private fun ThreadEvents(
+    events: kotlinx.coroutines.flow.Flow<ThreadEvent>,
+    nav: ThreadNav,
+    snackbar: SnackbarHostState,
+    onReadFiltered: (ReaderFilter) -> Unit = {},
+) {
     val browser = rememberOpenInBrowser()
     val failedText = stringResource(R.string.link_failed)
     LaunchedEffect(events) {
@@ -163,6 +176,7 @@ private fun ThreadEvents(events: kotlinx.coroutines.flow.Flow<ThreadEvent>, nav:
                 // Launched: showSnackbar suspends until the snackbar goes, which would hold back the next event.
                 is ThreadEvent.Failed -> launch { snackbar.showSnackbar(failedText) }
                 ThreadEvent.Back -> nav.back()
+                is ThreadEvent.ReadFiltered -> onReadFiltered(event.filter)
             }
         }
     }
@@ -288,7 +302,7 @@ private fun ThreadPager(
                     isWatched = isWatched,
                     onWatchAction = viewModel::perform,
                     myUserId = myUserId,
-                    onUsersPosts = viewModel::showUsersPosts,
+                    onUsersPosts = { viewModel.showMyPosts() },
                     onOpPosts = viewModel::showOpPosts,
                     onModeratorPosts = viewModel::showModeratorPosts,
                     onRepPosts = viewModel::showRepPosts,
@@ -462,7 +476,7 @@ private fun PostList(
                         onLink = viewModel::openLink,
                         onQuote = { viewModel.openQuote(it, ui) },
                         onUser = { viewModel.openUser(post.post.author.id) },
-                        onUsersPosts = { viewModel.showUsersPosts(post.post.author.id) },
+                        onUsersPosts = { viewModel.showUsersPosts(post.post.author.id, post.post.author.name) },
                         onReply = { browser(viewModel.replyToPostUrl(post.post)) },
                         onEdit = { browser(viewModel.editPostUrl(post.post)) },
                         onReport = { browser(viewModel.reportPostUrl(post.post)) },

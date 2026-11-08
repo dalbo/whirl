@@ -334,35 +334,23 @@ class ThreadViewModelTest {
     }
 
     @Test
-    fun `posts by OP reads the thread starter from page 1 and opens the filtered view in the browser`() = runTest {
-        enqueueHtml("thread_97r5wzn3_last.html")
-        val vm = viewModel(ThreadRoute("97r5wzn3", -1))
-        await { vm.state.mapNotNull { it.startPage }.first() }
-        server.takeRequest()
-        enqueueHtml("thread_97r5wzn3_p1.html")
-        vm.navigation.test {
-            vm.showOpPosts()
-            val op = await { vm.opUserId.filterNotNull().first() }
-            assertEquals(ThreadEvent.Browser("https://forums.whirlpool.net.au/thread/97r5wzn3?ux=$op"), awaitItem())
-            assertEquals(op, repo.page(ThreadId("97r5wzn3"), 1).first()!!.value.posts.first().author.id)
-        }
-        assertEquals("/thread/97r5wzn3", server.takeRequest().target)
-    }
-
-    @Test
-    fun `filters need a Whirlpool login, so they open in the browser`() = runTest {
+    fun `filters hand the thread to the scroll reader, which filters in the app`() = runTest {
         enqueueHtml("thread_3pxj858k_p2.html")
         val vm = viewModel(ThreadRoute("3pxj858k", 2))
         await { vm.page(2).filterNotNull().first() }
         vm.navigation.test {
+            vm.showOpPosts()
+            assertEquals(ThreadEvent.ReadFiltered(ReaderFilter.Op), awaitItem())
             vm.showModeratorPosts()
-            assertEquals(ThreadEvent.Browser("https://forums.whirlpool.net.au/thread/3pxj858k?um=1"), awaitItem())
+            assertEquals(ThreadEvent.ReadFiltered(ReaderFilter.Moderators), awaitItem())
             vm.showRepPosts()
-            assertEquals(ThreadEvent.Browser("https://forums.whirlpool.net.au/thread/3pxj858k?ur=1"), awaitItem())
-            vm.showUsersPosts(30703)
-            assertEquals(ThreadEvent.Browser("https://forums.whirlpool.net.au/thread/3pxj858k?ux=30703"), awaitItem())
+            assertEquals(ThreadEvent.ReadFiltered(ReaderFilter.Reps), awaitItem())
+            vm.showMyPosts()
+            assertEquals(ThreadEvent.ReadFiltered(ReaderFilter.Mine), awaitItem())
+            vm.showUsersPosts(30703, "Tiedan")
+            assertEquals(ThreadEvent.ReadFiltered(ReaderFilter.User(30703, "Tiedan")), awaitItem())
         }
-        assertEquals(1, server.requestCount, "nothing filtered is fetched")
+        assertEquals(1, server.requestCount, "nothing is fetched by the paged reader")
     }
 
     @Test

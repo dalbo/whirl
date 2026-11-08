@@ -9,6 +9,7 @@ import au.howesthat.whirl.core.model.UserRef
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ScrollReaderTest {
 
@@ -82,5 +83,37 @@ class ScrollReaderTest {
         val end = ScrollUiState(thread = thread, window = listOf(page(2, 1601)))
         assertEquals(ScrollRow.MarkRead, scrollRows(end, firstUnread = null, markReadButton = true).last())
         assertEquals(ScrollRow.PostRow(end.posts[0]), scrollRows(end, firstUnread = null, markReadButton = false).last())
+    }
+
+    @Test
+    fun `filters round-trip through their codes`() {
+        val all = listOf(
+            ReaderFilter.Mine, ReaderFilter.Op, ReaderFilter.Moderators, ReaderFilter.Reps,
+            ReaderFilter.User(27743, "Matt E.: Leaptel"), ReaderFilter.Text("5090 price"),
+        )
+        all.forEach { assertEquals(it, ReaderFilter.parse(it.code)) }
+        assertEquals(ReaderFilter.User(5, ""), ReaderFilter.parse("u:5"))
+        assertNull(ReaderFilter.parse("u:x:y"))
+        assertNull(ReaderFilter.parse("t:  "))
+        assertNull(ReaderFilter.parse("nope"))
+        assertNull(ReaderFilter.parse(null))
+        assertNull(ReaderFilter.Mine.scanQuery(myUserId = null), "no account, no posts by me")
+    }
+
+    @Test
+    fun `a filtered reader shows the header and the matches only`() {
+        val window = listOf(page(1, 801, 802, 805))
+        val f = Filtered(ReaderFilter.Op, posts = window.single().posts.take(1), fromIndex = 1)
+        val rows = scrollRows(ScrollUiState(thread = thread, window = window, filtered = f), firstUnread = 802, markReadButton = true)
+        assertEquals(listOf(ScrollRow.Status, ScrollRow.FilterHeader(f, 3, 805), ScrollRow.PostRow(f.posts.single())), rows)
+        assertEquals(801, f.fromPost)
+    }
+
+    @Test
+    fun `find offers to search earlier pages`() {
+        val middle = ScrollUiState(thread = thread, window = listOf(page(1, 801)))
+        assertEquals(ScrollRow.SearchThread("cheap"), scrollRows(middle, null, false, findQuery = "cheap")[1])
+        val first = ScrollUiState(thread = thread, window = listOf(page(0, 1)))
+        assertTrue(scrollRows(first, null, false, findQuery = "cheap").none { it is ScrollRow.SearchThread }, "nothing earlier")
     }
 }

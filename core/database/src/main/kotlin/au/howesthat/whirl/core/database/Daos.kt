@@ -362,6 +362,15 @@ interface ArchiveDao {
     @Query("SELECT * FROM archive_posts WHERE thread_id = :threadId AND path = :path ORDER BY reply_num")
     suspend fun posts(threadId: String, path: String): List<ArchivePostEntity>
 
+    @Query("SELECT * FROM archive_posts WHERE thread_id = :threadId AND reply_id IN (:replyIds) ORDER BY reply_num")
+    suspend fun postsByIds(threadId: String, replyIds: List<Long>): List<ArchivePostEntity>
+
+    @Query("SELECT reply_id FROM archive_posts WHERE thread_id = :threadId AND path = :path")
+    suspend fun keptIds(threadId: String, path: String): List<Long>
+
+    @Query("SELECT * FROM archive_index WHERE thread_id = :threadId AND path = :path ORDER BY reply_num")
+    suspend fun index(threadId: String, path: String): List<ArchiveIndexEntity>
+
     /** Paths of the pages whose posts are in the index (fetched at least once, bodies or not). */
     @Query("SELECT DISTINCT path FROM archive_index WHERE thread_id = :threadId")
     suspend fun indexedPaths(threadId: String): List<String>
@@ -425,6 +434,27 @@ interface ArchiveDao {
 
     @Query("SELECT COUNT(*) FROM archive_pages")
     suspend fun pageCount(): Int
+
+    /**
+     * A scanned page: its index rows replaced, the bodies of [kept] posts added to what it already has, and the page
+     * row kept (complete stays complete) or added as incomplete. Then trims the page cache to [keep] pages.
+     */
+    @Transaction
+    suspend fun storeScanned(
+        thread: ArchiveThreadEntity,
+        page: ArchivePageEntity,
+        kept: List<ArchivePostEntity>,
+        index: List<ArchiveIndexEntity>,
+        keep: Int,
+    ) {
+        putThread(thread)
+        val existing = page(page.threadId, page.path)
+        if (existing == null) insertPage(page.copy(complete = false)) else touch(page.threadId, page.path, page.accessedAt)
+        insertPosts(kept)
+        deleteIndex(page.threadId, page.path)
+        insertIndex(index)
+        evict(keep, openThreadId = page.threadId)
+    }
 
     /** Replaces one page, its posts and its index rows, then trims the page cache to [keep] pages. */
     @Transaction

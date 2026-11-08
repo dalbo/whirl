@@ -221,7 +221,9 @@ data class ArchiveThreadEntity(
 
 /**
  * A cached archive page whose posts are in [ArchivePostEntity] (v7). [path] is the page's address as listed;
- * [first]/[last] are the post numbers it holds. Evicted by count, least recently opened first.
+ * [first]/[last] are the post numbers it holds. [complete] when every post's body is kept (read in the scroll reader);
+ * a page scanned for a filter or a search keeps only the matching posts' bodies. Evicted by count, least recently
+ * opened first.
  */
 @Entity(tableName = "archive_pages", primaryKeys = ["thread_id", "path"])
 data class ArchivePageEntity(
@@ -231,6 +233,7 @@ data class ArchivePageEntity(
     val last: Int,
     @ColumnInfo(name = "fetched_at") val fetchedAt: Long,
     @ColumnInfo(name = "accessed_at") val accessedAt: Long,
+    val complete: Boolean = true,
 )
 
 /** A post on a cached [ArchivePageEntity], with its body (v7); deleted with its page. */

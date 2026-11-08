@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 7,
-    "identityHash": "9ba02951ef1a79fa15d03ebec465e94a",
+    "identityHash": "6397d947b88e5bd09ac1a7c1e194f0bd",
     "entities": [
       {
         "tableName": "forums",
@@ -735,7 +735,7 @@
       },
       {
         "tableName": "archive_pages",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`thread_id` TEXT NOT NULL, `path` TEXT NOT NULL, `first` INTEGER NOT NULL, `last` INTEGER NOT NULL, `fetched_at` INTEGER NOT NULL, `accessed_at` INTEGER NOT NULL, PRIMARY KEY(`thread_id`, `path`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`thread_id` TEXT NOT NULL, `path` TEXT NOT NULL, `first` INTEGER NOT NULL, `last` INTEGER NOT NULL, `fetched_at` INTEGER NOT NULL, `accessed_at` INTEGER NOT NULL, `complete` INTEGER NOT NULL, PRIMARY KEY(`thread_id`, `path`))",
         "fields": [
           {
             "fieldPath": "threadId",
@@ -770,6 +770,12 @@
           {
             "fieldPath": "accessedAt",
             "columnName": "accessed_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "complete",
+            "columnName": "complete",
             "affinity": "INTEGER",
             "notNull": true
           }
@@ -1016,7 +1022,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '9ba02951ef1a79fa15d03ebec465e94a')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '6397d947b88e5bd09ac1a7c1e194f0bd')"
     ]
   }
 }
