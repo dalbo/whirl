@@ -111,6 +111,8 @@ unit tests. Per-release checks: `docs/device-checklist.md`.
   header showed "data saver ON"). Show a note under the notification settings when
   `ConnectivityManager.restrictBackgroundStatus` is `ENABLED`, linking to the app's data usage setting
   (`Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS`).
+- **Post writer** (idea, `docs/plans/post-writer.md`): write a reply with collected quotes, a formatting bar and a live
+  preview, then copy it into Whirlpool's reply page. Probably after v1.8.
 - **Guest mode** (idea, `docs/plans/guest.md`): browse public pages with no API key. Ask the moderators first.
 - Waiting on others: Whirlpool's moderators (gates the community posts, `docs/community.md`, and the F-Droid merge
   request, `docs/fdroid/`); Play's closed test (12+ testers for 14 days, then production; `docs/play-console.md`).
