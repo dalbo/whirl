@@ -26,21 +26,15 @@ object ThreadPageParser {
         fun Regex.int() = find(scripts)?.groupValues?.get(1)?.toInt()
 
         val crumbs = doc.breadcrumb()
-        val threadId = crumbs.lastOrNull()?.second?.let(::threadIdFromHref)
-            ?: THREAD_ID_VAR.find(scripts)?.groupValues?.get(1)?.let(::ThreadId)
-            ?: threadIdFromHref(doc.selectFirst("link[rel=canonical]")?.attr("href")?.substringAfter(FORUMS_BASE))
-            ?: throw WhirlpoolError.Drift("Cannot find the thread id on '${doc.title()}'")
-
-        val posts = doc.select("div.replyblock[data-replyid]").map(::parsePost)
-        if (posts.isEmpty()) throw WhirlpoolError.Drift("No posts found in thread ${threadId.value}")
+        val threadId = doc.threadId(scripts)
+        val posts = doc.posts(threadId)
 
         val page = THREAD_PAGE_VAR.int() ?: PAGES_CURRENT.int() ?: 1
         val pageCount = THREAD_PAGES_VAR.int() ?: PAGES_TOTAL.int() ?: 1
 
         return ThreadPage(
             threadId = threadId,
-            title = crumbs.lastOrNull()?.first?.takeIf { threadIdFromHref(crumbs.last().second) != null }
-                ?: doc.title().substringBefore(" - ").squash(),
+            title = doc.threadTitle(crumbs),
             forum = doc.breadcrumbForum(),
             page = page,
             pageCount = maxOf(pageCount, page),
@@ -49,6 +43,21 @@ object ThreadPageParser {
             posts = posts,
         )
     }
+
+    internal fun Document.threadId(scripts: String = scripts()): ThreadId =
+        breadcrumb().lastOrNull()?.second?.let(::threadIdFromHref)
+            ?: THREAD_ID_VAR.find(scripts)?.groupValues?.get(1)?.let(::ThreadId)
+            ?: threadIdFromHref(selectFirst("link[rel=canonical]")?.attr("href")?.substringAfter(FORUMS_BASE))
+            ?: throw WhirlpoolError.Drift("Cannot find the thread id on '${title()}'")
+
+    internal fun Document.threadTitle(crumbs: List<Pair<String, String>> = breadcrumb()): String =
+        crumbs.lastOrNull()?.first?.takeIf { threadIdFromHref(crumbs.last().second) != null }
+            ?: title().substringBefore(" - ").squash()
+
+    /** Every post on the page; none at all is drift, since a thread always has its first post. */
+    internal fun Document.posts(threadId: ThreadId): List<Post> =
+        select("div.replyblock[data-replyid]").map(::parsePost)
+            .ifEmpty { throw WhirlpoolError.Drift("No posts found in thread ${threadId.value}") }
 
     private fun parts(doc: Document): List<ThreadPart> =
         doc.selectFirst("div.notebar.parts")?.select("a[href]")?.mapNotNull { a ->
@@ -121,6 +130,7 @@ object ThreadPageParser {
             isDeleted = date == null,
             shortUrl = shortUrl,
             bodyHtml = bodyHtml,
+            repOf = block.selectFirst(".username .reptag")?.text()?.squash()?.takeIf(String::isNotEmpty),
         )
     }
 }
