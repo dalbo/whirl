@@ -104,9 +104,13 @@ object ThreadPageParser {
         // Desktop and mobile tool bars both carry .date and .shortcode; prefer the desktop one.
         val date = block.selectFirst(".replytools-inner .date") ?: block.selectFirst(".date")
         val edited = date?.selectFirst(".edited")?.text()?.squash()?.removePrefix("edited")?.trim()
+        // Archive pages carry the exact time (`2026-11-06T07:11:30+10:00`); their text says "7:11 am AEST" all year,
+        // an hour behind Sydney in daylight saving, so the text is rebuilt from the time in Sydney.
+        val published = block.selectFirst("[itemprop=datePublished][content]")?.attr("content")?.let(WhirlpoolTime::parseIso)
         // "posted" is a link on thread pages and plain text on archive pages, where the date sits in a span.
-        val postedText = date?.clone()?.apply { select(".edited").remove() }?.text()?.squash()
-            ?.removePrefix("posted")?.trim()?.takeIf(String::isNotEmpty)
+        val postedText = published?.let(WhirlpoolTime::format)
+            ?: date?.clone()?.apply { select(".edited").remove() }?.text()?.squash()
+                ?.removePrefix("posted")?.trim()?.takeIf(String::isNotEmpty)
         val body = block.selectFirst(".replytext")
             ?: throw WhirlpoolError.Drift("Post $replyId has no body")
         val isOp = body.selectFirst("div.op") != null
@@ -122,7 +126,7 @@ object ThreadPageParser {
             quip = block.selectFirst(".quip")?.text()?.squash()?.takeIf(String::isNotEmpty),
             postCount = parseCount(block.selectFirst(".replycount")?.text()),
             postedText = postedText,
-            postedAt = postedText?.let(WhirlpoolTime::parseAbsolute),
+            postedAt = published ?: postedText?.let(WhirlpoolTime::parseAbsolute),
             editedText = edited?.takeIf(String::isNotEmpty),
             isOp = isOp,
             hiddenReason = null,
