@@ -61,6 +61,8 @@ import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.OnFindShortcut
 import au.howesthat.whirl.core.ui.PostBodyView
 import au.howesthat.whirl.core.ui.ScrollThumb
+import au.howesthat.whirl.core.ui.rememberScrollThumb
+import au.howesthat.whirl.core.ui.scrollThumbDrag
 import au.howesthat.whirl.core.ui.errorMessage
 import au.howesthat.whirl.core.ui.readableWidth
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
@@ -239,10 +241,14 @@ internal fun ScrollThread(
         val size = settings.postFontSize.sp
         val textStyle = base.copy(fontSize = size.sp, lineHeight = (size * 1.4f).sp)
         val opening = state.window.isEmpty()
+        // Dragging the thumb shows the post number it has reached.
+        val thumb = rememberScrollThumb(list) { index ->
+            rows.drop(index).firstNotNullOfOrNull { (it as? ScrollRow.PostRow)?.post?.post?.number }?.let { "#" + numbers.format(it) }
+        }
         PullToRefreshBox(
             isRefreshing = state.loading == ScrollLoad.REFRESH,
             onRefresh = viewModel::refresh,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().scrollThumbDrag(thumb),
         ) {
             when {
                 opening && state.error != null -> ErrorState(
@@ -314,7 +320,7 @@ internal fun ScrollThread(
                             }
                         }
                     }
-                    ScrollThumb(list, Modifier.align(Alignment.CenterEnd))
+                    ScrollThumb(thumb, Modifier.align(Alignment.CenterEnd))
                 }
             }
         }

@@ -34,4 +34,12 @@ class ScrollThumbTest {
         ).map { it!! }
         assertTrue(steps.zipWithNext().all { (a, b) -> b > a }, steps.toString())
     }
+
+    @Test
+    fun `a drag maps to the item it brings to the top`() {
+        assertEquals(0, thumbIndex(0f, 800))
+        assertEquals(799, thumbIndex(1f, 800))
+        assertEquals(400, thumbIndex(0.5f, 801))
+        assertEquals(0, thumbIndex(0.7f, 0))
+    }
 }
