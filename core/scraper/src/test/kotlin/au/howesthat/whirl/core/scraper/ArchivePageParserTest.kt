@@ -6,6 +6,7 @@ import au.howesthat.whirl.core.model.PostRole
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.model.WhirlpoolError
 import org.junit.jupiter.api.Test
+import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
@@ -48,6 +49,15 @@ class ArchivePageParserTest {
         assertEquals("September 2026—November 2026", page.pages.last().label)
         assertEquals(524, page.posts.size)
         assertEquals(45601..46125, page.posts.first().number..page.posts.last().number)
+    }
+
+    @Test
+    fun `times are Sydney time, daylight saving included`() {
+        // The page text says "posted 2026-Nov-6, 7:11 am AEST" all year; datePublished is 2026-11-06T07:11:30+10:00,
+        // which is 8:11 am in Sydney in November (AEDT), as the thread page shows it ("Friday at 8:11 am").
+        val post = ArchivePageParser.parse(Fixtures.html("archive_97r5wzn3_last.html")).posts.first { it.number == 46123 }
+        assertEquals(LocalDateTime.of(2026, 11, 6, 8, 11), post.postedAt)
+        assertEquals("2026-Nov-6, 8:11 am", post.postedText)
     }
 
     @Test
