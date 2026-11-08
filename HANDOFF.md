@@ -117,13 +117,6 @@ unit tests. Per-release checks: `docs/device-checklist.md`.
   (`core/notifications/.../AlertPlan.kt`), so the alert, the summary's thread and post counts and the per-thread
   notifications all leave muted threads out. Show a bell-off mark on the row. Drop the mute when the thread is unwatched,
   but only after a successful watched fetch, as `notified.keepOnly` does. Small: could ride along with the Data Saver note.
-- **Export and import settings** (idea, Dallin 2026-11-08): Settings › Export writes a JSON file through the system
-  file picker (`CreateDocument`, no storage permission); Import reads one (`OpenDocument`). Contents: every
-  `SettingsRepository` setting, favourite forums, muted threads (above). **Never the API key** (HANDOFF hard rules; a
-  shared file must be safe to post). Shape: `{"app":"whirl","format":1,"exportedFrom":"<versionName>",
-  "settings":{…},"favouriteForums":[…],"mutedThreads":[…]}`, thread ids as strings. Import validates each value, ignores
-  unknown keys (a newer export into an older app) and keeps the current value for missing ones; show what changed.
-  Re-arm the alarm after import (notification interval). Tests: round trip, a file from a later format, bad values.
 - **Settings and key restored on a new phone** (idea, Dallin 2026-11-08; do before export/import, it covers the common
   case with no user steps). Today Android's backup skips all settings (`res/xml/data_extraction_rules.xml` and
   `backup_rules.xml` exclude `datastore/` and shared prefs) because the API key lives in the settings DataStore.
@@ -143,6 +136,15 @@ unit tests. Per-release checks: `docs/device-checklist.md`.
     Drive scope, app verification).
   - Test on the phone with `adb shell bmgr backupnow au.howesthat.whirl.debug`, uninstall, reinstall, and
     `bmgr restore`; unit-test the rules files' contents and the key migration.
+- **Export and import settings** (idea, Dallin 2026-11-08): Settings › Export writes a JSON file through the system
+  file picker (`CreateDocument`, no storage permission); Import reads one (`OpenDocument`). Contents: every
+  `SettingsRepository` setting, favourite forums, muted threads (above). **Never the API key** (HANDOFF hard rules; a
+  shared file must be safe to post). Shape: `{"app":"whirl","format":1,"exportedFrom":"<versionName>",
+  "settings":{…},"favouriteForums":[…],"mutedThreads":[…]}`, thread ids as strings. Import validates each value, ignores
+  unknown keys (a newer export into an older app) and keeps the current value for missing ones; show what changed.
+  Re-arm the alarm after import (notification interval). Tests: round trip, a file from a later format, bad values.
+- **Post writer** (idea, `docs/plans/post-writer.md`): write a reply with collected quotes, a formatting bar and a live
+  preview, then copy it into Whirlpool's reply page. Probably after v1.8.
 - **Guest mode** (idea, `docs/plans/guest.md`): browse public pages with no API key. Ask the moderators first.
 - Waiting on others: Whirlpool's moderators (gates the community posts, `docs/community.md`, and the F-Droid merge
   request, `docs/fdroid/`); Play's closed test (12+ testers for 14 days, then production; `docs/play-console.md`).
