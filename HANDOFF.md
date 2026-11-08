@@ -117,6 +117,16 @@ unit tests. Per-release checks: `docs/device-checklist.md`.
   (`core/notifications/.../AlertPlan.kt`), so the alert, the summary's thread and post counts and the per-thread
   notifications all leave muted threads out. Show a bell-off mark on the row. Drop the mute when the thread is unwatched,
   but only after a successful watched fetch, as `notified.keepOnly` does. Small: could ride along with the Data Saver note.
+- **Export and import settings** (idea, Dallin 2026-11-08): Settings › Export writes a JSON file through the system
+  file picker (`CreateDocument`, no storage permission); Import reads one (`OpenDocument`). Contents: every
+  `SettingsRepository` setting, favourite forums, muted threads (above). **Never the API key** (HANDOFF hard rules; a
+  shared file must be safe to post). Shape: `{"app":"whirl","format":1,"exportedFrom":"<versionName>",
+  "settings":{…},"favouriteForums":[…],"mutedThreads":[…]}`, thread ids as strings. Import validates each value, ignores
+  unknown keys (a newer export into an older app) and keeps the current value for missing ones; show what changed.
+  Re-arm the alarm after import (notification interval). Tests: round trip, a file from a later format, bad values.
+  Related: Android's own backup skips settings today (`res/xml/data_extraction_rules.xml` excludes `datastore/` and
+  shared prefs, because the key lives there). Moving the key to its own store would let settings ride Google's backup
+  to a new phone automatically: worth doing alongside.
 - **Guest mode** (idea, `docs/plans/guest.md`): browse public pages with no API key. Ask the moderators first.
 - Waiting on others: Whirlpool's moderators (gates the community posts, `docs/community.md`, and the F-Droid merge
   request, `docs/fdroid/`); Play's closed test (12+ testers for 14 days, then production; `docs/play-console.md`).
