@@ -153,7 +153,8 @@ class ScrollThreadViewModelTest {
         enqueue("thread_97r5wzn3_last.html")
         enqueue("archive_97r5wzn3_last.html")
         val vm = viewModel(ThreadRoute("97r5wzn3", -1))
-        await { vm.state.first { it.window.isNotEmpty() } }
+        // The opening request is set just after the window: wait for it, so it cannot arrive after the refresh's.
+        assertEquals(ScrollRequest(last = true), await { vm.scrollTo.filterNotNull().first() })
         vm.scrollHandled()
         vm.setTopPost(45700)
 
