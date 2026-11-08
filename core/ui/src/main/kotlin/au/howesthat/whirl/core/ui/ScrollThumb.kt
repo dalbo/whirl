@@ -198,8 +198,16 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.thumbDra
                     val delta = dragDelta(at, to, travel, above, below)
                     at = to
                     thumb.dragFraction = to / travel
-                    thumb.list.dispatchRawDelta(delta)
-                    thumb.dragIndex = thumb.list.firstVisibleItemIndex
+                    // Scrolling by pixels lays out every post on the way: fine for a step of up to a screen, a freeze
+                    // for a quick drag across hundreds of long posts. A longer step jumps to its estimated post.
+                    val jump = info.jumpFor(above + delta)
+                    if (jump != null && kotlin.math.abs(delta) > info.viewportSize.height) {
+                        thumb.list.requestScrollToItem(jump.index, jump.offset)
+                        thumb.dragIndex = jump.index
+                    } else {
+                        thumb.list.dispatchRawDelta(delta)
+                        thumb.dragIndex = thumb.list.firstVisibleItemIndex
+                    }
                 }
             }
         } finally {
@@ -222,6 +230,23 @@ internal fun LazyListLayoutInfo.pixelsOutOfView(): Pair<Float, Float>? {
     val above = (viewportStartOffset - first.offset).coerceAtLeast(0) + first.index * average
     val below = (last.offset + last.size - viewportEndOffset).coerceAtLeast(0) + (totalItemsCount - 1 - last.index) * average
     return above to below
+}
+
+/** Where to scroll: [index] at the top, [offset] pixels of it scrolled out of view. */
+internal data class ScrollPosition(val index: Int, val offset: Int)
+
+/** The post and offset [abovePx] pixels from the top, at the visible posts' average height. */
+internal fun LazyListLayoutInfo.jumpFor(abovePx: Float): ScrollPosition? {
+    val visible = visibleItemsInfo.ifEmpty { return null }
+    val average = visible.sumOf { it.size }.toFloat() / visible.size
+    return jumpFor(abovePx, average, totalItemsCount)
+}
+
+internal fun jumpFor(abovePx: Float, average: Float, count: Int): ScrollPosition? {
+    if (count <= 0 || average <= 0f) return null
+    val items = abovePx.coerceAtLeast(0f) / average
+    val index = items.toInt().coerceAtMost(count - 1)
+    return ScrollPosition(index, ((items - index) * average).roundToInt())
 }
 
 /**

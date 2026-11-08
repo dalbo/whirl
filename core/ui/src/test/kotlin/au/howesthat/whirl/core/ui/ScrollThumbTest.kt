@@ -55,4 +55,12 @@ class ScrollThumbTest {
         }
         assertEquals(3_000f, moved, 0.01f)
     }
+
+    @Test
+    fun `a long step jumps to the estimated post`() {
+        assertEquals(ScrollPosition(12, 50), jumpFor(1_250f, 100f, 800))
+        assertEquals(ScrollPosition(0, 0), jumpFor(-30f, 100f, 800))
+        assertEquals(ScrollPosition(799, 0), jumpFor(1e9f, 100f, 800).let { it!!.copy(offset = 0) })
+        assertEquals(null, jumpFor(10f, 0f, 800))
+    }
 }
