@@ -66,6 +66,8 @@ data class ThreadRoute(
     val forumId: Int? = null,
     val fromWatched: Boolean = false,
     val lastReadPost: Int? = null,
+    /** Scroll reader (true) or pages (false); null follows the "Read threads as one scroll" setting. */
+    val scroll: Boolean? = null,
 ) : NavKey
 
 /** A post ready to draw: its body parsed into blocks. */
@@ -506,6 +508,15 @@ class ThreadViewModel @AssistedInject constructor(
             is WhirlpoolLink.External -> events.send(ThreadEvent.Browser(link.url))
         }
     }
+
+    private val _topPost = MutableStateFlow<Int?>(null)
+
+    /** The post at the top of the page on screen, for switching to the scroll reader. */
+    fun setTopPost(page: Int, number: Int) {
+        if (page == currentPage.value) _topPost.value = number
+    }
+
+    fun topPost(): Int? = _topPost.value
 
     fun threadUrl(page: Int? = currentPage.value): String = urls.thread(threadId, page ?: 1).toString()
     fun postUrl(post: Post, page: Int): String = urls.thread(threadId, page).newBuilder().fragment("r${post.number}").build().toString()

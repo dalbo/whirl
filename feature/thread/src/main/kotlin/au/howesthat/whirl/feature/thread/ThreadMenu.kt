@@ -32,11 +32,15 @@ internal fun ThreadMenu(
     onRepPosts: () -> Unit,
     onFirst: () -> Unit,
     onLast: () -> Unit,
-    onGoTo: () -> Unit,
+    /** Null hides "Go to page" (the scroll reader has no pages). */
+    onGoTo: (() -> Unit)?,
     onReply: () -> Unit,
     onOpenInBrowser: () -> Unit,
     onWatched: () -> Unit,
     onFind: () -> Unit,
+    /** The scroll reader: First and Last are posts, and the switch reads "Read in pages". */
+    scrolling: Boolean = false,
+    onSwitchMode: () -> Unit = {},
 ) {
     var open by remember { mutableStateOf(false) }
     IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, stringResource(R.string.more)) }
@@ -50,9 +54,17 @@ internal fun ThreadMenu(
         DropdownMenuItem(text = { Text(stringResource(R.string.find_on_page)) }, onClick = { open = false; onFind() })
         DropdownMenuItem(text = { Text(stringResource(R.string.watched_threads)) }, onClick = { open = false; onWatched() })
         HorizontalDivider()
-        DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.first_page)) }, onClick = { open = false; onFirst() })
-        DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.last_page)) }, onClick = { open = false; onLast() })
-        DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.go_to_page)) }, onClick = { open = false; onGoTo() })
+        val first = if (scrolling) R.string.first_post else au.howesthat.whirl.core.ui.R.string.first_page
+        val last = if (scrolling) R.string.newest_post else au.howesthat.whirl.core.ui.R.string.last_page
+        DropdownMenuItem(text = { Text(stringResource(first)) }, onClick = { open = false; onFirst() })
+        DropdownMenuItem(text = { Text(stringResource(last)) }, onClick = { open = false; onLast() })
+        onGoTo?.let { goTo ->
+            DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.go_to_page)) }, onClick = { open = false; goTo() })
+        }
+        DropdownMenuItem(
+            text = { Text(stringResource(if (scrolling) R.string.read_in_pages else R.string.read_as_scroll)) },
+            onClick = { open = false; onSwitchMode() },
+        )
         HorizontalDivider()
         // Whirlpool shows these filtered views only to signed-in users, so they open in the browser (its login).
         Text(

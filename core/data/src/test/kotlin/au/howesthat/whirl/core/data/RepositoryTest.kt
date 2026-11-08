@@ -286,7 +286,7 @@ class RepositoryTest {
             nightStart = LocalTime.of(21, 30), nightEnd = LocalTime.of(6, 15), postFontSize = PostFontSize.LARGE,
             textScale = TextScale.LARGER, screenAnimations = false, twoPane = true, twoPaneLandscapeOnly = true,
             browserApp = true, watchedNotify = true, notifyIntervalMinutes = 15, notifyStyle = NotifyStyle.PER_THREAD,
-            notifyKeepUntilRead = true, openThreadsInBrowser = true, loadPublicAtBottom = true, loadPrivateAtBottom = true,
+            notifyKeepUntilRead = true, openThreadsInBrowser = true, loadPublicAtBottom = true, loadPrivateAtBottom = true, readThreadsAsScroll = true,
             recentHistoryDays = 30, loadRecentAtTop = true, ignoreOwnRepliesRecent = true, loadWatchedAtTop = true,
             ignoreOwnRepliesWatched = true, watchedAutoMarkAsRead = true, watchedBackToList = true, watchUndo = false,
             undoSeconds = 10,

@@ -98,6 +98,7 @@ class MainActivity : ComponentActivity() {
                             animations = loaded.settings.screenAnimations,
                             twoPane = loaded.settings.twoPane,
                             twoPaneLandscapeOnly = loaded.settings.twoPaneLandscapeOnly,
+                            scrollThreads = loaded.settings.readThreadsAsScroll,
                         ) { host ->
                             WatchSnackbars(host, viewModel.watchEvents, loaded.settings.undoSeconds, viewModel::undo, viewModel::commit)
                         }

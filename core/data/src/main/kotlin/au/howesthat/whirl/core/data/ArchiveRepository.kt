@@ -67,7 +67,14 @@ class ArchiveRepository internal constructor(
     }
 
     /** Where [open] put the reader. [path] is cached; [number] is the post to show (null: the end). */
-    data class Opened(val thread: ArchiveThread, val path: String, val number: Int?, val offline: Boolean)
+    data class Opened(
+        val thread: ArchiveThread,
+        val path: String,
+        val number: Int?,
+        val offline: Boolean,
+        /** From the normal last page: the archive has none. */
+        val moderatorNoteHtml: String? = null,
+    )
 
     /**
      * Makes the archive page holding post [number] (null: the newest post) available and returns where it is.
@@ -76,11 +83,11 @@ class ArchiveRepository internal constructor(
      * archive page is fetched directly (`/archive/<slug>-K`); a multi-part thread, or a guess that 404s, goes through
      * the entry page's list. Offline, the cached page holding the post, or the newest cached page, will do.
      */
-    suspend fun open(id: ThreadId, number: Int? = null, forumId: Int? = null): Opened {
+    suspend fun open(id: ThreadId, number: Int? = null, forumId: Int? = null, force: Boolean = false): Opened {
         dao.forgetBefore(clock.millis() - FORGET_AFTER.inWholeMilliseconds)
         val cached = cachedThread(id)
         try {
-            val lastPage = threadPages.load(id, ThreadPageRepository.LAST_PAGE, forumId)
+            val lastPage = threadPages.load(id, ThreadPageRepository.LAST_PAGE, forumId, force)
             val tail = threadPages.page(id, lastPage).first()?.value
                 ?: throw WhirlpoolError.Drift("Thread ${id.value} has no last page")
             val newest = tail.posts.maxOf { it.number }
@@ -90,7 +97,7 @@ class ArchiveRepository internal constructor(
             val stored = path?.let { dao.page(id.value, it) }
             if (cached != null && stored != null && (path != cached.pages.last().path || stored.last >= newest)) {
                 dao.touch(id.value, stored.path, clock.millis())
-                return Opened(cached, stored.path, number, offline = false)
+                return Opened(cached, stored.path, number, offline = false, tail.moderatorNoteHtml)
             }
             val page = when {
                 path != null -> fetch(id, path)
@@ -106,7 +113,7 @@ class ArchiveRepository internal constructor(
                 }
             }.let { if (target in rangeOf(it)) it else fetchVia(id, target, start = it) }
             val thread = cachedThread(id)!!
-            return Opened(thread, thread.pages[page.pageInPart - 1].path, number, offline = false)
+            return Opened(thread, thread.pages[page.pageInPart - 1].path, number, offline = false, tail.moderatorNoteHtml)
         } catch (e: WhirlpoolError.Network) {
             cached ?: throw e
             val pages = dao.pages(id.value).ifEmpty { throw e }
