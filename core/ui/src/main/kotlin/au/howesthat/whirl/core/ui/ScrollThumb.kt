@@ -74,6 +74,10 @@ class ScrollThumbState internal constructor(val list: LazyListState) {
     internal val progress by derivedStateOf { list.layoutInfo.scrollProgress() }
     /** The item the drag has put at the top, for the label. */
     internal var dragIndex by mutableStateOf<Int?>(null)
+    /** While dragging, where the finger has put the thumb (0 top … 1 bottom); the thumb is drawn there. */
+    internal var dragFraction by mutableStateOf<Float?>(null)
+    /** Where the thumb is drawn: under the finger while dragging, else where the list is. */
+    internal val shownAt: Float? get() = dragFraction ?: progress
 }
 
 @Composable
@@ -93,7 +97,7 @@ fun ScrollThumb(thumb: ScrollThumbState, modifier: Modifier = Modifier) {
     val density = LocalDensity.current
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     // Read here so the exclusion below follows the thumb as the list scrolls.
-    val progress = thumb.progress
+    val progress = thumb.shownAt
     Box(modifier.fillMaxHeight().clearAndSetSemantics {}) {
         Spacer(
             Modifier
@@ -117,7 +121,7 @@ fun ScrollThumb(thumb: ScrollThumbState, modifier: Modifier = Modifier) {
                     },
                 )
                 .drawBehind {
-                    val p = thumb.progress ?: return@drawBehind
+                    val p = thumb.shownAt ?: return@drawBehind
                     if (alpha == 0f) return@drawBehind
                     val length = ThumbLength.toPx().coerceAtMost(size.height)
                     val width = (if (thumb.dragging) DraggingWidth else ThumbWidth).toPx()
@@ -190,21 +194,49 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.thumbDra
                 if (change.positionChange() != Offset.Zero) {
                     change.consume()
                     val fraction = ((change.position.y - grab - margin) / (thumb.track - length)).coerceIn(0f, 1f)
-                    val index = thumbIndex(fraction, thumb.list.layoutInfo.totalItemsCount)
-                    thumb.dragIndex = index
-                    scope.launch { thumb.list.scrollToItem(index) }
+                    thumb.dragFraction = fraction
+                    val target = thumb.list.layoutInfo.positionFor(fraction) ?: continue
+                    thumb.dragIndex = target.index
+                    scope.launch { thumb.list.scrollToItem(target.index, target.offset) }
                 }
             }
         } finally {
             thumb.dragging = false
             thumb.dragIndex = null
+            thumb.dragFraction = null
         }
     }
 }
 
-/** The item a drag to [fraction] (0 top … 1 bottom) brings to the top of a list of [count] items. */
-internal fun thumbIndex(fraction: Float, count: Int): Int =
-    if (count <= 0) 0 else (fraction * (count - 1)).roundToInt().coerceIn(0, count - 1)
+/** Where to scroll: [index] at the top, [offset] pixels of it scrolled out of view. */
+internal data class ScrollPosition(val index: Int, val offset: Int)
+
+/**
+ * Where a drag to [fraction] (0 top … 1 bottom) puts the list: the inverse of [scrollProgress], so the thumb the list
+ * then shows is where the finger is. Progress counts items out of view above and below (whole and part); their sum is
+ * the same wherever the list is, give or take items of different heights, so [fraction] of it is how much to have
+ * above: that many whole items, and the rest a part of the next one. Moving within an item, not item by item, is what
+ * keeps a short list (20 posts) smooth.
+ */
+internal fun LazyListLayoutInfo.positionFor(fraction: Float): ScrollPosition? {
+    val visible = visibleItemsInfo.ifEmpty { return null }
+    val first = visible.first()
+    val last = visible.last()
+    fun hidden(px: Int, size: Int) = if (size <= 0) 0f else (px.toFloat() / size).coerceIn(0f, 1f)
+    val above = first.index + hidden(viewportStartOffset - first.offset, first.size)
+    val below = (totalItemsCount - 1 - last.index) + hidden(last.offset + last.size - viewportEndOffset, last.size)
+    val average = visible.sumOf { it.size } / visible.size
+    return positionFor(fraction, above + below, totalItemsCount) { index -> visible.firstOrNull { it.index == index }?.size ?: average }
+}
+
+/** [positionFor] over a [span] of items out of view, with [sizeOf] an item's height (or a guess). */
+internal fun positionFor(fraction: Float, span: Float, count: Int, sizeOf: (Int) -> Int): ScrollPosition {
+    if (count <= 0) return ScrollPosition(0, 0)
+    val target = (fraction.coerceIn(0f, 1f) * span).coerceAtLeast(0f)
+    val index = target.toInt().coerceAtMost(count - 1)
+    val offset = ((target - index) * sizeOf(index)).roundToInt()
+    return ScrollPosition(index, offset)
+}
 
 private val ThumbWidth = 4.dp
 private val DraggingWidth = 8.dp

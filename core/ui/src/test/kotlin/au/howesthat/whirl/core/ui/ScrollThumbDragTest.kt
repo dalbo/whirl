@@ -14,7 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
@@ -59,11 +60,16 @@ class ScrollThumbDragTest {
             moveTo(androidx.compose.ui.geometry.Offset(x, height - 1f))
         }
         compose.mainClock.advanceTimeBy(100)
-        compose.onNodeWithText("#1000", useUnmergedTree = true).assertExists()
+        // The label names the post the drag brought to the top.
+        val labels = compose.onAllNodes(hasText("#", substring = true), useUnmergedTree = true)
+            .fetchSemanticsNodes().map { it.config[SemanticsProperties.Text].joinToString() }
         compose.onNodeWithTag("box").performTouchInput { up() }
         compose.mainClock.autoAdvance = true
         compose.waitForIdle()
-        assertTrue(list.firstVisibleItemIndex > 900, "jumped from $before to ${list.firstVisibleItemIndex}")
+        // At the bottom of the track the list is at its end: its last posts fill the box, not the last one alone.
+        assertEquals(listOf("#${list.firstVisibleItemIndex + 1}"), labels, "jumped from $before")
+        assertTrue(list.firstVisibleItemIndex > 900)
+        assertTrue(!list.canScrollForward)
     }
 
     @Test

@@ -36,10 +36,15 @@ class ScrollThumbTest {
     }
 
     @Test
-    fun `a drag maps to the item it brings to the top`() {
-        assertEquals(0, thumbIndex(0f, 800))
-        assertEquals(799, thumbIndex(1f, 800))
-        assertEquals(400, thumbIndex(0.5f, 801))
-        assertEquals(0, thumbIndex(0.7f, 0))
+    fun `a drag maps back to the position the thumb shows, part way into an item`() {
+        // 20 posts of 100 px; the screen shows 4.5 of them, so 15.5 are out of view wherever the list is.
+        val at = { f: Float -> positionFor(f, span = 15.5f, count = 20) { 100 } }
+        assertEquals(ScrollPosition(0, 0), at(0f))
+        assertEquals(ScrollPosition(15, 50), at(1f), "the end: the last post at the bottom, not at the top")
+        assertEquals(ScrollPosition(7, 75), at(0.5f))
+        // Small moves of the finger move the list a little, not a post at a time.
+        val steps = (0..20).map { at(it / 20f) }.map { it.index * 100 + it.offset }
+        assertTrue(steps.zipWithNext().all { (a, b) -> b - a in 70..85 }, steps.toString())
+        assertEquals(ScrollPosition(0, 0), positionFor(0.7f, 0f, 0) { 0 })
     }
 }
