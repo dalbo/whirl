@@ -147,4 +147,19 @@ class ScrollThreadViewModelTest {
         val posts = vm.state.value.posts.associateBy { it.post.replyId }
         assertTrue(matches.replyIds.all { it in posts })
     }
+
+    @Test
+    fun `refresh stays at the post at the top of the screen`() = runTest {
+        enqueue("thread_97r5wzn3_last.html")
+        enqueue("archive_97r5wzn3_last.html")
+        val vm = viewModel(ThreadRoute("97r5wzn3", -1))
+        await { vm.state.first { it.window.isNotEmpty() } }
+        vm.scrollHandled()
+        vm.setTopPost(45700)
+
+        vm.refresh()
+        assertEquals(ScrollRequest(number = 45700), await { vm.scrollTo.filterNotNull().first() })
+        // The cached archive page still holds the newest post, so it is not fetched again.
+        assertEquals(2, server.requestCount)
+    }
 }

@@ -1,6 +1,7 @@
 package au.howesthat.whirl.feature.thread
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -148,6 +149,11 @@ internal fun ScrollThread(
         val marker = if (post.post.post.number == firstUnread) rows.indexOf(ScrollRow.NewPosts).takeIf { it >= 0 } else null
         list.scrollToItem(marker ?: row)
         viewModel.scrollHandled()
+    }
+    // A drag outranks a pending scroll (it cancels scrollToItem part way): drop the request, or it would fire on the
+    // next change to the rows, moving the posts from under the reader.
+    LaunchedEffect(list) {
+        list.interactionSource.interactions.collect { if (it is DragInteraction.Start) viewModel.scrollHandled() }
     }
     // The post at the top, for process death and switching to pages.
     LaunchedEffect(list, rows) {

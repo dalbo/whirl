@@ -203,11 +203,13 @@ class ScrollThreadViewModel @AssistedInject constructor(
         }
     }
 
-    /** The newest posts: reloads the thread's last page and shows the window ending there. */
+    /**
+     * Reloads (the thread's last page is fetched again, so new posts appear at the end) and stays at the post at the top
+     * of the screen; "Newest post" goes to the end.
+     */
     fun refresh() {
-        val atEnd = _state.value.atEnd || _state.value.window.isEmpty()
         val top = topPost()
-        open(if (atEnd) null else top, request = if (atEnd) ScrollRequest(last = true) else ScrollRequest(number = top), force = true, kind = ScrollLoad.REFRESH)
+        open(top, request = top?.let { ScrollRequest(number = it) } ?: ScrollRequest(last = true), force = true, kind = ScrollLoad.REFRESH)
     }
 
     /** The first post of the part. */
