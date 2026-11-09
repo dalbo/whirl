@@ -24,7 +24,6 @@ import org.robolectric.RobolectricTestRunner
 import java.io.File
 import java.lang.reflect.Proxy
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 
 /** Favourite forums in the library store (v1.9), moved once from Room. */
 @RunWith(RobolectricTestRunner::class)
@@ -71,12 +70,12 @@ class LibraryRepositoryTest {
     }
 
     @Test
-    fun `a change before the first read still moves the old favourites first`() = runBlocking {
-        v18Favourites(92)
+    fun `a removal before the first read is not undone by the move`() = runBlocking {
+        v18Favourites(92, 100)
         val s = Opened()
         withTimeout(5_000) {
-            s.repo.setFavourite(7, true)
-            assertEquals(setOf(92, 7), s.repo.favouriteForums.first())
+            s.repo.setFavourite(92, false)
+            assertEquals(setOf(100), s.repo.favouriteForums.first())
         }
     }
 
@@ -94,8 +93,8 @@ class LibraryRepositoryTest {
         } as ForumDao
         val s = Opened(flaky)
         withTimeout(5_000) {
-            assertFailsWith<IllegalStateException> { s.repo.favouriteForums.first() }
-            assertEquals(setOf(92), s.repo.favouriteForums.first())
+            assertEquals(emptySet(), s.repo.favouriteForums.first(), "the list still shows")
+            assertEquals(setOf(92), s.repo.favouriteForums.first(), "and the next read moves them")
         }
     }
 

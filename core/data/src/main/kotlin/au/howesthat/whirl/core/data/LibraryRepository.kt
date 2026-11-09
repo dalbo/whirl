@@ -1,6 +1,7 @@
 package au.howesthat.whirl.core.data
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -9,6 +10,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import au.howesthat.whirl.core.database.ForumDao
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
@@ -21,6 +23,8 @@ import javax.inject.Singleton
 private val Context.libraryStore: DataStore<Preferences> by preferencesDataStore(name = LIBRARY_STORE)
 
 const val LIBRARY_STORE = "library"
+
+private const val TAG = "LibraryRepository"
 
 private object LibraryKeys {
     /** Forum ids, as strings (a Preferences set holds strings only). */
@@ -38,16 +42,28 @@ class LibraryRepository internal constructor(private val store: DataStore<Prefer
 
     @Inject constructor(@ApplicationContext context: Context, forums: ForumDao) : this(context.libraryStore, forums)
 
+    /** A failed move from Room still shows the favourites stored so far; the next collection tries the move again. */
     val favouriteForums: Flow<Set<Int>> = flow {
-        moveFromRoomOnce()
+        tryMoveFromRoomOnce()
         emitAll(store.data.map { p -> p[LibraryKeys.favouriteForums].orEmpty().mapNotNullTo(mutableSetOf()) { it.toIntOrNull() } })
     }
 
     suspend fun setFavourite(forumId: Int, favourite: Boolean) {
-        moveFromRoomOnce()
+        tryMoveFromRoomOnce()
         store.edit { p ->
             val ids = p[LibraryKeys.favouriteForums].orEmpty()
             p[LibraryKeys.favouriteForums] = if (favourite) ids + forumId.toString() else ids - forumId.toString()
+        }
+    }
+
+    private suspend fun tryMoveFromRoomOnce() {
+        try {
+            moveFromRoomOnce()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // A full disk or a closed database: the list still shows, and the move is tried again next time.
+            Log.w(TAG, "Favourites not moved from Room yet", e)
         }
     }
 
@@ -56,7 +72,7 @@ class LibraryRepository internal constructor(private val store: DataStore<Prefer
      * again, and once done it never runs again (so a favourite removed since cannot come back). The table stays until
      * a later version drops it.
      */
-    private suspend fun moveFromRoomOnce() {
+    internal suspend fun moveFromRoomOnce() {
         if (store.data.first()[LibraryKeys.movedFromRoom] == true) return
         store.edit { p ->
             if (p[LibraryKeys.movedFromRoom] == true) return@edit
