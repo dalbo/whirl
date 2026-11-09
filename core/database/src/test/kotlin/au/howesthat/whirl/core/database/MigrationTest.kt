@@ -162,4 +162,33 @@ class MigrationTest {
             db.close()
         }
     }
+
+    @Test
+    fun `v6 to v7 adds the archive cache and the rep's company, keeping cached posts`() = runTest {
+        helper.createDatabase(name, 6).use { db ->
+            db.execSQL(
+                "INSERT INTO thread_pages (thread_id, page, page_count, title, forum_id, forum_title, group_id, moderator_note_html, parts, " +
+                    "fetched_at, accessed_at) VALUES ('3l10nlj5', 1, 31, 'Leaptel', 31, 'Other ISPs', NULL, NULL, '', 1, 1)",
+            )
+            db.execSQL(
+                "INSERT INTO posts (thread_id, page, reply_id, reply_num, user_id, user_name, user_group, quip, post_count, posted_text, " +
+                    "posted_at, edited_text, is_op, hidden_reason, is_deleted, short_url, body_html) " +
+                    "VALUES ('3l10nlj5', 1, 73670545, 13, 27743, 'Matt E.', 'ISP Representative', NULL, 9458, 'x', NULL, NULL, 0, NULL, 0, NULL, '<p>hi</p>')",
+            )
+        }
+        helper.runMigrationsAndValidate(name, 7, true, MIGRATION_4_5).close()
+
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), WhirlDatabase::class.java, name)
+            .addMigrations(MIGRATION_4_5)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val post = db.threadPageDao().posts("3l10nlj5", 1).single()
+            assertEquals("ISP Representative", post.userGroup)
+            assertEquals(null, post.repOf, "filled in when the page is next fetched")
+            assertEquals(0, db.archiveDao().pageCount())
+        } finally {
+            db.close()
+        }
+    }
 }

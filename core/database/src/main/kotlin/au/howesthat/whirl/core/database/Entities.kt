@@ -197,4 +197,93 @@ data class PostEntity(
     @ColumnInfo(name = "is_deleted") val isDeleted: Boolean,
     @ColumnInfo(name = "short_url") val shortUrl: String?,
     @ColumnInfo(name = "body_html") val bodyHtml: String,
+    /** The company a representative posts for (v7). */
+    @ColumnInfo(name = "rep_of") val repOf: String? = null,
+)
+
+/**
+ * A thread's archive page list as last seen (v7): every archive page, in order, as `path|label` joined with `\n`
+ * (a label never holds a newline). Also counts the earlier pages searched today, for the daily cap.
+ */
+@Entity(tableName = "archive_threads")
+data class ArchiveThreadEntity(
+    @PrimaryKey @ColumnInfo(name = "thread_id") val threadId: String,
+    val title: String,
+    @ColumnInfo(name = "forum_id") val forumId: Int?,
+    @ColumnInfo(name = "forum_title") val forumTitle: String?,
+    @ColumnInfo(name = "group_id") val groupId: Int?,
+    val pages: String,
+    @ColumnInfo(name = "fetched_at") val fetchedAt: Long,
+    /** The Sydney day ([java.time.LocalDate.toEpochDay]) [searchedToday] counts for. */
+    @ColumnInfo(name = "searched_day") val searchedDay: Long = 0,
+    @ColumnInfo(name = "searched_today") val searchedToday: Int = 0,
+)
+
+/**
+ * A cached archive page whose posts are in [ArchivePostEntity] (v7). [path] is the page's address as listed;
+ * [first]/[last] are the post numbers it holds. Evicted by count, least recently opened first.
+ */
+@Entity(tableName = "archive_pages", primaryKeys = ["thread_id", "path"])
+data class ArchivePageEntity(
+    @ColumnInfo(name = "thread_id") val threadId: String,
+    val path: String,
+    val first: Int,
+    val last: Int,
+    @ColumnInfo(name = "fetched_at") val fetchedAt: Long,
+    @ColumnInfo(name = "accessed_at") val accessedAt: Long,
+)
+
+/** A post on a cached [ArchivePageEntity], with its body (v7); deleted with its page. */
+@Entity(
+    tableName = "archive_posts",
+    primaryKeys = ["thread_id", "reply_id"],
+    indices = [Index("thread_id", "path"), Index("thread_id", "reply_num")],
+    foreignKeys = [
+        ForeignKey(
+            entity = ArchivePageEntity::class,
+            parentColumns = ["thread_id", "path"],
+            childColumns = ["thread_id", "path"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+)
+data class ArchivePostEntity(
+    @ColumnInfo(name = "thread_id") val threadId: String,
+    val path: String,
+    @ColumnInfo(name = "reply_id") val replyId: Long,
+    @ColumnInfo(name = "reply_num") val replyNum: Int,
+    @ColumnInfo(name = "user_id") val userId: Long,
+    @ColumnInfo(name = "user_name") val userName: String,
+    @ColumnInfo(name = "user_group") val userGroup: String?,
+    val quip: String?,
+    @ColumnInfo(name = "post_count") val postCount: Int?,
+    @ColumnInfo(name = "posted_text") val postedText: String?,
+    @ColumnInfo(name = "posted_at") val postedAt: Long?,
+    @ColumnInfo(name = "edited_text") val editedText: String?,
+    @ColumnInfo(name = "is_op") val isOp: Boolean,
+    @ColumnInfo(name = "is_deleted") val isDeleted: Boolean,
+    @ColumnInfo(name = "short_url") val shortUrl: String?,
+    @ColumnInfo(name = "body_html") val bodyHtml: String,
+    @ColumnInfo(name = "rep_of") val repOf: String?,
+)
+
+/**
+ * Who wrote each post of every archive page ever fetched (v7), without bodies: small, kept when bodies are evicted,
+ * so filters ("posts by", moderators, reps) are a query and never refetch a page.
+ */
+@Entity(
+    tableName = "archive_index",
+    primaryKeys = ["thread_id", "reply_id"],
+    indices = [Index("thread_id", "user_id"), Index("thread_id", "path")],
+)
+data class ArchiveIndexEntity(
+    @ColumnInfo(name = "thread_id") val threadId: String,
+    @ColumnInfo(name = "reply_id") val replyId: Long,
+    val path: String,
+    @ColumnInfo(name = "reply_num") val replyNum: Int,
+    @ColumnInfo(name = "user_id") val userId: Long,
+    @ColumnInfo(name = "user_name") val userName: String,
+    @ColumnInfo(name = "user_group") val userGroup: String?,
+    @ColumnInfo(name = "rep_of") val repOf: String?,
+    @ColumnInfo(name = "is_op") val isOp: Boolean,
 )

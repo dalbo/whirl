@@ -340,3 +340,107 @@ interface PendingWatchDao {
     @Query("DELETE FROM pending_watch")
     suspend fun clear()
 }
+
+@Dao
+interface ArchiveDao {
+    @Query("SELECT * FROM archive_threads WHERE thread_id = :threadId")
+    suspend fun thread(threadId: String): ArchiveThreadEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putThread(thread: ArchiveThreadEntity)
+
+    @Query("UPDATE archive_threads SET searched_day = :day, searched_today = :count WHERE thread_id = :threadId")
+    suspend fun setSearched(threadId: String, day: Long, count: Int)
+
+    @Query("SELECT * FROM archive_pages WHERE thread_id = :threadId AND path = :path")
+    suspend fun page(threadId: String, path: String): ArchivePageEntity?
+
+    /** The thread's cached pages, newest posts last. */
+    @Query("SELECT * FROM archive_pages WHERE thread_id = :threadId ORDER BY first")
+    suspend fun pages(threadId: String): List<ArchivePageEntity>
+
+    @Query("SELECT * FROM archive_posts WHERE thread_id = :threadId AND path = :path ORDER BY reply_num")
+    suspend fun posts(threadId: String, path: String): List<ArchivePostEntity>
+
+    /** Paths of the pages whose posts are in the index (fetched at least once, bodies or not). */
+    @Query("SELECT DISTINCT path FROM archive_index WHERE thread_id = :threadId")
+    suspend fun indexedPaths(threadId: String): List<String>
+
+    @Query("SELECT * FROM archive_index WHERE thread_id = :threadId AND user_id = :userId ORDER BY reply_num")
+    suspend fun byUser(threadId: String, userId: Long): List<ArchiveIndexEntity>
+
+    @Query("SELECT * FROM archive_index WHERE thread_id = :threadId AND is_op = 1 ORDER BY reply_num")
+    suspend fun byOp(threadId: String): List<ArchiveIndexEntity>
+
+    @Query("SELECT * FROM archive_index WHERE thread_id = :threadId AND user_group IN (:groups) ORDER BY reply_num")
+    suspend fun byGroup(threadId: String, groups: List<String>): List<ArchiveIndexEntity>
+
+    @Query("SELECT * FROM archive_index WHERE thread_id = :threadId AND (rep_of IS NOT NULL OR user_group = :repGroup) ORDER BY reply_num")
+    suspend fun byReps(threadId: String, repGroup: String): List<ArchiveIndexEntity>
+
+    @Query("UPDATE archive_pages SET accessed_at = :at WHERE thread_id = :threadId AND path = :path")
+    suspend fun touch(threadId: String, path: String, at: Long)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPage(page: ArchivePageEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPosts(posts: List<ArchivePostEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertIndex(rows: List<ArchiveIndexEntity>)
+
+    @Query("DELETE FROM archive_posts WHERE thread_id = :threadId AND path = :path")
+    suspend fun deletePosts(threadId: String, path: String)
+
+    @Query("DELETE FROM archive_index WHERE thread_id = :threadId AND path = :path")
+    suspend fun deleteIndex(threadId: String, path: String)
+
+    /**
+     * Deletes all but the [keep] most recently opened pages, never those of [openThreadId]; their posts go with them.
+     * The index stays.
+     */
+    @Query(
+        """DELETE FROM archive_pages WHERE thread_id != :openThreadId AND rowid NOT IN
+           (SELECT rowid FROM archive_pages ORDER BY accessed_at DESC, fetched_at DESC LIMIT :keep)""",
+    )
+    suspend fun evict(keep: Int, openThreadId: String)
+
+    /** Forgets threads not fetched since [before]: their list, index and any pages left. */
+    @Transaction
+    suspend fun forgetBefore(before: Long) {
+        deleteIndexOfStale(before)
+        deletePagesOfStale(before)
+        deleteStaleThreads(before)
+    }
+
+    @Query("DELETE FROM archive_index WHERE thread_id IN (SELECT thread_id FROM archive_threads WHERE fetched_at < :before)")
+    suspend fun deleteIndexOfStale(before: Long)
+
+    @Query("DELETE FROM archive_pages WHERE thread_id IN (SELECT thread_id FROM archive_threads WHERE fetched_at < :before)")
+    suspend fun deletePagesOfStale(before: Long)
+
+    @Query("DELETE FROM archive_threads WHERE fetched_at < :before")
+    suspend fun deleteStaleThreads(before: Long)
+
+    @Query("SELECT COUNT(*) FROM archive_pages")
+    suspend fun pageCount(): Int
+
+    /** Replaces one page, its posts and its index rows, then trims the page cache to [keep] pages. */
+    @Transaction
+    suspend fun store(
+        thread: ArchiveThreadEntity,
+        page: ArchivePageEntity,
+        posts: List<ArchivePostEntity>,
+        index: List<ArchiveIndexEntity>,
+        keep: Int,
+    ) {
+        putThread(thread)
+        deletePosts(page.threadId, page.path)
+        deleteIndex(page.threadId, page.path)
+        insertPage(page)
+        insertPosts(posts)
+        insertIndex(index)
+        evict(keep, openThreadId = page.threadId)
+    }
+}

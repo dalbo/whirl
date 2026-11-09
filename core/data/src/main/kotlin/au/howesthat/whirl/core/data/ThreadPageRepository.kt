@@ -153,7 +153,7 @@ private fun Post.toEntity(id: ThreadId, page: Int) = PostEntity(
     userId = author.id, userName = author.name, userGroup = userGroup, quip = quip, postCount = postCount,
     postedText = postedText, postedAt = postedAt?.atZone(WhirlpoolTime.SYDNEY)?.toInstant()?.toEpochMilli(),
     editedText = editedText, isOp = isOp, hiddenReason = hiddenReason, isDeleted = isDeleted, shortUrl = shortUrl,
-    bodyHtml = bodyHtml,
+    bodyHtml = bodyHtml, repOf = repOf,
 )
 
 private fun ThreadPageEntity.toModel(posts: List<PostEntity>) = ThreadPage(
@@ -173,7 +173,7 @@ private fun ThreadPageEntity.toModel(posts: List<PostEntity>) = ThreadPage(
             userGroup = it.userGroup, quip = it.quip, postCount = it.postCount, postedText = it.postedText,
             postedAt = it.postedAt?.let { ms -> LocalDateTime.ofInstant(Instant.ofEpochMilli(ms), WhirlpoolTime.SYDNEY) },
             editedText = it.editedText, isOp = it.isOp, hiddenReason = it.hiddenReason, isDeleted = it.isDeleted,
-            shortUrl = it.shortUrl, bodyHtml = it.bodyHtml,
+            shortUrl = it.shortUrl, bodyHtml = it.bodyHtml, repOf = it.repOf,
         )
     },
 )
