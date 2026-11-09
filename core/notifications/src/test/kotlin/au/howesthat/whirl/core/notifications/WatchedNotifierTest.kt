@@ -14,6 +14,7 @@ import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import au.howesthat.whirl.core.data.Account
 import au.howesthat.whirl.core.data.AccountGeneration
+import au.howesthat.whirl.core.data.LibraryRepository
 import au.howesthat.whirl.core.data.NotifyStyle
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.model.WatchAction
@@ -66,7 +67,8 @@ class WatchedNotifierTest {
     private val api = WhirlpoolApi(WhirlpoolHttp.client("Whirl/test"), settings::apiKey, server.url("/api/"), RetryPolicy.NONE)
     private val store = WatchedStore(db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), Clock.systemUTC())
     private val watched = WatchedRepository(api, store)
-    private val notifier = WatchedNotifier(context, settings, watched, WatchQueue(api, store, watched, WatchSendScheduler.None, Dispatchers.Default, appScope), db.notifiedDao())
+    private val library = LibraryRepository(context, db.forumDao())
+    private val notifier = WatchedNotifier(context, settings, watched, WatchQueue(api, store, watched, WatchSendScheduler.None, Dispatchers.Default, appScope), db.notifiedDao(), library)
     private val manager = context.getSystemService(NotificationManager::class.java)
 
     @Before
@@ -74,6 +76,7 @@ class WatchedNotifierTest {
         shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         settings.signIn("k", Account(216903, "d@llin"))
         settings.update { it.copy(watchedNotify = true, ignoreOwnRepliesWatched = false, notifyStyle = NotifyStyle.SUMMARY, notifyKeepUntilRead = false) }
+        library.setMuted(library.mutedThreads.first(), muted = false) // one library store per JVM
     }
 
     @After
@@ -129,6 +132,37 @@ class WatchedNotifierTest {
         enqueue(unreadTwo)
         notifier.check()
         assertNull(shown())
+    }
+
+    @Test
+    fun `a muted thread stays out of the notification and never alerts`() = runTest {
+        library.setMuted(listOf(ThreadId("9q684xp3")), muted = true)
+        enqueue(unreadTwo)
+        notifier.check()
+        val n = assertNotNull(shown())
+        assertEquals("Bike Riding", n.extras.getString(NotificationCompat.EXTRA_TITLE))
+        assertEquals(setOf("9yvx1663"), db.notifiedDao().all().map { it.threadId }.toSet())
+        assertEquals(2, cachedUnread().size, "still in Watched")
+
+        // Bike muted too: nothing left to show.
+        library.setMuted(listOf(ThreadId("9yvx1663")), muted = true)
+        notifier.sync(cachedUnread())
+        assertNull(shown())
+    }
+
+    @Test
+    fun `a thread's Don't notify button mutes it and removes its notification`() = runTest {
+        settings.update { it.copy(notifyStyle = NotifyStyle.PER_THREAD) }
+        enqueue(unreadTwo)
+        notifier.check()
+        val bike = assertNotNull(thread("9yvx1663"))
+        assertEquals(listOf("Mark read", "Unwatch", "Don't notify"), bike.actions.map { it.title.toString() })
+        val (action, ids) = assertNotNull(NotificationActionReceiver.parse(shadowOf(bike.actions[2].actionIntent).savedIntent))
+        assertNull(action, "local, nothing to send")
+        notifier.mute(ids)
+        assertEquals(setOf(ThreadId("9yvx1663")), library.mutedThreads.first())
+        assertNull(thread("9yvx1663"))
+        assertEquals(listOf("Electric Vehicles (17527)"), lines(assertNotNull(groupSummary())))
     }
 
     @Test
@@ -209,7 +243,7 @@ class WatchedNotifierTest {
 
         server.takeRequest()
         enqueue(fixture("api_watched_mode1.json").replace("\"UNREAD\":683", "\"UNREAD\":0").replace("\"UNREAD\":17527", "\"UNREAD\":0"))
-        assertTrue(notifier.act(action, ids))
+        assertTrue(notifier.act(assertNotNull(action), ids))
         assertEquals("9yvx1663,9q684xp3", server.takeRequest().url.queryParameter("watchedread"))
         assertNull(shown())
         assertEquals(emptyList(), watched.watched(unreadOnly = true).first().value)

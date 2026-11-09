@@ -5,7 +5,7 @@ import au.howesthat.whirl.core.model.WatchedThread
 
 /** What one notification check decided. */
 data class AlertPlan(
-    /** Unread threads to list, after "ignore my own replies". Empty means cancel the notification. */
+    /** Unread threads to list, after "ignore my own replies" and mutes. Empty means cancel the notification. */
     val threads: List<WatchedThread>,
     /** Threads with a reply newer than the one last notified for them, so the notification should alert. */
     val newIds: Set<ThreadId>,
@@ -16,12 +16,18 @@ data class AlertPlan(
  * `LAST_DATE` in epoch milliseconds). 2.14.12 kept a single last-notify time; per-thread dates (PLAN.md §3) mean a
  * thread is announced once per new reply, and a thread read elsewhere and replied to again is announced again.
  */
-fun planAlert(unread: List<WatchedThread>, notified: Map<String, Long>, myUserId: Long?, ignoreOwnReplies: Boolean): AlertPlan {
-    val threads = notifiable(unread, myUserId, ignoreOwnReplies)
+fun planAlert(
+    unread: List<WatchedThread>,
+    notified: Map<String, Long>,
+    myUserId: Long?,
+    ignoreOwnReplies: Boolean,
+    muted: Set<ThreadId> = emptySet(),
+): AlertPlan {
+    val threads = notifiable(unread, myUserId, ignoreOwnReplies, muted)
     val newIds = threads.filter { it.lastDate.toInstant().toEpochMilli() > (notified[it.id.value] ?: Long.MIN_VALUE) }.mapTo(mutableSetOf()) { it.id }
     return AlertPlan(threads, newIds)
 }
 
-/** The unread threads a notification lists, after "ignore my own replies". */
-fun notifiable(unread: List<WatchedThread>, myUserId: Long?, ignoreOwnReplies: Boolean): List<WatchedThread> =
-    unread.filter { it.unreadCount > 0 && !(ignoreOwnReplies && myUserId != null && it.lastPoster.id == myUserId) }
+/** The unread threads a notification lists, after "ignore my own replies" and leaving out [muted] threads. */
+fun notifiable(unread: List<WatchedThread>, myUserId: Long?, ignoreOwnReplies: Boolean, muted: Set<ThreadId> = emptySet()): List<WatchedThread> =
+    unread.filter { it.unreadCount > 0 && it.id !in muted && !(ignoreOwnReplies && myUserId != null && it.lastPoster.id == myUserId) }

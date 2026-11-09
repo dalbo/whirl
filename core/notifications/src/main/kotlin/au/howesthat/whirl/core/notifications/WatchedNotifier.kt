@@ -8,6 +8,7 @@ import android.content.Intent
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import au.howesthat.whirl.core.data.LibraryRepository
 import au.howesthat.whirl.core.data.NotifyStyle
 import au.howesthat.whirl.core.data.Settings
 import au.howesthat.whirl.core.data.SettingsRepository
@@ -23,6 +24,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -50,6 +52,7 @@ class WatchedNotifier @Inject constructor(
     private val watched: WatchedRepository,
     private val queue: WatchQueue,
     private val notified: NotifiedDao,
+    private val library: LibraryRepository,
 ) {
     private val manager = NotificationManagerCompat.from(context)
 
@@ -67,7 +70,7 @@ class WatchedNotifier @Inject constructor(
         if (!canNotify()) return CheckOutcome(CheckResult.BLOCKED)
         val me = settings.account.first()?.userId
         val before = notified.all().associate { it.threadId to it.lastDate }
-        val plan = planAlert(watched.fetchUnread(), before, me, s.ignoreOwnRepliesWatched)
+        val plan = planAlert(watched.fetchUnread(), before, me, s.ignoreOwnRepliesWatched, library.mutedThreads.first())
         posting.withLock { render(plan.threads, plan.newIds, s) }
         notified.put(plan.threads.map { NotifiedEntity(it.id.value, it.lastDate.toInstant().toEpochMilli()) })
         notified.keepOnly(plan.threads.map { it.id.value })
@@ -78,7 +81,7 @@ class WatchedNotifier @Inject constructor(
     suspend fun sync(unread: List<WatchedThread>) {
         val s = settings.settings.first()
         if (!s.watchedNotify || !canNotify()) return
-        val threads = notifiable(unread, settings.account.first()?.userId, s.ignoreOwnRepliesWatched)
+        val threads = notifiable(unread, settings.account.first()?.userId, s.ignoreOwnRepliesWatched, library.mutedThreads.first())
         posting.withLock { render(threads, newIds = emptySet(), s) }
     }
 
@@ -87,9 +90,24 @@ class WatchedNotifier @Inject constructor(
         scope.launch {
             val shape = settings.settings.map { listOf(it.notifyStyle, it.notifyKeepUntilRead, it.ignoreOwnRepliesWatched, it.watchedNotify) }
                 .distinctUntilChanged()
-            combine(watched.watched(unreadOnly = true).map { it.value }.distinctUntilChanged(), shape) { unread, _ -> unread }
+            combine(watched.watched(unreadOnly = true).map { it.value }.distinctUntilChanged(), shape, library.mutedThreads) { unread, _, _ -> unread }
                 .collect { sync(it) }
         }
+        // A mute lasts while the thread is watched: each fetch of the All list forgets the others. Keyed on the fetch
+        // time, so an Unwatch waiting out its Undo (gone from the list, not yet sent) never drops a mute.
+        scope.launch {
+            watched.watched(unreadOnly = false)
+                .filter { it.updatedAt != null }
+                .distinctUntilChanged { a, b -> a.updatedAt == b.updatedAt }
+                .collect { list -> library.keepMutedOnly(list.value.mapTo(mutableSetOf()) { it.id }) }
+        }
+    }
+
+    /** The notification's "Don't notify": mutes [ids] and takes them out of what is showing. */
+    suspend fun mute(ids: List<ThreadId>) {
+        library.setMuted(ids, muted = true)
+        ids.forEach { manager.cancel(it.value, THREAD_NOTIFICATION_ID) }
+        sync(watched.watched(unreadOnly = true).first().value)
     }
 
     fun cancel() = manager.cancelAll()
@@ -185,10 +203,13 @@ class WatchedNotifier @Inject constructor(
         .setOnlyAlertOnce(!alert)
         .setSilent(!alert)
 
+    /** Mark read and Unwatch; a single thread's notification also offers Don't notify. */
     private fun NotificationCompat.Builder.actions(ids: List<ThreadId>, key: String): NotificationCompat.Builder {
         val raw = ids.map { it.value }.toTypedArray()
-        return addAction(0, context.getString(R.string.notify_mark_read), action(NotificationActionReceiver.ACTION_MARK_READ, raw, key))
-            .addAction(0, context.getString(R.string.notify_unwatch), action(NotificationActionReceiver.ACTION_UNWATCH, raw, key))
+        addAction(0, context.getString(R.string.notify_mark_read), action(NotificationActionReceiver.ACTION_MARK_READ, raw, key))
+        addAction(0, context.getString(R.string.notify_unwatch), action(NotificationActionReceiver.ACTION_UNWATCH, raw, key))
+        if (key.isNotEmpty()) addAction(0, context.getString(R.string.notify_mute), action(NotificationActionReceiver.ACTION_MUTE, raw, key))
+        return this
     }
 
     // canNotify() checks POST_NOTIFICATIONS; lint does not follow the helper.
