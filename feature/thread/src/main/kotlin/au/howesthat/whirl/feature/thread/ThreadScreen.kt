@@ -74,6 +74,8 @@ import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.PagePickerDialog
 import au.howesthat.whirl.core.ui.PostBodyView
 import au.howesthat.whirl.core.ui.ScrollThumb
+import au.howesthat.whirl.core.ui.rememberScrollThumb
+import au.howesthat.whirl.core.ui.scrollThumbDrag
 import androidx.compose.runtime.mutableIntStateOf
 import au.howesthat.whirl.core.ui.FindHighlight
 import au.howesthat.whirl.core.ui.OnFindShortcut
@@ -383,7 +385,10 @@ private fun PageContent(page: Int, viewModel: ThreadViewModel, context: PageCont
         }
     }
 
-    PullToRefreshBox(isRefreshing = refreshing, onRefresh = { viewModel.refresh() }, modifier = Modifier.fillMaxSize()) {
+    val thumb = rememberScrollThumb(list) { index ->
+        loaded?.posts?.getOrNull((index - headerCount).coerceAtLeast(0))?.let { "#${it.post.number}" }
+    }
+    PullToRefreshBox(isRefreshing = refreshing, onRefresh = { viewModel.refresh() }, modifier = Modifier.fillMaxSize().scrollThumbDrag(thumb)) {
         when {
             loaded == null && error != null -> ErrorState(
                 error,
@@ -395,7 +400,7 @@ private fun PageContent(page: Int, viewModel: ThreadViewModel, context: PageCont
             else -> {
                 PostList(loaded, page, list, error, textStyle, context, viewModel)
                 // At the edge of the pane, not of the readable-width column of posts.
-                ScrollThumb(list, Modifier.align(Alignment.CenterEnd))
+                ScrollThumb(thumb, Modifier.align(Alignment.CenterEnd))
             }
         }
     }
