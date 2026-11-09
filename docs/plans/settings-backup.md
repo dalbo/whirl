@@ -130,7 +130,7 @@ through `OpenDocument`. No storage permission.
 - Import: reject a file whose `app` is not `whirl` or whose `format` is newer than the app knows with a clear message;
   for each setting, `decode` (an unknown enum constant or bad time is skipped and reported, as stored values already
   are); unknown keys ignored (a newer export into an older app); missing keys keep the current value. Favourites and
-  mutes are merged (union), not replaced. Then a dialog lists what changed ("Theme: System → Dark", "+3 favourite
+  mutes are merged (union), never replaced. Then a dialog lists what changed ("Theme: System → Dark", "+3 favourite
   forums") with Apply / Cancel; nothing is written before Apply.
 - Apply goes through `SettingsRepository.update` and the library store, so `NotificationScheduler`'s flow re-arms the
   alarm on an interval change with no extra code; test that it does.
@@ -146,14 +146,14 @@ schema bump. If it ships first, it moves with the favourites in step 2.
 ## Decided (Dallin, 2026-11-09)
 - The cache is never backed up or transferred, cloud or phone to phone.
 - Backup sits at the end of Settings.
+- Phones with no screen lock back up nothing (Android 12+; on 9–11 they back up settings and favourites without the
+  key). When `KeyguardManager.isDeviceSecure` is false, the Backup group in Settings says so: on 12+ "Android backs
+  up Whirl's settings only on phones with a screen lock", on 9–11 "Your API key is backed up only on phones with a
+  screen lock". Part 1 adds the group with just this note (and a line on what
+  is backed up); Part 2 adds Export and Import to it.
+- Import merges favourite forums and mutes with the current ones (union); it never removes any.
 
 ## Reviewed
 An architect review (2026-11-09) found the `requireFlags` gap on API 31+ and on API 28–30 device transfer, the
 include-only semantics, the missing migration markers and wiring, the failure handling of the account migration, and
 the risk of signing out on `BadKey`; all are folded in above.
-
-## Open questions
-- API 31+ phones with no screen lock: with `disableIfNoEncryptionCapabilities` they back up nothing (as today). The
-  alternative is backing up settings and favourites but never the key on 31+, which loses key restore for everyone.
-  The plan takes the first.
-- Import: merge favourites (planned) or replace?
