@@ -14,7 +14,7 @@ theme and favourites carry over. Then, on the debug app:
 - [ ] Mute: a watched thread's row menu and thread menu offer Don't notify; the row shows a crossed-out bell; the next
   check leaves it out of the notification (summary and per thread); a per-thread notification's Don't notify removes
   it at once; Notify again brings it back on its next reply; unwatching it and refreshing Watched › All forgets the mute.
-- [ ] Data Saver on (Whirl not unrestricted): Settings › Notifications shows "Data Saver holds back checks"; tapping it
+- [ ] Data Saver on (Whirl not unrestricted), or Whirl's own Background data off: Settings › Notifications shows "Checks wait for Wi-Fi"; tapping it
   opens Whirl's data usage setting; allowing unrestricted data and coming back hides the note.
 
 ## v1.8 (archive reader)

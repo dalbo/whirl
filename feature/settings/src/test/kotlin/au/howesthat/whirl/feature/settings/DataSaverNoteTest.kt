@@ -29,7 +29,7 @@ class DataSaverNoteTest {
     fun `shown while Data Saver restricts Whirl, and opens its data setting`() {
         restrict(ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED)
         compose.setContent { WhirlTheme(darkTheme = false) { DataSaverNote() } }
-        compose.onNodeWithText("Data Saver holds back checks").performClick()
+        compose.onNodeWithText("Checks wait for Wi-Fi").performClick()
         val opened: Intent = shadowOf(app).nextStartedActivity
         assertEquals(Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS, opened.action)
         assertEquals("package:${app.packageName}", opened.dataString)
@@ -39,6 +39,6 @@ class DataSaverNoteTest {
     fun `hidden when Whirl may use data in the background, or Data Saver is off`() {
         restrict(ConnectivityManager.RESTRICT_BACKGROUND_STATUS_WHITELISTED)
         compose.setContent { WhirlTheme(darkTheme = false) { DataSaverNote() } }
-        compose.onNodeWithText("Data Saver holds back checks").assertDoesNotExist()
+        compose.onNodeWithText("Checks wait for Wi-Fi").assertDoesNotExist()
     }
 }

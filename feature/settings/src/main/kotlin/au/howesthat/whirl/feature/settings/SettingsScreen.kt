@@ -207,8 +207,9 @@ fun SettingsPageScreen(
 }
 
 /**
- * With Data Saver on and Whirl not allowed unrestricted data, Android holds the background check back on mobile data
- * until Wi-Fi returns (a 1h38m gap seen on 2026-11-07). Shown only then; tapping opens the app's data usage setting.
+ * With Whirl's own "Background data" off, or Data Saver on and Whirl not allowed unrestricted data, Android holds the
+ * background check back on mobile data until Wi-Fi returns (a 1h38m gap seen on 2026-11-07). Both read as
+ * RESTRICT_BACKGROUND_STATUS_ENABLED. Shown only then; tapping opens the app's data usage setting, which has both.
  */
 @Composable
 internal fun DataSaverNote() {
