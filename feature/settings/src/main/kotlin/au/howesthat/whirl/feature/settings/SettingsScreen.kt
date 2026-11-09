@@ -1,6 +1,9 @@
 package au.howesthat.whirl.feature.settings
 
 import android.app.KeyguardManager
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.ConnectivityManager
 import android.os.Build
 import android.text.format.DateFormat
 import androidx.compose.foundation.background
@@ -47,6 +50,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -164,6 +168,7 @@ fun SettingsPageScreen(
                         )
                     }
                     if (settings.watchedNotify) {
+                        DataSaverNote()
                         Choice(stringResource(R.string.settings_notify_style), NotifyStyle.entries, settings.notifyStyle, { styleLabel(it) }) { v ->
                             update { it.copy(notifyStyle = v) }
                         }
@@ -197,6 +202,33 @@ fun SettingsPageScreen(
                 }
                 SettingsPage.BACKUP -> BackupPage()
             }
+        }
+    }
+}
+
+/**
+ * With Data Saver on and Whirl not allowed unrestricted data, Android holds the background check back on mobile data
+ * until Wi-Fi returns (a 1h38m gap seen on 2026-11-07). Shown only then; tapping opens the app's data usage setting.
+ */
+@Composable
+internal fun DataSaverNote() {
+    val context = LocalContext.current
+    fun restricted() = context.getSystemService(ConnectivityManager::class.java).restrictBackgroundStatus ==
+        ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
+    var shown by remember(context) { mutableStateOf(restricted()) }
+    // Read again on return from the system setting.
+    LifecycleResumeEffect(context) {
+        shown = restricted()
+        onPauseOrDispose {}
+    }
+    if (!shown) return
+    SettingRow(stringResource(R.string.settings_data_saver), stringResource(R.string.settings_data_saver_summary)) {
+        val app = "package:${context.packageName}".toUri()
+        try {
+            context.startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS, app))
+        } catch (_: ActivityNotFoundException) {
+            // Some phones have no such screen: the app's info page has the data usage setting too.
+            context.startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, app))
         }
     }
 }

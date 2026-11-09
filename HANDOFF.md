@@ -110,11 +110,6 @@ unit tests. Per-release checks: `docs/device-checklist.md`.
 - **v1.8: the archive reader** (released 2026-11-09; `docs/plans/v1.8.md`, history in `docs/history.md`): still to
   check on the phone are §7's TalkBack, process-death and offline items. Follow-ups: a moderator view of whole-thread
   search (the note in `docs/play-console.md` mentions it), "tap a filtered post to see it in context".
-- **Next release: Data Saver note.** With Data Saver on and Whirl not set to unrestricted data, Android blocks the
-  background check on mobile data until Wi-Fi returns (debug app, 2026-11-07: a 1h38m gap while out; the check history
-  header showed "data saver ON"). Show a note under the notification settings when
-  `ConnectivityManager.restrictBackgroundStatus` is `ENABLED`, linking to the app's data usage setting
-  (`Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS`).
 - **Settings restored on a new phone, then export/import** (ideas, Dallin 2026-11-08; plan
   `docs/plans/settings-backup.md`, reviewed; steps 1–3 in PRs #138–#140, Settings now in pages): the API key moves to its own DataStore (cloud backup only end-to-end
   encrypted), settings and favourite forums are backed up, and `whirl.db` leaves backup and transfer (caches; the
