@@ -38,6 +38,19 @@ class WatchedRepository @Inject constructor(
 
     fun isWatched(id: ThreadId): Flow<Boolean> = watchedIds.map { id in it }
 
+    /** When the All list was last fetched (epoch milliseconds); null before the first fetch and after an account switch. */
+    val allFetchedAt: Flow<Long?> = log.observeFetchedAt(logKey(unreadOnly = false))
+
+    /**
+     * The All list as last stored, plus the threads with an Unwatch still waiting to be sent: those are out of the
+     * stored list already, but Undo (or Whirlpool rejecting it) brings them back.
+     */
+    suspend fun watchedAsFetched(): Set<ThreadId> {
+        val stored = dao.observeSource(ThreadSource.WATCHED, WatchedStore.key(unreadOnly = false)).first().map { it.id }
+        val unwatching = store.queue.all().filter { it.action == WatchAction.UNWATCH }.flatMap { it.ids }
+        return (stored + unwatching).mapTo(mutableSetOf(), ::ThreadId)
+    }
+
     /** The last post read in a watched thread with unread posts, as the cached lists know it; null otherwise. */
     suspend fun lastReadPost(id: ThreadId): Int? {
         if (!isWatched(id).first()) return null

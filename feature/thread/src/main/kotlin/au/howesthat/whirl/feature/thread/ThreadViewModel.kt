@@ -254,10 +254,6 @@ class ThreadViewModel @AssistedInject constructor(
         if (watchedRepo.isWatched(threadId).first()) watchQueue.perform(WatchAction.MARK_READ, listOf(threadId), undoable = false)
     }
 
-    /**
-     * Watch, mark read or unwatch (with Undo unless it is turned off); marking read can return to the list (2.14.12
-     * `pref_watchedbacktolist`).
-     */
     /** This watched thread never notifies (Whirl's own mute). */
     val isMuted: StateFlow<Boolean> = library.mutedThreads.map { threadId in it }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
@@ -265,6 +261,10 @@ class ThreadViewModel @AssistedInject constructor(
         viewModelScope.launch { library.setMuted(listOf(threadId), muted) }
     }
 
+    /**
+     * Watch, mark read or unwatch (with Undo unless it is turned off); marking read can return to the list (2.14.12
+     * `pref_watchedbacktolist`).
+     */
     fun perform(action: WatchAction) {
         viewModelScope.launch {
             val current = settingsRepo.settings.first()
