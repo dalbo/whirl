@@ -66,9 +66,9 @@ internal fun ThreadMenu(
             onClick = { open = false; onSwitchMode() },
         )
         HorizontalDivider()
-        // Whirlpool shows these filtered views only to signed-in users, so they open in the browser (its login).
+        // Filtered in the app from the thread's archive pages (Whirlpool shows its own filters only to signed-in users).
         Text(
-            stringResource(R.string.filters_in_browser),
+            stringResource(R.string.filters_title),
             Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

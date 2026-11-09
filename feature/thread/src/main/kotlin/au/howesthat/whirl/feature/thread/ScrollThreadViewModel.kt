@@ -63,6 +63,8 @@ data class ScrollUiState(
     val offline: Boolean = false,
     val loading: ScrollLoad? = null,
     val error: Throwable? = null,
+    /** Set while the reader shows only some posts. */
+    val filtered: Filtered? = null,
 ) {
     val posts: List<UiPost> get() = window.flatMap { it.posts }
     val canLoadEarlier: Boolean get() = (window.firstOrNull()?.index ?: 0) > 0
@@ -71,8 +73,25 @@ data class ScrollUiState(
     val atEnd: Boolean get() = thread != null && window.isNotEmpty() && !canLoadLater
 }
 
+/**
+ * The reader filtered by [filter]: the matching [posts] among archive pages [fromIndex] onwards (the window's pages, then
+ * any earlier ones searched). [progress] is (pages done, pages to do) while "Search earlier pages" runs; [stoppedBy]
+ * says why the last search ended early.
+ */
+data class Filtered(
+    val filter: ReaderFilter,
+    val posts: List<UiPost> = emptyList(),
+    val fromIndex: Int,
+    val progress: Pair<Int, Int>? = null,
+    val stoppedBy: ArchiveRepository.Stop? = null,
+    val searched: Boolean = false,
+) {
+    /** The first post number searched: archive page [fromIndex] starts there. */
+    val fromPost: Int get() = fromIndex * au.howesthat.whirl.core.model.ArchivePage.POSTS_PER_PAGE + 1
+}
+
 /** A post to bring into view: by reply id, by number (the first post at or after it, since hidden posts are missing), or the last. */
-data class ScrollRequest(val replyId: Long? = null, val number: Int? = null, val last: Boolean = false)
+data class ScrollRequest(val replyId: Long? = null, val number: Int? = null, val last: Boolean = false, val top: Boolean = false)
 
 /** Index in [posts] of the post [request] asks for, or null. */
 internal fun ScrollRequest.indexIn(posts: List<Post>): Int? = when {
@@ -138,6 +157,10 @@ class ScrollThreadViewModel @AssistedInject constructor(
     val firstUnread: StateFlow<Int?> = _firstUnread.asStateFlow()
 
     private var loadJob: Job? = null
+    private var searchJob: Job? = null
+
+    /** A filter to apply once the window is open (from the route, or restored after process death). */
+    private var pendingFilter: ReaderFilter? = ReaderFilter.parse(savedState.get<String>(FILTER_KEY) ?: route.filter)
 
     init {
         // After process death, reopen where the reader was, not where the route pointed.
@@ -176,6 +199,10 @@ class ScrollThreadViewModel @AssistedInject constructor(
                 )
             }
             _scrollTo.value = request
+            pendingFilter?.let {
+                pendingFilter = null
+                filterTo(it)
+            }
         }
     }
 
@@ -334,17 +361,104 @@ class ScrollThreadViewModel @AssistedInject constructor(
         }
     }
 
-    // Filters still open the browser until v1.8 step D.
-    fun showUsersPosts(userId: Long) = browse(urls.thread(threadId, userId = userId).toString())
-    fun showOpPosts() {
-        val op = _state.value.posts.firstOrNull { it.post.isOp }?.post?.author?.id
-        if (op != null) showUsersPosts(op) else browse(urls.thread(threadId).toString())
-    }
-    fun showModeratorPosts() = browse(urls.thread(threadId, moderatorsOnly = true).toString())
-    fun showRepPosts() = browse(urls.thread(threadId, repsOnly = true).toString())
+    /** Parsed bodies of filtered posts, so each search step parses only the new matches. */
+    private val parsedMatches = HashMap<Long, UiPost>()
 
-    private fun browse(url: String) {
-        viewModelScope.launch { events.send(ThreadEvent.Browser(url)) }
+    /** Shows only the posts [filter] picks out, starting with the pages in the window (cached, so nothing is fetched). */
+    fun filterTo(filter: ReaderFilter) {
+        savedState[FILTER_KEY] = filter.code
+        val s = _state.value
+        val first = s.window.firstOrNull() ?: run { pendingFilter = filter; return }
+        _state.update { it.copy(filtered = Filtered(filter, fromIndex = first.index)) }
+        // The results start at their header, whatever the reader was about to scroll to.
+        _scrollTo.value = ScrollRequest(top = true)
+        search(filter, s.window.map { it.path }.reversed(), first.index, ids = emptyList())
+    }
+
+    /** Searches the archive pages before those already searched, newest first, one at a time. */
+    fun searchEarlier() {
+        val f = _state.value.filtered ?: return
+        val thread = _state.value.thread ?: return
+        if (f.fromIndex == 0 || f.progress != null) return
+        val paths = (f.fromIndex - 1 downTo 0).map { thread.pages[it].path }
+        search(f.filter, paths, f.fromIndex, ids = f.posts.map { it.post.replyId }, earlier = true)
+    }
+
+    /** Stops "Search earlier pages"; what it found so far stays. */
+    fun stopSearch() {
+        searchJob?.cancel()
+        _state.update { s -> s.copy(filtered = s.filtered?.copy(progress = null)) }
+    }
+
+    /** Back to every post, at the post that was at the top of the filtered list (its page loaded if need be). */
+    fun clearFilter() {
+        searchJob?.cancel()
+        savedState[FILTER_KEY] = null
+        parsedMatches.clear()
+        _state.update { it.copy(filtered = null) }
+        topPost()?.let(::showPost)
+    }
+
+    private fun search(filter: ReaderFilter, paths: List<String>, startIndex: Int, ids: List<Long>, earlier: Boolean = false) {
+        searchJob?.cancel()
+        val query = filter.scanQuery(myUserId.value) ?: return
+        searchJob = viewModelScope.launch {
+            try {
+                if (earlier) _state.update { s -> s.copy(filtered = s.filtered?.copy(progress = 0 to paths.size, stoppedBy = null)) }
+                val result = archive.scan(threadId, paths, query) { done, total, matches ->
+                    val shown = show(ids + matches)
+                    _state.update { s ->
+                        s.copy(
+                            filtered = s.filtered?.copy(
+                                posts = shown,
+                                fromIndex = if (earlier) startIndex - done else startIndex,
+                                progress = if (earlier && done < total) done to total else null,
+                            ),
+                        )
+                    }
+                }
+                val shown = show(ids + result.matches)
+                _state.update { s ->
+                    s.copy(
+                        filtered = s.filtered?.copy(
+                            posts = shown,
+                            fromIndex = if (earlier) startIndex - result.scanned else startIndex,
+                            progress = null,
+                            stoppedBy = result.stoppedBy,
+                            searched = s.filtered.searched || earlier,
+                        ),
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { s -> s.copy(filtered = s.filtered?.copy(progress = null), error = e) }
+            }
+        }
+    }
+
+    /** The posts with reply ids [ids], parsed (each once), in thread order. */
+    private suspend fun show(ids: List<Long>): List<UiPost> {
+        val missing = ids.filter { it !in parsedMatches }.distinct()
+        if (missing.isNotEmpty()) {
+            val posts = archive.postsByIds(threadId, missing)
+            withContext(parsing) { posts.forEach { parsedMatches[it.replyId] = UiPost(it, PostBodyParser.parse(it.bodyHtml)) } }
+        }
+        return ids.distinct().mapNotNull { parsedMatches[it] }.sortedBy { it.post.number }
+    }
+
+    // The menu's filters.
+    fun showUsersPosts(userId: Long, name: String) = filterTo(ReaderFilter.User(userId, name))
+    fun showMyPosts() = filterTo(ReaderFilter.Mine)
+    fun showOpPosts() = filterTo(ReaderFilter.Op)
+    fun showModeratorPosts() = filterTo(ReaderFilter.Moderators)
+    fun showRepPosts() = filterTo(ReaderFilter.Reps)
+
+    /** Find's "Search earlier pages": the query becomes a filter over the whole thread. */
+    fun searchThread(query: String) {
+        if (query.isBlank()) return
+        setFindQuery(null)
+        filterTo(ReaderFilter.Text(query))
     }
 
     fun openUser(userId: Long) {
@@ -383,6 +497,7 @@ class ScrollThreadViewModel @AssistedInject constructor(
         const val WINDOW = 3
         private const val ANCHOR_KEY = "scrollAnchor"
         private const val FIND_KEY = "scrollFind"
+        private const val FILTER_KEY = "scrollFilter"
     }
 }
 

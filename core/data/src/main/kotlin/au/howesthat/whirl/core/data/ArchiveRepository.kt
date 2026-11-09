@@ -10,6 +10,9 @@ import au.howesthat.whirl.core.model.ArchivePageRef
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.Post
 import au.howesthat.whirl.core.model.PostRole
+import au.howesthat.whirl.core.model.TextQuery
+import au.howesthat.whirl.core.model.searchText
+import au.howesthat.whirl.core.scraper.PostBodyParser
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.model.UserRef
 import au.howesthat.whirl.core.model.WhirlpoolError
@@ -19,6 +22,7 @@ import au.howesthat.whirl.core.scraper.WhirlpoolTime
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
@@ -94,7 +98,7 @@ class ArchiveRepository internal constructor(
             val target = (number ?: newest).coerceIn(1, newest)
             val path = cached?.pageFor(target)?.path
             // An earlier page rarely changes; the last one is current while it holds the newest post.
-            val stored = path?.let { dao.page(id.value, it) }
+            val stored = path?.let { dao.page(id.value, it) }?.takeIf { it.complete }
             if (cached != null && stored != null && (path != cached.pages.last().path || stored.last >= newest)) {
                 dao.touch(id.value, stored.path, clock.millis())
                 return Opened(cached, stored.path, number, offline = false, tail.moderatorNoteHtml)
@@ -116,16 +120,88 @@ class ArchiveRepository internal constructor(
             return Opened(thread, thread.pages[page.pageInPart - 1].path, number, offline = false, tail.moderatorNoteHtml)
         } catch (e: WhirlpoolError.Network) {
             cached ?: throw e
-            val pages = dao.pages(id.value).ifEmpty { throw e }
+            val pages = dao.pages(id.value).filter { it.complete }.ifEmpty { throw e }
             val page = number?.let { n -> pages.firstOrNull { n in it.first..it.last } } ?: pages.last()
             return Opened(cached, page.path, number, offline = true)
         }
     }
 
-    /** The cached posts of [path], oldest first; empty when the page is not cached (or was evicted). */
+    /** The cached posts of [path], oldest first; empty unless the whole page is cached. */
     suspend fun posts(id: ThreadId, path: String): List<Post> {
+        if (dao.page(id.value, path)?.complete != true) return emptyList()
         dao.touch(id.value, path, clock.millis())
         return dao.posts(id.value, path).map { it.toModel() }
+    }
+
+    /** Cached posts by reply id (whole pages or kept by [scan]), oldest first. */
+    suspend fun postsByIds(id: ThreadId, replyIds: List<Long>): List<Post> =
+        replyIds.chunked(500).flatMap { dao.postsByIds(id.value, it) }.map { it.toModel() }.sortedBy { it.number }
+
+    /** What [scan] looks for. */
+    sealed interface ScanQuery {
+        fun matches(post: Post): Boolean
+
+        data class Filter(val filter: PostFilter) : ScanQuery {
+            override fun matches(post: Post) = filter.matches(post.author.id, post.isOp, post.role)
+        }
+
+        data class Text(val query: TextQuery) : ScanQuery {
+            override fun matches(post: Post) = query.matches(post.author.name, PostBodyParser.parse(post.bodyHtml).searchText())
+        }
+    }
+
+    /** What [scan] found: the matching posts' reply ids in thread order, the pages scanned, and why it stopped early. */
+    data class ScanResult(val matches: List<Long>, val scanned: Int, val stoppedBy: Stop?)
+
+    /**
+     * Looks through the pages at [paths] (newest first, say) for posts matching [query]. A page is read from the cache
+     * when it is whole, or, for a filter, when the index and the kept bodies already answer it; otherwise it is fetched
+     * (one at a time, [spacing] apart, counting against the daily cap), its index stored and only the matching posts'
+     * bodies kept. [onProgress] gets the pages done, the total and the matches so far.
+     */
+    suspend fun scan(
+        id: ThreadId,
+        paths: List<String>,
+        query: ScanQuery,
+        onProgress: suspend (done: Int, total: Int, matches: List<Long>) -> Unit = { _, _, _ -> },
+    ): ScanResult {
+        val found = sortedMapOf<Int, Long>()
+        var fetched = 0
+        for ((i, path) in paths.withIndex()) {
+            val cached = fromCache(id, path, query)
+            if (cached != null) {
+                cached.forEach { (n, reply) -> found[n] = reply }
+            } else {
+                if (!takeFromDailyCap(id)) return ScanResult(found.values.toList(), i, Stop.DAILY_CAP)
+                if (fetched > 0) delay(spacing)
+                val page = try {
+                    parse(web.get(web.urls.archivePage(path)))
+                } catch (_: WhirlpoolError.RateLimited) {
+                    return ScanResult(found.values.toList(), i, Stop.RATE_LIMITED)
+                }
+                fetched++
+                val kept = withContext(parsing) { page.posts.filter(query::matches) }
+                storeScanned(id, page, kept)
+                kept.forEach { found[it.number] = it.replyId }
+            }
+            onProgress(i + 1, paths.size, found.values.toList())
+        }
+        return ScanResult(found.values.toList(), paths.size, null)
+    }
+
+    /** [query]'s matches on [path] from the cache, or null when the page must be fetched. */
+    private suspend fun fromCache(id: ThreadId, path: String, query: ScanQuery): List<Pair<Int, Long>>? {
+        val page = dao.page(id.value, path)
+        if (page?.complete == true) {
+            return withContext(parsing) { dao.posts(id.value, path).map { it.toModel() }.filter(query::matches) }
+                .map { it.number to it.replyId }
+        }
+        if (query !is ScanQuery.Filter) return null
+        val index = dao.index(id.value, path).ifEmpty { return null }
+        val rows = index.filter { query.filter.matches(it.userId, it.isOp, PostRole.of(it.userGroup, it.repOf)) }
+        // Bodies are needed to show the posts: a page scanned for another filter may not have kept these.
+        if (rows.isNotEmpty() && !dao.keptIds(id.value, path).toSet().containsAll(rows.map { it.replyId })) return null
+        return rows.map { it.replyNum to it.replyId }
     }
 
     /** What [loadPages] needs of each page: its bodies (reading, find) or only who wrote what (filters). */
@@ -147,7 +223,7 @@ class ArchiveRepository internal constructor(
         onProgress: suspend (done: Int, total: Int) -> Unit = { _, _ -> },
     ): LoadResult {
         val have = when (need) {
-            Need.BODIES -> dao.pages(id.value).map { it.path }.toSet()
+            Need.BODIES -> dao.pages(id.value).filter { it.complete }.map { it.path }.toSet()
             Need.INDEX -> dao.indexedPaths(id.value).toSet()
         }
         val todo = paths.filter { it !in have }
@@ -198,29 +274,40 @@ class ArchiveRepository internal constructor(
     }
 
     private suspend fun fetch(id: ThreadId, path: String): ArchivePage {
-        val html = web.get(web.urls.archivePage(path))
-        val page = parseOrDrift(parsing) { ArchivePageParser.parse(html) }
+        val page = parse(web.get(web.urls.archivePage(path)))
         store(id, page)
         return page
     }
 
-    private suspend fun store(id: ThreadId, page: ArchivePage) {
-        val now = clock.millis()
-        val path = page.partPages[page.pageInPart - 1].path
+    private suspend fun parse(html: String): ArchivePage = parseOrDrift(parsing) { ArchivePageParser.parse(html) }
+
+    private suspend fun threadRow(id: ThreadId, page: ArchivePage, now: Long): ArchiveThreadEntity {
         val old = dao.thread(id.value)
-        val thread = ArchiveThreadEntity(
+        return ArchiveThreadEntity(
             threadId = id.value, title = page.title, forumId = page.forum?.id, forumTitle = page.forum?.title,
             groupId = page.forum?.groupId, pages = page.partPages.joinToString("\n") { "${it.path}|${it.label.orEmpty()}" },
             fetchedAt = now, searchedDay = old?.searchedDay ?: 0, searchedToday = old?.searchedToday ?: 0,
         )
+    }
+
+    private fun pageRow(id: ThreadId, page: ArchivePage, now: Long): ArchivePageEntity {
         val range = rangeOf(page)
-        dao.store(
-            thread,
-            ArchivePageEntity(id.value, path, range.first, range.last, fetchedAt = now, accessedAt = now),
-            page.posts.map { it.toEntity(id, path) },
-            page.posts.map { ArchiveIndexEntity(id.value, it.replyId, path, it.number, it.author.id, it.author.name, it.userGroup, it.repOf, it.isOp) },
-            keep = KEEP_PAGES,
-        )
+        return ArchivePageEntity(id.value, page.partPages[page.pageInPart - 1].path, range.first, range.last, fetchedAt = now, accessedAt = now)
+    }
+
+    private fun indexRows(id: ThreadId, page: ArchivePage, path: String) =
+        page.posts.map { ArchiveIndexEntity(id.value, it.replyId, path, it.number, it.author.id, it.author.name, it.userGroup, it.repOf, it.isOp) }
+
+    private suspend fun store(id: ThreadId, page: ArchivePage) {
+        val now = clock.millis()
+        val row = pageRow(id, page, now)
+        dao.store(threadRow(id, page, now), row, page.posts.map { it.toEntity(id, row.path) }, indexRows(id, page, row.path), keep = KEEP_PAGES)
+    }
+
+    private suspend fun storeScanned(id: ThreadId, page: ArchivePage, kept: List<Post>) {
+        val now = clock.millis()
+        val row = pageRow(id, page, now)
+        dao.storeScanned(threadRow(id, page, now), row, kept.map { it.toEntity(id, row.path) }, indexRows(id, page, row.path), keep = KEEP_PAGES)
     }
 
     private suspend fun cachedThread(id: ThreadId): ArchiveThread? = dao.thread(id.value)?.let { t ->
@@ -257,10 +344,23 @@ class ArchiveRepository internal constructor(
 
 /** Posts picked out in the app from the archive (replacing the site's signed-in `ux=`, `um=`, `ur=` views). */
 sealed interface PostFilter {
-    data class User(val userId: Long) : PostFilter
-    data object Op : PostFilter
-    data object Moderators : PostFilter
-    data object Reps : PostFilter
+    fun matches(userId: Long, isOp: Boolean, role: PostRole?): Boolean
+
+    data class User(val userId: Long) : PostFilter {
+        override fun matches(userId: Long, isOp: Boolean, role: PostRole?) = userId == this.userId
+    }
+
+    data object Op : PostFilter {
+        override fun matches(userId: Long, isOp: Boolean, role: PostRole?) = isOp
+    }
+
+    data object Moderators : PostFilter {
+        override fun matches(userId: Long, isOp: Boolean, role: PostRole?) = role == PostRole.MODERATOR
+    }
+
+    data object Reps : PostFilter {
+        override fun matches(userId: Long, isOp: Boolean, role: PostRole?) = role == PostRole.REP
+    }
 }
 
 /** A post found by a [PostFilter]: enough to list it and to open its page. */

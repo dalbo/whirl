@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import au.howesthat.whirl.core.data.ArchiveRepository
 import au.howesthat.whirl.core.model.PostBody
 import au.howesthat.whirl.core.model.WatchAction
 import au.howesthat.whirl.core.ui.ErrorState
@@ -80,15 +81,25 @@ internal sealed interface ScrollRow {
     data class PostRow(val post: UiPost) : ScrollRow { override val key: Any = post.post.replyId }
     data class Later(val page: Int, val pages: Int, val label: String?) : ScrollRow { override val key = "later" }
     data object MarkRead : ScrollRow { override val key = "mark_read" }
+    data class FilterHeader(val filtered: Filtered, val pages: Int, val toPost: Int?) : ScrollRow { override val key = "filter" }
+    /** Find's offer to search the earlier pages for [query]. */
+    data class SearchThread(val query: String) : ScrollRow { override val key = "search_thread" }
 }
 
 /**
  * The rows for [state]: status, moderator note, "Load earlier", the posts with a divider where the archive left posts
  * out and the "New posts" marker before [firstUnread], "Load later", and Mark as read at the newest post.
  */
-internal fun scrollRows(state: ScrollUiState, firstUnread: Int?, markReadButton: Boolean): List<ScrollRow> = buildList {
+internal fun scrollRows(state: ScrollUiState, firstUnread: Int?, markReadButton: Boolean, findQuery: String? = null): List<ScrollRow> = buildList {
     val thread = state.thread
     add(ScrollRow.Status)
+    val filtered = state.filtered
+    if (filtered != null) {
+        add(ScrollRow.FilterHeader(filtered, thread?.pages?.size ?: 1, state.posts.lastOrNull()?.post?.number))
+        filtered.posts.forEach { add(ScrollRow.PostRow(it)) }
+        return@buildList
+    }
+    if (!findQuery.isNullOrBlank() && state.canLoadEarlier) add(ScrollRow.SearchThread(findQuery))
     state.note?.let { add(ScrollRow.Note(it)) }
     if (thread != null && state.canLoadEarlier) {
         val index = state.window.first().index - 1
@@ -133,13 +144,18 @@ internal fun ScrollThread(
     val matchIds = find?.replyIds.orEmpty()
     OnFindShortcut { if (findQuery == null) viewModel.setFindQuery("") }
 
-    val rows = remember(state, firstUnread, isWatched, settings.watchedAutoMarkAsRead) {
-        scrollRows(state, firstUnread, markReadButton = isWatched && !settings.watchedAutoMarkAsRead)
+    val rows = remember(state, firstUnread, isWatched, settings.watchedAutoMarkAsRead, findQuery) {
+        scrollRows(state, firstUnread, markReadButton = isWatched && !settings.watchedAutoMarkAsRead, findQuery = findQuery)
     }
 
     // Bring the requested post into view once its rows exist.
     LaunchedEffect(request, rows) {
         val r = request ?: return@LaunchedEffect
+        if (r.top) {
+            list.scrollToItem(0)
+            viewModel.scrollHandled()
+            return@LaunchedEffect
+        }
         val posts = rows.filterIsInstance<ScrollRow.PostRow>()
         if (posts.isEmpty()) return@LaunchedEffect
         val target = r.indexIn(posts.map { it.post.post }) ?: return@LaunchedEffect
@@ -202,7 +218,7 @@ internal fun ScrollThread(
                     isWatched = isWatched,
                     onWatchAction = viewModel::perform,
                     myUserId = myUserId,
-                    onUsersPosts = viewModel::showUsersPosts,
+                    onUsersPosts = { viewModel.showMyPosts() },
                     onOpPosts = viewModel::showOpPosts,
                     onModeratorPosts = viewModel::showModeratorPosts,
                     onRepPosts = viewModel::showRepPosts,
@@ -265,7 +281,7 @@ internal fun ScrollThread(
                                             onLink = viewModel::openLink,
                                             onQuote = viewModel::openQuote,
                                             onUser = { viewModel.openUser(post.post.author.id) },
-                                            onUsersPosts = { viewModel.showUsersPosts(post.post.author.id) },
+                                            onUsersPosts = { viewModel.showUsersPosts(post.post.author.id, post.post.author.name) },
                                             onReply = { browser(viewModel.replyToPostUrl(post.post)) },
                                             onEdit = { browser(viewModel.editPostUrl(post.post)) },
                                             onReport = { browser(viewModel.reportPostUrl(post.post)) },
@@ -280,6 +296,13 @@ internal fun ScrollThread(
                                     pageLabel(row.page, row.pages, row.label),
                                     loading = state.loading == ScrollLoad.LATER,
                                     onClick = viewModel::loadLater,
+                                )
+                                is ScrollRow.FilterHeader -> FilterHeaderRow(row, viewModel)
+                                is ScrollRow.SearchThread -> LoadRow(
+                                    stringResource(R.string.scroll_search_earlier),
+                                    stringResource(R.string.scroll_search_for, row.query),
+                                    loading = false,
+                                    onClick = { viewModel.searchThread(row.query) },
                                 )
                                 ScrollRow.MarkRead -> Box(Modifier.readableWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                                     FilledTonalButton(onClick = { viewModel.perform(WatchAction.MARK_READ) }) {
@@ -363,5 +386,62 @@ private fun LoadRow(text: String, detail: String, loading: Boolean, onClick: () 
             Text(text)
         }
         Text(detail, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun filterLabel(filter: ReaderFilter): String = when (filter) {
+    is ReaderFilter.User -> stringResource(R.string.post_users_posts, filter.name)
+    ReaderFilter.Mine -> stringResource(R.string.filter_mine)
+    ReaderFilter.Op -> stringResource(R.string.filter_op)
+    ReaderFilter.Moderators -> stringResource(R.string.filter_mods)
+    ReaderFilter.Reps -> stringResource(R.string.filter_reps)
+    is ReaderFilter.Text -> stringResource(R.string.scroll_search_for, filter.query)
+}
+
+/**
+ * The filter in force, what it found and where it looked ("12 posts in posts 45,601–46,125"), with Search earlier
+ * pages (or its progress and Stop) and Show all posts.
+ */
+@Composable
+private fun FilterHeaderRow(row: ScrollRow.FilterHeader, viewModel: ScrollThreadViewModel) {
+    val f = row.filtered
+    val numbers = NumberFormat.getIntegerInstance()
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = cardShape(),
+        modifier = Modifier.readableWidth().cardGutter(),
+    ) {
+        Column(
+            Modifier.padding(16.dp).semantics { liveRegion = LiveRegionMode.Polite },
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(filterLabel(f.filter), style = MaterialTheme.typography.titleSmall)
+            val range = row.toPost?.let { stringResource(R.string.scroll_filter_range, numbers.format(f.fromPost), numbers.format(it)) }.orEmpty()
+            Text(
+                pluralStringResource(R.plurals.scroll_filter_found, f.posts.size, f.posts.size, range),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            when (f.stoppedBy) {
+                ArchiveRepository.Stop.DAILY_CAP -> stringResource(R.string.scroll_limit)
+                ArchiveRepository.Stop.RATE_LIMITED -> stringResource(R.string.scroll_rate_limited)
+                null -> null
+            }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val progress = f.progress
+                if (progress != null) {
+                    Text(
+                        stringResource(R.string.scroll_searching, f.fromIndex, row.pages),
+                        Modifier.align(Alignment.CenterVertically),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                    OutlinedButton(onClick = viewModel::stopSearch) { Text(stringResource(R.string.scroll_stop)) }
+                } else if (f.fromIndex > 0) {
+                    FilledTonalButton(onClick = viewModel::searchEarlier) { Text(stringResource(R.string.scroll_search_earlier)) }
+                }
+                OutlinedButton(onClick = viewModel::clearFilter) { Text(stringResource(R.string.scroll_show_all)) }
+            }
+        }
     }
 }

@@ -68,6 +68,8 @@ data class ThreadRoute(
     val lastReadPost: Int? = null,
     /** Scroll reader (true) or pages (false); null follows the "Read threads as one scroll" setting. */
     val scroll: Boolean? = null,
+    /** A [ReaderFilter.code] the scroll reader opens with. */
+    val filter: String? = null,
 ) : NavKey
 
 /** A post ready to draw: its body parsed into blocks. */
@@ -125,6 +127,8 @@ sealed interface ThreadEvent {
     data class Failed(val error: Throwable) : ThreadEvent
     /** Back to the list ("back to list after marking read"). */
     data object Back : ThreadEvent
+    /** A filter from the paged reader: the thread switches to the scroll reader, which filters in the app. */
+    data class ReadFiltered(val filter: ReaderFilter) : ThreadEvent
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -385,43 +389,20 @@ class ThreadViewModel @AssistedInject constructor(
         load(LAST_PAGE, force = false)
     }
 
-    private val _opUserId = MutableStateFlow<Long?>(null)
-    /** The thread starter, once "Posts by OP" has found them. */
-    val opUserId: StateFlow<Long?> = _opUserId.asStateFlow()
-
-    /** "Posts by OP": the thread starter wrote the first post on page 1, which is fetched if it is not cached. */
-    fun showOpPosts() {
-        _opUserId.value?.let { showUsersPosts(it); return }
-        viewModelScope.launch {
-            try {
-                repo.load(threadId, 1, route.forumId)
-                val op = repo.page(threadId, 1).first()?.value?.posts?.firstOrNull()?.author?.id ?: return@launch
-                _opUserId.value = op
-                showUsersPosts(op)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                events.send(ThreadEvent.Failed(e))
-            }
-        }
-    }
-
     /**
-     * One user's posts, in the browser. Whirlpool shows filtered views (one user's posts, moderators', reps') only to
-     * signed-in users ("You must be registered and signed in", checked 2026-10-23), and Whirl has no web session, so
-     * they open in the browser, which has the user's login. (v1.8 filters the archive's posts in the app instead.)
+     * The filters (posts by a user, the OP, moderators, reps) switch to the scroll reader, which filters the thread's
+     * archive pages in the app: Whirlpool shows its own filtered views only to signed-in users, and Whirl has no web
+     * session.
      */
-    fun showUsersPosts(userId: Long) = browse(urls.thread(threadId, userId = userId).toString())
-
-    /** Moderators' posts, in the browser (see [showUsersPosts]). */
-    fun showModeratorPosts() = browse(urls.thread(threadId, moderatorsOnly = true).toString())
-
-    /** Reps' posts, in the browser (see [showUsersPosts]). */
-    fun showRepPosts() = browse(urls.thread(threadId, repsOnly = true).toString())
-
-    private fun browse(url: String) {
-        viewModelScope.launch { events.send(ThreadEvent.Browser(url)) }
+    private fun readFiltered(filter: ReaderFilter) {
+        viewModelScope.launch { events.send(ThreadEvent.ReadFiltered(filter)) }
     }
+
+    fun showUsersPosts(userId: Long, name: String) = readFiltered(ReaderFilter.User(userId, name))
+    fun showMyPosts() = readFiltered(ReaderFilter.Mine)
+    fun showOpPosts() = readFiltered(ReaderFilter.Op)
+    fun showModeratorPosts() = readFiltered(ReaderFilter.Moderators)
+    fun showRepPosts() = readFiltered(ReaderFilter.Reps)
 
     fun openUser(userId: Long) {
         viewModelScope.launch { events.send(ThreadEvent.OpenUser(userId)) }

@@ -163,4 +163,46 @@ class ScrollThreadViewModelTest {
         // The cached archive page still holds the newest post, so it is not fetched again.
         assertEquals(2, server.requestCount)
     }
+
+    @Test
+    fun `a filter shows the window's matches, and searching earlier stops when Whirlpool says slow down`() = runTest {
+        enqueue("thread_97r5wzn3_last.html")
+        enqueue("archive_97r5wzn3_last.html")
+        val vm = viewModel(ThreadRoute("97r5wzn3", -1))
+        val opened = await { vm.state.first { it.window.isNotEmpty() } }
+        // The opening request is set just after the window: wait for it, so it cannot replace the filter's.
+        await { vm.scrollTo.filterNotNull().first() }
+        val poster = opened.posts.first().post.author
+        vm.filterTo(ReaderFilter.User(poster.id, poster.name))
+        val filtered = await { vm.state.first { it.filtered?.posts?.isNotEmpty() == true } }.filtered!!
+        assertEquals(ScrollRequest(top = true), vm.scrollTo.value, "results start at their header")
+        assertTrue(filtered.posts.all { it.post.author.id == poster.id })
+        assertEquals(opened.posts.count { it.post.author.id == poster.id }, filtered.posts.size)
+        assertEquals(57, filtered.fromIndex)
+        assertEquals(2, server.requestCount, "the window's page is cached: nothing fetched")
+
+        server.enqueue(MockResponse.Builder().code(429).body("").build())
+        vm.searchEarlier()
+        val stopped = await { vm.state.first { it.filtered?.stoppedBy != null } }.filtered!!
+        assertEquals(ArchiveRepository.Stop.RATE_LIMITED, stopped.stoppedBy)
+        assertEquals(null, stopped.progress)
+        assertEquals(filtered.posts, stopped.posts, "what was found stays")
+        server.takeRequest()
+        server.takeRequest()
+        assertEquals("/archive/97r5wzn3-57", server.takeRequest().target)
+
+        vm.setTopPost(filtered.posts.last().post.number)
+        vm.clearFilter()
+        assertEquals(null, vm.state.value.filtered)
+        assertEquals(ScrollRequest(number = filtered.posts.last().post.number), vm.scrollTo.value, "back at the post, among all the others")
+    }
+
+    @Test
+    fun `a filter from the paged reader applies once the window opens`() = runTest {
+        enqueue("thread_97r5wzn3_last.html")
+        enqueue("archive_97r5wzn3_last.html")
+        val vm = viewModel(ThreadRoute("97r5wzn3", -1, filter = ReaderFilter.Moderators.code))
+        val state = await { vm.state.first { it.filtered != null && it.window.isNotEmpty() } }
+        assertEquals(ReaderFilter.Moderators, state.filtered!!.filter)
+    }
 }

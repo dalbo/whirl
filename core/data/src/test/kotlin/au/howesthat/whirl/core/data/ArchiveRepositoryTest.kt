@@ -192,4 +192,46 @@ class ArchiveRepositoryTest {
         assertEquals(524, repo.posts(rtx, "/archive/97r5wzn3-58").size)
         assertEquals(61, repo.filter(leaptel, PostFilter.Reps).size, "the index outlives the bodies")
     }
+
+    @Test
+    fun `a scan keeps only the matching posts' bodies and answers again from the cache`() = runTest {
+        enqueue("archive_3l10nlj5_reps.html")
+        val path = "/archive/3l10nlj5"
+        val reps = repo.scan(leaptel, listOf(path), ArchiveRepository.ScanQuery.Filter(PostFilter.Reps))
+        assertEquals(61, reps.matches.size)
+        assertEquals(listOf(path), requests())
+        // The page is not whole: the reader would fetch it, but the reps' posts are there to show.
+        assertEquals(emptyList(), repo.posts(leaptel, path))
+        val shown = repo.postsByIds(leaptel, reps.matches)
+        assertEquals(61, shown.size)
+        assertTrue(shown.all { it.role == PostRole.REP && it.bodyHtml.isNotEmpty() })
+
+        // Again: the index and the kept bodies answer it.
+        assertEquals(reps.matches, repo.scan(leaptel, listOf(path), ArchiveRepository.ScanQuery.Filter(PostFilter.Reps)).matches)
+        assertEquals(emptyList(), requests())
+
+        // Moderators' posts are in the index but their bodies were not kept: fetched again.
+        enqueue("archive_3l10nlj5_reps.html")
+        assertEquals(3, repo.scan(leaptel, listOf(path), ArchiveRepository.ScanQuery.Filter(PostFilter.Moderators)).matches.size)
+        assertEquals(listOf(path), requests())
+
+        // Reading the page fetches it whole.
+        enqueue("archive_3l10nlj5_reps.html")
+        repo.loadPages(leaptel, listOf(path), ArchiveRepository.Need.BODIES)
+        assertEquals(listOf(path), requests())
+        assertEquals(616, repo.posts(leaptel, path).size)
+    }
+
+    @Test
+    fun `a text scan of a whole cached page fetches nothing`() = runTest {
+        enqueue("thread_97r5wzn3_last.html")
+        enqueue("archive_97r5wzn3_last.html")
+        val opened = repo.open(rtx)
+        requests()
+        val found = repo.scan(rtx, listOf(opened.path), ArchiveRepository.ScanQuery.Text(au.howesthat.whirl.core.model.TextQuery("5090")))
+        assertTrue(found.matches.isNotEmpty())
+        assertEquals(emptyList(), requests())
+        val posts = repo.postsByIds(rtx, found.matches)
+        assertEquals(found.matches, posts.map { it.replyId })
+    }
 }
