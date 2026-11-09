@@ -393,6 +393,9 @@ interface ArchiveDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPage(page: ArchivePageEntity)
 
+    @androidx.room.Update
+    suspend fun updatePage(page: ArchivePageEntity)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPosts(posts: List<ArchivePostEntity>)
 
@@ -454,6 +457,15 @@ interface ArchiveDao {
         deleteIndex(page.threadId, page.path)
         insertIndex(index)
         evict(keep, openThreadId = page.threadId)
+    }
+
+    /** New posts at the end of a cached page: [page] with its new last post, and the posts and index rows to add. */
+    @Transaction
+    suspend fun append(page: ArchivePageEntity, posts: List<ArchivePostEntity>, index: List<ArchiveIndexEntity>) {
+        // An update, not REPLACE: replacing the row would cascade-delete the posts already on the page.
+        updatePage(page)
+        insertPosts(posts)
+        insertIndex(index)
     }
 
     /** Replaces one page, its posts and its index rows, then trims the page cache to [keep] pages. */

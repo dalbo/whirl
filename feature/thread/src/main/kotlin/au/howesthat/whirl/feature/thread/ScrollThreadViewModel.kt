@@ -186,23 +186,58 @@ class ScrollThreadViewModel @AssistedInject constructor(
     fun topPost(): Int? = savedState.get<Int>(ANCHOR_KEY)
 
     /** Opens the window at the archive page holding post [number] (null: the newest). */
+    /**
+     * Opens the window at the archive page holding post [number] (null: the newest). A page cached whole shows at once;
+     * the check for newer posts then runs, and new posts join the page on screen without moving the reader.
+     */
     private fun open(number: Int?, request: ScrollRequest, force: Boolean = false, kind: ScrollLoad = ScrollLoad.OPEN) {
         launchLoad(kind) {
-            val opened = archive.open(threadId, number, route.forumId, force)
-            val index = opened.thread.indexOf(opened.path)
-            val page = parsed(index, opened.path, archive.posts(threadId, opened.path))
+            // A refresh has its window on screen already.
+            val cached = if (force) null else archive.openCached(threadId, number)
+            if (cached != null) show(cached, request)
+            val opened = try {
+                archive.open(threadId, number, route.forumId, force)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Something is on screen: say what went wrong above it rather than replacing it.
+                if (_state.value.window.isEmpty()) throw e
+                _state.update { it.copy(error = e) }
+                return@launchLoad
+            }
+            val showing = _state.value.window.firstOrNull { it.path == opened.path }
             val note = opened.moderatorNoteHtml?.let { withContext(parsing) { PostBodyParser.parse(it) } }
-            _state.update {
-                it.copy(
-                    title = opened.thread.title, thread = opened.thread, window = listOf(page),
-                    note = note ?: it.note, offline = opened.offline, error = null,
-                )
+            when {
+                showing == null -> show(opened, request)
+                opened.changed -> {
+                    val page = reparsed(showing, archive.posts(threadId, opened.path))
+                    _state.update { s ->
+                        s.copy(
+                            thread = opened.thread, window = s.window.map { if (it.path == opened.path) page else it },
+                            note = note ?: s.note, offline = opened.offline, error = null,
+                        )
+                    }
+                }
+                else -> _state.update { it.copy(thread = opened.thread, note = note ?: it.note, offline = opened.offline, error = null) }
             }
-            _scrollTo.value = request
-            pendingFilter?.let {
-                pendingFilter = null
-                filterTo(it)
-            }
+        }
+    }
+
+    /** Puts [opened]'s page alone in the window and brings [request]'s post into view. */
+    private suspend fun show(opened: ArchiveRepository.Opened, request: ScrollRequest) {
+        val index = opened.thread.indexOf(opened.path)
+        val page = parsed(index, opened.path, archive.posts(threadId, opened.path))
+        val note = opened.moderatorNoteHtml?.let { withContext(parsing) { PostBodyParser.parse(it) } }
+        _state.update {
+            it.copy(
+                title = opened.thread.title, thread = opened.thread, window = listOf(page),
+                note = note ?: it.note, offline = opened.offline, error = null,
+            )
+        }
+        _scrollTo.value = request
+        pendingFilter?.let {
+            pendingFilter = null
+            filterTo(it)
         }
     }
 
@@ -474,6 +509,12 @@ class ScrollThreadViewModel @AssistedInject constructor(
 
     private suspend fun parsed(index: Int, path: String, posts: List<Post>): ScrollPage = withContext(parsing) {
         ScrollPage(index, path, posts.map { UiPost(it, PostBodyParser.parse(it.bodyHtml)) })
+    }
+
+    /** [page] with [posts], parsing only the posts that are new or changed (a handful, after new posts arrive). */
+    private suspend fun reparsed(page: ScrollPage, posts: List<Post>): ScrollPage = withContext(parsing) {
+        val had = page.posts.associateBy { it.post.replyId }
+        ScrollPage(page.index, page.path, posts.map { p -> had[p.replyId]?.takeIf { it.post == p } ?: UiPost(p, PostBodyParser.parse(p.bodyHtml)) })
     }
 
     private fun launchLoad(kind: ScrollLoad, block: suspend () -> Unit) {
