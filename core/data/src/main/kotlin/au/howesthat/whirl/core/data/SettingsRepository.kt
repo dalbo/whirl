@@ -94,6 +94,7 @@ internal val SETTING_FIELDS: List<SettingField<*, *>> = listOf(
     bool("open_threads_in_browser", Settings::openThreadsInBrowser) { copy(openThreadsInBrowser = it) },
     bool("load_public_at_bottom", Settings::loadPublicAtBottom) { copy(loadPublicAtBottom = it) },
     bool("load_private_at_bottom", Settings::loadPrivateAtBottom) { copy(loadPrivateAtBottom = it) },
+    bool("read_threads_as_scroll", Settings::readThreadsAsScroll) { copy(readThreadsAsScroll = it) },
     int("recent_days", Settings::recentHistoryDays) { copy(recentHistoryDays = it) },
     bool("load_recent_at_top", Settings::loadRecentAtTop) { copy(loadRecentAtTop = it) },
     bool("ignore_own_replies_recent", Settings::ignoreOwnRepliesRecent) { copy(ignoreOwnRepliesRecent = it) },

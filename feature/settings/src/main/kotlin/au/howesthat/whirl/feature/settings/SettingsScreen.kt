@@ -142,6 +142,7 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, onCheckHistory: 
                 Toggle(stringResource(R.string.settings_open_in_browser), settings.openThreadsInBrowser, stringResource(R.string.settings_open_in_browser_summary)) { v -> update { it.copy(openThreadsInBrowser = v) } }
                 Toggle(stringResource(R.string.settings_public_at_bottom), settings.loadPublicAtBottom) { v -> update { it.copy(loadPublicAtBottom = v) } }
                 Toggle(stringResource(R.string.settings_private_at_bottom), settings.loadPrivateAtBottom) { v -> update { it.copy(loadPrivateAtBottom = v) } }
+                Toggle(stringResource(R.string.settings_read_as_scroll), settings.readThreadsAsScroll, stringResource(R.string.settings_read_as_scroll_summary)) { v -> update { it.copy(readThreadsAsScroll = v) } }
             }
 
             Group(stringResource(R.string.settings_recent)) {

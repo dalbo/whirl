@@ -103,6 +103,8 @@ fun WhirlApp(
     twoPane: Boolean = false,
     /** Its "Only in landscape" option. */
     twoPaneLandscapeOnly: Boolean = false,
+    /** The "Read threads as one scroll" setting: how a thread opens unless its route says. */
+    scrollThreads: Boolean = false,
     /** How many panes fit; null measures the window. Tests pass one, since Robolectric's window is not the point. */
     paneDirective: PaneScaffoldDirective? = null,
     onLinkHandled: () -> Unit = {},
@@ -202,7 +204,7 @@ fun WhirlApp(
         entry<WatchedRoute>(metadata = listMeta) { ListPane(it) { WatchedScreen(drawerIcon, listNav) } }
         entry<PopularRoute>(metadata = listMeta) { ListPane(it) { PopularScreen(drawerIcon, listNav) } }
         entry<ForumRoute>(metadata = listMeta) { ListPane(it) { ForumScreen(it, backIcon, listNav) } }
-        entry<ThreadRoute>(metadata = threadMeta) { ThreadScreen(it, backIcon, threadNav) }
+        entry<ThreadRoute>(metadata = threadMeta) { ThreadScreen(it, backIcon, threadNav, scrollByDefault = scrollThreads) }
         entry<UserRoute>(metadata = listMeta) { ListPane(it) { UserScreen(it, backIcon, listNav) } }
         entry<SearchRoute>(metadata = listMeta) { ListPane(it) { SearchScreen(it, backIcon, listNav) } }
         entry<ForumsRoute>(metadata = listMeta) { ListPane(it) { ForumsScreen(drawerIcon, onOpenForum = listNav.openForum, onSearch = { words -> listNav.openSearch(SearchRoute(query = words)) }) } }

@@ -75,6 +75,8 @@
     <string name="settings_recent_at_top">Open at the first page</string>
     <string name="settings_ignore_own_recent">Ignore my own replies</string>
     <string name="settings_watched">Watched threads</string>
+    <string name="settings_read_as_scroll">Read threads as one scroll</string>
+    <string name="settings_read_as_scroll_summary">Up to 800 posts at a time instead of pages of 20. Any thread can switch from its menu.</string>
     <string name="settings_watched_at_top">Open at the first page instead of the first unread post</string>
     <string name="settings_ignore_own_watched">Don\'t notify about my own replies</string>
     <string name="settings_auto_mark_read">Mark as read when opened</string>

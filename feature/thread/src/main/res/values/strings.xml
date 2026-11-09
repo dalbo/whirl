@@ -41,4 +41,21 @@
         <item quantity="one">%1$d post</item>
         <item quantity="other">%1$d posts</item>
     </plurals>
+    <string name="read_as_scroll">Read as one scroll</string>
+    <string name="read_in_pages">Read in pages</string>
+    <string name="first_post">First post</string>
+    <string name="newest_post">Newest post</string>
+    <string name="scroll_load_earlier">Load earlier posts</string>
+    <string name="scroll_load_later">Load later posts</string>
+    <string name="scroll_archive_page">Archive page %1$d of %2$d</string>
+    <string name="scroll_archive_page_dated">Archive page %1$d of %2$d, %3$s</string>
+    <string name="scroll_posts_range">Posts %1$s–%2$s</string>
+    <string name="scroll_loading">Loading posts</string>
+    <string name="scroll_loaded">Posts loaded</string>
+    <string name="scroll_offline">Offline: showing saved posts</string>
+    <string name="scroll_limit">Whirl has loaded as many earlier pages of this thread as it will today.</string>
+    <plurals name="scroll_posts_missing">
+        <item quantity="one">%1$d post not shown (hidden by a moderator)</item>
+        <item quantity="other">%1$d posts not shown (hidden by moderators)</item>
+    </plurals>
 </resources>
