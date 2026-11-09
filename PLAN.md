@@ -204,7 +204,7 @@ Accessibility (TalkBack, font scaling), landscape, Material You, store listing t
 
 **Backlog**: app widget, loading linked images (Whirlpool has no inline images; a later idea), and the archive idea below.
 
-**Archive reader and in-app post filters (idea 2026-10-23; decided 2026-11-05 for v1.8: `docs/plans/v1.7.md` §8 is what the v1.8 plan must cover; the measurements below are its starting point).** `/archive/<id>` is the thread 800 posts at a time (`/archive/<id>-N` for later pages), public (no login), every post with `data-userid`, name and `.usergroup`. Two uses of one download:
+**Archive reader and in-app post filters (released in v1.8.0, 2026-11-09: `docs/plans/v1.8.md`; idea 2026-10-23; decided 2026-11-05 for v1.8: `docs/plans/v1.7.md` §8 is what the v1.8 plan must cover; the measurements below are its starting point).** `/archive/<id>` is the thread 800 posts at a time (`/archive/<id>-N` for later pages), public (no login), every post with `data-userid`, name and `.usergroup`. Two uses of one download:
 - *Archive reader*: read a thread a few hundred posts at a time by scrolling instead of paging; offline once cached.
 - *Filters in the app*: since v1.1.2, "Posts by me / OP / moderators / reps" and "user's posts" open the browser, because Whirlpool's `ux=`, `um=`, `ur=` views need a login (checked 2026-10-23). From the archive pages, Whirl could filter by user id itself.
 

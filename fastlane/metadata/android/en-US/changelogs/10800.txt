@@ -1,0 +1,6 @@
+Whirl 1.8.0
+- Read a thread as one scroll of up to 800 posts: Settings › Threads, or any thread's ⋮ menu
+- Posts by me, the OP, moderators, reps or anyone filter in the app, back through the whole thread
+- Find can search the whole thread
+- Drag the scroll bar to move through long threads
+- Threads you have read open at once

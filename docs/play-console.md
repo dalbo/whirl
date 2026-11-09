@@ -119,7 +119,9 @@ Google Play's Data safety section", read 2026-10-21).
 > Hi, I'm d@llin (#216903). I've written Whirl, a free, open-source (MIT) Android reader for Whirlpool that replaces
 > Whirldroid. It uses the API with each user's own key for watched threads, news and actions, and reads public forum and
 > thread pages for display, at about the rate a person browses (no background scraping; notifications use one
-> `get=watched` call per interval). It never logs in to the site: posting, private forums and PMs open in the user's
+> `get=watched` call per interval). Since v1.8 it can read a thread from its /archive/ pages (800 posts each) and
+> filter or search them in the app; earlier pages are fetched only when the reader asks, one a second, at most 60
+> per thread a day, and cached. It never logs in to the site: posting, private forums and PMs open in the user's
 > browser. It's free with no ads, analytics or revenue.
 >
 > Before I publish it on Google Play I wanted to check: (1) are you comfortable with an app reading public pages this

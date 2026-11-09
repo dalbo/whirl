@@ -2,6 +2,14 @@
 
 Run on a real phone before tagging a release (PLAN.md §8). Debug builds install beside the release app as `au.howesthat.whirl.debug`. Note the build, the phone and its Android version, and the network (Wi-Fi or mobile data) with the result.
 
+## v1.8 (archive reader)
+- [ ] Settings › Threads › Read threads as one scroll: a watched thread opens at its first unread post (also when that post was hidden); a long thread opens at its newest posts; ⋮ › Read in pages / Read as one scroll keeps the post at the top.
+- [ ] Load earlier posts keeps your place; the bar shows "Archive page N of M" with its dates; a gap divider where a post was hidden.
+- [ ] Posts by OP / moderators / reps / a poster (from pages too): results from the loaded posts, Search earlier pages with progress and Stop, Show all posts returns to the post. Reps show their company.
+- [ ] Reopen a thread read before: posts show at once; a few new posts appear below without moving you.
+- [ ] Drag the scroll bar on an 800-post page and a 20-post page: smooth, the bubble shows the post number, a fast drag does not freeze; the Back gesture still works away from the thumb.
+- [ ] TalkBack through Load earlier and the filter header; rotate and kill the process (`adb shell am kill`) mid-thread: it reopens at the same post; offline, a cached thread opens with "Offline: showing saved posts".
+
 ## v1.0 (polish)
 **TalkBack** (Settings → Accessibility → TalkBack; or hold both volume keys if the shortcut is on)
 - [ ] Watched, a forum and a thread: every button is read with a name (menu, back, search, refresh, more options, previous/next part).

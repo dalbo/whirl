@@ -9,7 +9,7 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 |---|---|
 | `PLAN.md` | Target features (from Whirldroid 2.14.12), verified Whirlpool behaviour, architecture, decisions (§5) |
 | `docs/plans/` | The plans since v1.3 (`v1.3.md` also covers v1.4; v1.5 had none) |
-| `docs/history.md` | How each phase and release was built and what it decided, up to v1.7.1 |
+| `docs/history.md` | How each phase and release was built and what it decided, up to v1.8.0 |
 | `fixtures/api/`, `fixtures/html/` | Real API responses and **raw** pages (no key inside); `fixtures/README.md` |
 | `tools/capture/` | Headed Playwright captures, the only way past Cloudflare from this machine |
 | `docs/device-checklist.md` | The phone pass before each release |
@@ -58,7 +58,7 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 | Module | What it holds |
 |---|---|
 | `:core:model` | `ThreadId`, `WhirlpoolError`, list/thread/post models, `PostBody`, `TextQuery`, `WatchAction`, `WhirlpoolSite` |
-| `:core:scraper` | Pure JVM parsers for the raw pages (`ThreadListParser`, `ThreadPageParser`, `PostBodyParser`, `UserProfileParser`, `WhirlpoolTime`). `SearchResultsParser` and `ForumIndexParser` are kept for v1.8 |
+| `:core:scraper` | Pure JVM parsers for the raw pages (`ThreadListParser`, `ThreadPageParser`, `PostBodyParser`, `UserProfileParser`, `WhirlpoolTime`). `ArchivePageParser` (v1.8: `/archive/` pages, parts, exact page mapping). `SearchResultsParser` and `ForumIndexParser` are kept for later |
 | `:core:network` | `WhirlpoolApi`, `WhirlpoolWeb`, `WhirlpoolUrls`; main-safe (bodies read on IO), Cloudflare detection, retries |
 | `:core:database` | Room **v6**, schemas in `core/database/schemas/` |
 | `:core:data` | Repositories, `SettingsRepository` (DataStore), `Refresher`, `WatchedRepository` + `WatchQueue`, dispatchers |
@@ -104,8 +104,9 @@ unlock it rather than changing its settings. It stays one pane in landscape (448
 unit tests. Per-release checks: `docs/device-checklist.md`.
 
 ## Open ideas
-- **v1.8: the archive reader** (in progress; plan `docs/plans/v1.8.md`, decided in docs/plans/v1.7.md §8): whole-thread reading from `/archive/<id>`, find in
-  the whole thread, posts by a user filtered in the app. First step: raw fixtures of a multi-page archive.
+- **v1.8: the archive reader** (released 2026-11-09; `docs/plans/v1.8.md`, history in `docs/history.md`): still to
+  check on the phone are §7's TalkBack, process-death and offline items. Follow-ups: a moderator view of whole-thread
+  search (the note in `docs/play-console.md` mentions it), "tap a filtered post to see it in context".
 - **Next release: Data Saver note.** With Data Saver on and Whirl not set to unrestricted data, Android blocks the
   background check on mobile data until Wi-Fi returns (debug app, 2026-11-07: a 1h38m gap while out; the check history
   header showed "data saver ON"). Show a note under the notification settings when
