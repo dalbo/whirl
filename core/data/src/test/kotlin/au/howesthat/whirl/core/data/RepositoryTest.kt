@@ -69,7 +69,8 @@ class RepositoryTest {
     // DataStore needs a scope that actually runs; a TestScope that nobody advances would hang every read.
     private val dataStoreScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val store by lazy { PreferenceDataStoreFactory.create(scope = dataStoreScope) { tmp.newFile("s.preferences_pb").also { it.delete() } } }
-    private val settings by lazy { SettingsRepository(store) }
+    private val accountStore by lazy { PreferenceDataStoreFactory.create(scope = dataStoreScope) { tmp.newFile("a.preferences_pb").also { it.delete() } } }
+    private val settings by lazy { SettingsRepository(store, accountStore) }
     private val api by lazy {
         WhirlpoolApi(WhirlpoolHttp.client("Whirl/test"), settings::apiKey, server.url("/api/"), RetryPolicy.NONE)
     }
@@ -364,7 +365,7 @@ class RepositoryTest {
         val oldScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         val file = File(tmp.root, "old.preferences_pb")
         val old = PreferenceDataStoreFactory.create(scope = oldScope) { file }
-        SettingsRepository(old).update { it.copy(theme = ThemeMode.DARK) }
+        SettingsRepository(old, accountStore).update { it.copy(theme = ThemeMode.DARK) }
         old.edit { p ->
             p[stringPreferencesKey("homepage")] = Settings().homepage.name
             p[intPreferencesKey("undo_seconds")] = Settings().undoSeconds
@@ -373,7 +374,7 @@ class RepositoryTest {
         oldScope.coroutineContext.job.cancelAndJoin() // one DataStore per file at a time
 
         val migrated = PreferenceDataStoreFactory.create(scope = dataStoreScope, migrations = listOf(DropStoredDefaults)) { file }
-        val settings = SettingsRepository(migrated)
+        val settings = SettingsRepository(migrated, accountStore)
         assertEquals(Settings(theme = ThemeMode.DARK), settings.settings.first())
         assertEquals(setOf("theme", "stored_defaults_dropped"), migrated.data.first().asMap().keys.map { it.name }.toSet())
     }
