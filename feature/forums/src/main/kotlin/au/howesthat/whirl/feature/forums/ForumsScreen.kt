@@ -33,6 +33,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import au.howesthat.whirl.core.data.ForumListItem
+import au.howesthat.whirl.core.data.LibraryRepository
 import au.howesthat.whirl.core.data.ForumRepository
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.TextQuery
@@ -59,7 +60,7 @@ import au.howesthat.whirl.core.ui.whirlTopBarColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -87,7 +88,11 @@ fun filterForums(sections: List<ForumSection>, query: TextQuery): List<ForumSect
 data class ForumsState(val forums: List<ForumListItem>?, val updatedAt: Instant?)
 
 @HiltViewModel
-class ForumsViewModel @Inject constructor(private val repo: ForumRepository, savedState: SavedStateHandle) : ViewModel() {
+class ForumsViewModel @Inject constructor(
+    private val repo: ForumRepository,
+    private val library: LibraryRepository,
+    savedState: SavedStateHandle,
+) : ViewModel() {
     private val screen = ListScreenState(viewModelScope, savedState)
     val query: StateFlow<String?> = screen.query
     val refreshing: StateFlow<Boolean> = screen.refreshing
@@ -95,8 +100,10 @@ class ForumsViewModel @Inject constructor(private val repo: ForumRepository, sav
 
     fun setQuery(query: String?) = screen.setQuery(query)
 
-    val state: StateFlow<ForumsState> = repo.forums
-        .map { ForumsState(it.value.takeIf { _ -> it.updatedAt != null || it.value.isNotEmpty() }, it.updatedAt) }
+    val state: StateFlow<ForumsState> = combine(repo.forums, library.favouriteForums) { cached, favourites ->
+        val forums = cached.value.map { it.copy(isFavourite = it.forum.id in favourites) }
+        ForumsState(forums.takeIf { cached.updatedAt != null || it.isNotEmpty() }, cached.updatedAt)
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ForumsState(null, null))
 
     init {
@@ -106,7 +113,7 @@ class ForumsViewModel @Inject constructor(private val repo: ForumRepository, sav
     fun refresh(force: Boolean = true) = screen.refreshSame(force) { repo.refresh(force) }
 
     fun setFavourite(forumId: Int, favourite: Boolean) {
-        viewModelScope.launch { repo.setFavourite(forumId, favourite) }
+        viewModelScope.launch { library.setFavourite(forumId, favourite) }
     }
 }
 

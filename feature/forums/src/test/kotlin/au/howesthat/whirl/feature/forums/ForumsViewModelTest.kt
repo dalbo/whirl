@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import au.howesthat.whirl.core.data.ForumRepository
+import au.howesthat.whirl.core.data.LibraryRepository
 import au.howesthat.whirl.core.database.WhirlDatabase
 import au.howesthat.whirl.core.network.RetryPolicy
 import au.howesthat.whirl.core.network.WhirlpoolApi
@@ -72,7 +73,7 @@ class ForumsViewModelTest {
 
     @Test
     fun `a pull to refresh while the list is loading is not dropped`() {
-        val vm = ForumsViewModel(ForumRepository(api, db.forumDao(), db.fetchLogDao(), Clock.systemUTC()), SavedStateHandle())
+        val vm = ForumsViewModel(ForumRepository(api, db.forumDao(), db.fetchLogDao(), Clock.systemUTC()), LibraryRepository(ApplicationProvider.getApplicationContext(), db.forumDao()), SavedStateHandle())
         assertTrue(firstHeld.await(5, TimeUnit.SECONDS), "the first load is under way")
         vm.refresh()
         assertTrue(secondCall.await(2, TimeUnit.SECONDS), "the pull to refresh fetches while the first load is still held")
@@ -87,7 +88,7 @@ class ForumsViewModelTest {
     @Test
     fun `pulling to refresh again while a refresh is running sends nothing more`() {
         held = 2
-        val vm = ForumsViewModel(ForumRepository(api, db.forumDao(), db.fetchLogDao(), Clock.systemUTC()), SavedStateHandle())
+        val vm = ForumsViewModel(ForumRepository(api, db.forumDao(), db.fetchLogDao(), Clock.systemUTC()), LibraryRepository(ApplicationProvider.getApplicationContext(), db.forumDao()), SavedStateHandle())
         assertTrue(firstHeld.await(5, TimeUnit.SECONDS))
         vm.refresh()
         assertTrue(secondCall.await(2, TimeUnit.SECONDS), "the pull to refresh replaces the opening load")

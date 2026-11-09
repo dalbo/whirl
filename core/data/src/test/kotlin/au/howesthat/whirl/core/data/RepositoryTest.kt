@@ -215,10 +215,9 @@ class RepositoryTest {
         val forums = ForumRepository(api, db.forumDao(), db.fetchLogDao(), clock)
         enqueue("api_forum.json")
         forums.refresh()
-        forums.setFavourite(92, true)
         val list = forums.forums.first().value
         assertEquals(54, list.size)
-        assertTrue(list.single { it.forum.id == 92 }.isFavourite)
+        assertTrue(list.single { it.forum.id == 1 }.isPrivate)
 
         val latest = LatestThreadsRepository(api, db.threadDao(), db.fetchLogDao(), clock)
         enqueue("api_threads_count100.json")

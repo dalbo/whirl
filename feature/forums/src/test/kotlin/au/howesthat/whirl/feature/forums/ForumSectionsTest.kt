@@ -9,7 +9,7 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ForumSectionsTest {
-    private fun f(id: Int, section: String, fav: Boolean = false) = ForumListItem(Forum(id, "F$id", section), fav, isPrivate = false)
+    private fun f(id: Int, section: String, fav: Boolean = false) = ForumListItem(Forum(id, "F$id", section), isPrivate = false, isFavourite = fav)
 
     @Test
     fun `favourites lead, then API sections in order`() {

@@ -115,17 +115,15 @@ class DaoTest {
     }
 
     @Test
-    fun `forum refresh keeps favourites and learned privacy`() = runTest {
+    fun `forum refresh keeps learned privacy, and v1_8's favourites stay readable`() = runTest {
         forums.replaceAll(listOf(ForumEntity(92, "Choosing an ISP", "ISPs", 0), ForumEntity(35, "Feedback", "Whirlpool", 1)))
-        forums.addFavourite(FavouriteForumEntity(92, 1))
+        db.openHelper.writableDatabase.execSQL("INSERT INTO favourite_forums (forum_id, added_at) VALUES (92, 1)")
         forums.setPrivate(35, true)
         forums.replaceAll(listOf(ForumEntity(35, "Feedback", "Whirlpool", 0), ForumEntity(92, "Choosing an ISP", "ISPs", 1)))
         val rows = forums.observeAll().first()
         assertEquals(listOf(35, 92), rows.map { it.id })
-        assertTrue(rows.single { it.id == 92 }.isFavourite)
         assertTrue(rows.single { it.id == 35 }.isPrivate)
-        forums.removeFavourite(92)
-        assertTrue(forums.observeAll().first().none { it.isFavourite })
+        assertEquals(listOf(92), forums.favouriteIds())
     }
 
     @Test
