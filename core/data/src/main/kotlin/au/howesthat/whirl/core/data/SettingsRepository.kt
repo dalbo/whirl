@@ -177,8 +177,17 @@ internal class MoveAccountOut(private val settings: DataStore<Preferences>) : Da
         }
     }
 
+    /**
+     * A failure here is swallowed: DataStore would otherwise fail every read and write of the account store until it
+     * succeeded (a full disk would stop the app starting). [shouldMigrate] sees the keys still in the settings file and
+     * tries the removal again on a later start.
+     */
     override suspend fun cleanUp() {
-        settings.edit { p -> AccountKeys.all.forEach { p.remove(it) } }
+        try {
+            settings.edit { p -> AccountKeys.all.forEach { p.remove(it) } }
+        } catch (_: IOException) {
+            // Retried on a later start.
+        }
     }
 
     private fun <T> MutablePreferences.copy(from: Preferences, key: Preferences.Key<T>) {
@@ -205,8 +214,8 @@ class SettingsRepository internal constructor(
     val settings: Flow<Settings> = store.data.map { it.toSettings() }
 
     /**
-     * The account store, retried a few times if it cannot be read: a failed [MoveAccountOut] fails every read until the
-     * next attempt, and the app's start would otherwise crash on it.
+     * The account store, its read retried a few times on a passing I/O error (a failed [MoveAccountOut] copy fails the
+     * read until the next attempt).
      */
     private val accountData: Flow<Preferences> = accountStore.data.retryWhen { cause, attempt ->
         (cause is IOException && attempt < 3).also { if (it) delay(100L shl attempt.toInt()) }

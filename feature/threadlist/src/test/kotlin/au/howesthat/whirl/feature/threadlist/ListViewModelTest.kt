@@ -116,8 +116,8 @@ class ListViewModelTest {
 
     @Before
     fun setUp() {
-        // DataStore reads the file once; do it here in wall-clock time, not on a test dispatcher.
-        runBlocking { withTimeout(10_000) { deps.settings.settings.first() } }
+        // DataStore reads each file once (settings, account); do it here in wall-clock time, not on a test dispatcher.
+        runBlocking { withTimeout(10_000) { deps.settings.settings.first(); deps.settings.account.first() } }
         Dispatchers.setMain(dispatcher)
     }
 

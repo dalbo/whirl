@@ -88,7 +88,7 @@ class ListKeyTest {
     @Before
     fun setUp() {
         // Settings live in one DataStore per JVM; read it once in wall-clock time.
-        runBlocking { withTimeout(10_000) { settings.settings.first() } }
+        runBlocking { withTimeout(10_000) { settings.settings.first(); settings.account.first() } }
         Dispatchers.setMain(UnconfinedTestDispatcher())
     }
 
