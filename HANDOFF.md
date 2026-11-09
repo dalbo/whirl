@@ -104,7 +104,7 @@ unlock it rather than changing its settings. It stays one pane in landscape (448
 unit tests. Per-release checks: `docs/device-checklist.md`.
 
 ## Open ideas
-- **v1.8: the archive reader** (decided; docs/plans/v1.7.md §8): whole-thread reading from `/archive/<id>`, find in
+- **v1.8: the archive reader** (in progress; plan `docs/plans/v1.8.md`, decided in docs/plans/v1.7.md §8): whole-thread reading from `/archive/<id>`, find in
   the whole thread, posts by a user filtered in the app. First step: raw fixtures of a multi-page archive.
 - **Next release: Data Saver note.** With Data Saver on and Whirl not set to unrestricted data, Android blocks the
   background check on mobile data until Wi-Fi returns (debug app, 2026-11-07: a 1h38m gap while out; the check history

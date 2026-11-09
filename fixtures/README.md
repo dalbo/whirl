@@ -37,6 +37,10 @@ Raw HTML in `html/` is the server body an HTTP client receives; `html/rendered/`
 ## html/
 | File | URL / content | Notes |
 |---|---|---|
+| `archive_3l10nlj5_reps.html` | /archive/3l10nlj5 — one page, no page list, 616 posts; `ISP Representative` posts with `span.reptag`, `Section Moderator` (2026-11-08; no rendered copy) | 1666499 bytes |
+| `archive_3mnkq4v9_chunks.html` | /archive/3mnkq4v9 — multi-part sticky: 37 archive pages across three thread ids, `.notebar.chunks`, canonical `/archive/2690338` (2026-11-08) | 1992990 bytes |
+| `archive_97q1vrm9_p2.html` | /archive/97q1vrm9-2 — page 2 of 2, posts 801–1213 (2026-11-08) | 1072882 bytes |
+| `archive_97r5wzn3_last.html` | /archive/97r5wzn3-58 — page 58 of 58, posts 45601–46125, 58-entry page list (2026-11-08) | 1481473 bytes |
 | `forum1_pm_html.html` | /forum/1 — Private Messages, "Not signed in" | 14461 bytes |
 | `forum35_feedback_html.html` | /forum/35 — "Not signed in" | 14462 bytes |
 | `forum7_g179.html` | /forum/7?g=179 — group page, select[name=g] | 68295 bytes |

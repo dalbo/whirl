@@ -19,6 +19,7 @@ class AllFixturesTest {
                     if (name.startsWith("thread_")) ThreadPageParser.parse(html) else ThreadListParser.parse(html)
                 }
                 name.startsWith("thread_") -> assertTrue(ThreadPageParser.parse(html).posts.isNotEmpty())
+                name.startsWith("archive_") -> assertTrue(ArchivePageParser.parse(html).posts.isNotEmpty())
                 name.startsWith("forum_index") -> assertTrue(ForumIndexParser.parse(html).sections.isNotEmpty())
                 name.startsWith("forum") || name == "popular.html" || name.endsWith("_listview.html") ->
                     assertTrue(ThreadListParser.parse(html).rows.isNotEmpty())

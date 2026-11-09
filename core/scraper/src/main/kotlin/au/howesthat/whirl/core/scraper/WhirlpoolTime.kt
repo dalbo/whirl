@@ -38,6 +38,23 @@ object WhirlpoolTime {
     private val AM_PM = Regex("""\s*([ap]m)$""", RegexOption.IGNORE_CASE)
 
     /** Parses the absolute forms (`2025-Jun-23, 11:11 am`, `2017-Dec-1`, optional trailing zone name). */
+    /**
+     * An ISO time with an offset (archive pages' `datePublished`) as Sydney local time, to the minute like the page
+     * text; null if unreadable.
+     */
+    fun parseIso(text: String): LocalDateTime? = try {
+        java.time.OffsetDateTime.parse(text.trim()).atZoneSameInstant(SYDNEY).toLocalDateTime()
+            .truncatedTo(java.time.temporal.ChronoUnit.MINUTES)
+    } catch (_: DateTimeParseException) {
+        null
+    }
+
+    /** Sydney local time as thread pages write it: `2025-Jun-23, 11:11 am`. */
+    fun format(time: LocalDateTime): String =
+        "${time.toLocalDate().format(DATE)}, ${time.toLocalTime().format(TIME_OUT).lowercase()}"
+
+    private val TIME_OUT: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH)
+
     fun parseAbsolute(text: String): LocalDateTime? {
         val m = ABSOLUTE.matchEntire(text.squash()) ?: return null
         return try {
