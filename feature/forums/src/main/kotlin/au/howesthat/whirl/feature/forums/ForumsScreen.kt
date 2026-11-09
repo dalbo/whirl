@@ -32,6 +32,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import au.howesthat.whirl.core.data.Cached
 import au.howesthat.whirl.core.data.ForumListItem
 import au.howesthat.whirl.core.data.LibraryRepository
 import au.howesthat.whirl.core.data.ForumRepository
@@ -87,6 +88,12 @@ fun filterForums(sections: List<ForumSection>, query: TextQuery): List<ForumSect
 
 data class ForumsState(val forums: List<ForumListItem>?, val updatedAt: Instant?)
 
+/** The cached forum list with [favourites] marked; null forums while nothing has been fetched yet. */
+fun forumsState(cached: Cached<List<ForumListItem>>, favourites: Set<Int>): ForumsState {
+    val forums = cached.value.map { it.copy(isFavourite = it.forum.id in favourites) }
+    return ForumsState(forums.takeIf { cached.updatedAt != null || it.isNotEmpty() }, cached.updatedAt)
+}
+
 @HiltViewModel
 class ForumsViewModel @Inject constructor(
     private val repo: ForumRepository,
@@ -100,10 +107,7 @@ class ForumsViewModel @Inject constructor(
 
     fun setQuery(query: String?) = screen.setQuery(query)
 
-    val state: StateFlow<ForumsState> = combine(repo.forums, library.favouriteForums) { cached, favourites ->
-        val forums = cached.value.map { it.copy(isFavourite = it.forum.id in favourites) }
-        ForumsState(forums.takeIf { cached.updatedAt != null || it.isNotEmpty() }, cached.updatedAt)
-    }
+    val state: StateFlow<ForumsState> = combine(repo.forums, library.favouriteForums, ::forumsState)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ForumsState(null, null))
 
     init {
