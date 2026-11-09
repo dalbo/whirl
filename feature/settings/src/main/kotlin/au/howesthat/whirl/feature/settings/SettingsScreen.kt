@@ -1,5 +1,7 @@
 package au.howesthat.whirl.feature.settings
 
+import android.app.KeyguardManager
+import android.os.Build
 import android.text.format.DateFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -66,7 +68,53 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, onCheckHistory: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
+private fun SettingsScaffold(title: String, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                colors = whirlTopBarColors(),
+                title = { Text(title) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
+                },
+            )
+        },
+    ) { padding ->
+        Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(top = 8.dp), content = content)
+    }
+}
+
+/** Settings: a list of its pages, each with a line on what it holds. */
+@Composable
+fun SettingsScreen(onBack: () -> Unit, onOpenPage: (SettingsPage) -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val account by viewModel.account.collectAsStateWithLifecycle()
+    SettingsScaffold(stringResource(R.string.settings_title), onBack) {
+        Group(null) {
+            SettingsPage.entries.forEach { page ->
+                val summary = when (page) {
+                    SettingsPage.ACCOUNT -> account?.let { stringResource(R.string.settings_logged_in_as, it.userName, it.userId) }
+                    SettingsPage.NOTIFICATIONS -> settings?.let {
+                        if (it.watchedNotify) pluralStringResource(R.plurals.settings_notifications_every, it.notifyIntervalMinutes, it.notifyIntervalMinutes)
+                        else stringResource(R.string.settings_notifications_off)
+                    }
+                    else -> pageSummary(page)?.let { stringResource(it) }
+                }
+                SettingRow(stringResource(pageTitle(page)), summary) { onOpenPage(page) }
+            }
+        }
+    }
+}
+
+/** One page of Settings. */
+@Composable
+fun SettingsPageScreen(
+    page: SettingsPage,
+    onBack: () -> Unit,
+    onSignedOut: () -> Unit,
+    onCheckHistory: () -> Unit,
+    viewModel: SettingsViewModel = hiltViewModel(),
+) {
     val loaded by viewModel.settings.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val layouts = remember(context) { Styles.layouts(context) }
@@ -74,94 +122,118 @@ fun SettingsScreen(onBack: () -> Unit, onSignedOut: () -> Unit, onCheckHistory: 
     val account by viewModel.account.collectAsStateWithLifecycle()
     val update = viewModel::update
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                colors = whirlTopBarColors(),
-                title = { Text(stringResource(R.string.settings_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
-                },
-            )
-        },
-    ) { padding ->
+    SettingsScaffold(stringResource(pageTitle(page)), onBack) {
         // Shown once read from disk (a moment): toggles drawn from the defaults would act on the wrong values.
-        val settings = loaded ?: return@Scaffold
-        Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {
-            Group(stringResource(R.string.settings_account)) {
-                account?.let { SettingRow(stringResource(R.string.settings_logged_in_as, it.userName, it.userId)) }
-                SettingRow(stringResource(R.string.settings_sign_out), stringResource(R.string.settings_sign_out_summary)) { viewModel.signOut(onSignedOut) }
-            }
-
-            Group(stringResource(R.string.settings_general)) {
-                Choice(stringResource(R.string.settings_homepage), Homepage.entries, settings.homepage, { homepageLabel(it) }) { v -> update { it.copy(homepage = v) } }
-                Choice(stringResource(R.string.settings_theme), ThemeMode.entries, settings.theme, { themeLabel(it) }) { v -> update { it.copy(theme = v) } }
-                Choice(stringResource(R.string.settings_layout), layouts, Styles.layout(context, settings.layout), { styleLabel(it.name, it.credit) }) { v ->
-                    update { it.copy(layout = v.id) }
+        val settings = loaded ?: return@SettingsScaffold
+        Group(null) {
+            when (page) {
+                SettingsPage.ACCOUNT -> {
+                    account?.let { SettingRow(stringResource(R.string.settings_logged_in_as, it.userName, it.userId)) }
+                    SettingRow(stringResource(R.string.settings_sign_out), stringResource(R.string.settings_sign_out_summary)) { viewModel.signOut(onSignedOut) }
                 }
-                // Wallpaper (Material You) is offered from Android 12; older phones list only the palettes.
-                Choice(stringResource(R.string.settings_palette), palettes, Styles.palette(context, settings.palette), { paletteLabel(it) }) { v ->
-                    update { it.copy(palette = v.id) }
-                }
-                if (settings.theme == ThemeMode.DARK_AT_NIGHT) {
-                    TimeSetting(stringResource(R.string.settings_night_start), settings.nightStart) { v -> update { it.copy(nightStart = v) } }
-                    TimeSetting(stringResource(R.string.settings_night_end), settings.nightEnd) { v -> update { it.copy(nightEnd = v) } }
-                }
-                Choice(stringResource(R.string.settings_text_scale), TextScale.entries, settings.textScale, { scaleLabel(it) }) { v -> update { it.copy(textScale = v) } }
-                Choice(stringResource(R.string.settings_font_size), PostFontSize.entries, settings.postFontSize, { fontLabel(it) }) { v -> update { it.copy(postFontSize = v) } }
-                Toggle(stringResource(R.string.settings_screen_animations), settings.screenAnimations) { v -> update { it.copy(screenAnimations = v) } }
-                Toggle(stringResource(R.string.settings_two_pane), settings.twoPane, stringResource(R.string.settings_two_pane_summary)) { v -> update { it.copy(twoPane = v) } }
-                if (settings.twoPane) {
-                    Toggle(stringResource(R.string.settings_two_pane_landscape), settings.twoPaneLandscapeOnly) { v -> update { it.copy(twoPaneLandscapeOnly = v) } }
-                }
-                Toggle(stringResource(R.string.settings_browser_app), settings.browserApp) { v -> update { it.copy(browserApp = v) } }
-            }
-
-            Group(stringResource(R.string.settings_notifications)) {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    NotificationOptions(
-                        settings,
-                        onWatchedNotify = { v -> update { it.copy(watchedNotify = v) } },
-                        onInterval = { v -> update { it.copy(notifyIntervalMinutes = v) } },
-                    )
-                }
-                if (settings.watchedNotify) {
-                    Choice(stringResource(R.string.settings_notify_style), NotifyStyle.entries, settings.notifyStyle, { styleLabel(it) }) { v ->
-                        update { it.copy(notifyStyle = v) }
+                SettingsPage.GENERAL -> {
+                    Choice(stringResource(R.string.settings_homepage), Homepage.entries, settings.homepage, { homepageLabel(it) }) { v -> update { it.copy(homepage = v) } }
+                    Choice(stringResource(R.string.settings_theme), ThemeMode.entries, settings.theme, { themeLabel(it) }) { v -> update { it.copy(theme = v) } }
+                    Choice(stringResource(R.string.settings_layout), layouts, Styles.layout(context, settings.layout), { styleLabel(it.name, it.credit) }) { v ->
+                        update { it.copy(layout = v.id) }
                     }
-                    if (settings.notifyStyle == NotifyStyle.SUMMARY) {
-                        Toggle(stringResource(R.string.settings_notify_keep), settings.notifyKeepUntilRead) { v ->
-                            update { it.copy(notifyKeepUntilRead = v) }
+                    // Wallpaper (Material You) is offered from Android 12; older phones list only the palettes.
+                    Choice(stringResource(R.string.settings_palette), palettes, Styles.palette(context, settings.palette), { paletteLabel(it) }) { v ->
+                        update { it.copy(palette = v.id) }
+                    }
+                    if (settings.theme == ThemeMode.DARK_AT_NIGHT) {
+                        TimeSetting(stringResource(R.string.settings_night_start), settings.nightStart) { v -> update { it.copy(nightStart = v) } }
+                        TimeSetting(stringResource(R.string.settings_night_end), settings.nightEnd) { v -> update { it.copy(nightEnd = v) } }
+                    }
+                    Choice(stringResource(R.string.settings_text_scale), TextScale.entries, settings.textScale, { scaleLabel(it) }) { v -> update { it.copy(textScale = v) } }
+                    Choice(stringResource(R.string.settings_font_size), PostFontSize.entries, settings.postFontSize, { fontLabel(it) }) { v -> update { it.copy(postFontSize = v) } }
+                    Toggle(stringResource(R.string.settings_screen_animations), settings.screenAnimations) { v -> update { it.copy(screenAnimations = v) } }
+                    Toggle(stringResource(R.string.settings_two_pane), settings.twoPane, stringResource(R.string.settings_two_pane_summary)) { v -> update { it.copy(twoPane = v) } }
+                    if (settings.twoPane) {
+                        Toggle(stringResource(R.string.settings_two_pane_landscape), settings.twoPaneLandscapeOnly) { v -> update { it.copy(twoPaneLandscapeOnly = v) } }
+                    }
+                    Toggle(stringResource(R.string.settings_browser_app), settings.browserApp) { v -> update { it.copy(browserApp = v) } }
+                }
+                SettingsPage.NOTIFICATIONS -> {
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        NotificationOptions(
+                            settings,
+                            onWatchedNotify = { v -> update { it.copy(watchedNotify = v) } },
+                            onInterval = { v -> update { it.copy(notifyIntervalMinutes = v) } },
+                        )
+                    }
+                    if (settings.watchedNotify) {
+                        Choice(stringResource(R.string.settings_notify_style), NotifyStyle.entries, settings.notifyStyle, { styleLabel(it) }) { v ->
+                            update { it.copy(notifyStyle = v) }
+                        }
+                        if (settings.notifyStyle == NotifyStyle.SUMMARY) {
+                            Toggle(stringResource(R.string.settings_notify_keep), settings.notifyKeepUntilRead) { v ->
+                                update { it.copy(notifyKeepUntilRead = v) }
+                            }
                         }
                     }
+                    SettingRow(stringResource(R.string.settings_check_history), stringResource(R.string.settings_check_history_summary), onCheckHistory)
                 }
-                SettingRow(stringResource(R.string.settings_check_history), stringResource(R.string.settings_check_history_summary), onCheckHistory)
-            }
-
-            Group(stringResource(R.string.settings_threads)) {
-                Toggle(stringResource(R.string.settings_open_in_browser), settings.openThreadsInBrowser, stringResource(R.string.settings_open_in_browser_summary)) { v -> update { it.copy(openThreadsInBrowser = v) } }
-                Toggle(stringResource(R.string.settings_public_at_bottom), settings.loadPublicAtBottom) { v -> update { it.copy(loadPublicAtBottom = v) } }
-                Toggle(stringResource(R.string.settings_private_at_bottom), settings.loadPrivateAtBottom) { v -> update { it.copy(loadPrivateAtBottom = v) } }
-                Toggle(stringResource(R.string.settings_read_as_scroll), settings.readThreadsAsScroll, stringResource(R.string.settings_read_as_scroll_summary)) { v -> update { it.copy(readThreadsAsScroll = v) } }
-            }
-
-            Group(stringResource(R.string.settings_recent)) {
-                Toggle(stringResource(R.string.settings_recent_at_top), settings.loadRecentAtTop) { v -> update { it.copy(loadRecentAtTop = v) } }
-                Toggle(stringResource(R.string.settings_ignore_own_recent), settings.ignoreOwnRepliesRecent) { v -> update { it.copy(ignoreOwnRepliesRecent = v) } }
-            }
-
-            Group(stringResource(R.string.settings_watched)) {
-                Toggle(stringResource(R.string.settings_watched_at_top), settings.loadWatchedAtTop) { v -> update { it.copy(loadWatchedAtTop = v) } }
-                Toggle(stringResource(R.string.settings_ignore_own_watched), settings.ignoreOwnRepliesWatched) { v -> update { it.copy(ignoreOwnRepliesWatched = v) } }
-                Toggle(stringResource(R.string.settings_auto_mark_read), settings.watchedAutoMarkAsRead) { v -> update { it.copy(watchedAutoMarkAsRead = v) } }
-                Toggle(stringResource(R.string.settings_back_to_list), settings.watchedBackToList) { v -> update { it.copy(watchedBackToList = v) } }
-                Toggle(stringResource(R.string.settings_watch_undo), settings.watchUndo, stringResource(R.string.settings_watch_undo_summary)) { v -> update { it.copy(watchUndo = v) } }
-                Choice(stringResource(R.string.settings_undo_time), Settings.UNDO_SECONDS, settings.undoSeconds, { pluralStringResource(R.plurals.settings_seconds, it, it) }) { v ->
-                    update { it.copy(undoSeconds = v) }
+                SettingsPage.THREADS -> {
+                    Toggle(stringResource(R.string.settings_open_in_browser), settings.openThreadsInBrowser, stringResource(R.string.settings_open_in_browser_summary)) { v -> update { it.copy(openThreadsInBrowser = v) } }
+                    Toggle(stringResource(R.string.settings_public_at_bottom), settings.loadPublicAtBottom) { v -> update { it.copy(loadPublicAtBottom = v) } }
+                    Toggle(stringResource(R.string.settings_private_at_bottom), settings.loadPrivateAtBottom) { v -> update { it.copy(loadPrivateAtBottom = v) } }
+                    Toggle(stringResource(R.string.settings_read_as_scroll), settings.readThreadsAsScroll, stringResource(R.string.settings_read_as_scroll_summary)) { v -> update { it.copy(readThreadsAsScroll = v) } }
                 }
+                SettingsPage.RECENT -> {
+                    Toggle(stringResource(R.string.settings_recent_at_top), settings.loadRecentAtTop) { v -> update { it.copy(loadRecentAtTop = v) } }
+                    Toggle(stringResource(R.string.settings_ignore_own_recent), settings.ignoreOwnRepliesRecent) { v -> update { it.copy(ignoreOwnRepliesRecent = v) } }
+                }
+                SettingsPage.WATCHED -> {
+                    Toggle(stringResource(R.string.settings_watched_at_top), settings.loadWatchedAtTop) { v -> update { it.copy(loadWatchedAtTop = v) } }
+                    Toggle(stringResource(R.string.settings_ignore_own_watched), settings.ignoreOwnRepliesWatched) { v -> update { it.copy(ignoreOwnRepliesWatched = v) } }
+                    Toggle(stringResource(R.string.settings_auto_mark_read), settings.watchedAutoMarkAsRead) { v -> update { it.copy(watchedAutoMarkAsRead = v) } }
+                    Toggle(stringResource(R.string.settings_back_to_list), settings.watchedBackToList) { v -> update { it.copy(watchedBackToList = v) } }
+                    Toggle(stringResource(R.string.settings_watch_undo), settings.watchUndo, stringResource(R.string.settings_watch_undo_summary)) { v -> update { it.copy(watchUndo = v) } }
+                    Choice(stringResource(R.string.settings_undo_time), Settings.UNDO_SECONDS, settings.undoSeconds, { pluralStringResource(R.plurals.settings_seconds, it, it) }) { v ->
+                        update { it.copy(undoSeconds = v) }
+                    }
+                }
+                SettingsPage.BACKUP -> BackupPage()
             }
         }
     }
+}
+
+@Composable
+private fun BackupPage() {
+    val context = LocalContext.current
+    val note = remember(context) {
+        backupNote(Build.VERSION.SDK_INT, context.getSystemService(KeyguardManager::class.java).isDeviceSecure)
+    }
+    SettingRow(stringResource(R.string.settings_backup_what), stringResource(R.string.settings_backup_what_summary))
+    val (title, summary) = when (note) {
+        BackupNote.ALL -> R.string.settings_backup_all to R.string.settings_backup_all_summary
+        BackupNote.NOTHING_WITHOUT_LOCK -> R.string.settings_backup_no_lock to R.string.settings_backup_nothing_summary
+        BackupNote.NO_KEY_WITHOUT_LOCK -> R.string.settings_backup_no_lock to R.string.settings_backup_no_key_summary
+        BackupNote.NO_KEY_ON_THIS_VERSION -> R.string.settings_backup_old_android to R.string.settings_backup_old_android_summary
+    }
+    SettingRow(stringResource(title), stringResource(summary))
+}
+
+private fun pageTitle(page: SettingsPage) = when (page) {
+    SettingsPage.ACCOUNT -> R.string.settings_account
+    SettingsPage.GENERAL -> R.string.settings_general
+    SettingsPage.NOTIFICATIONS -> R.string.settings_notifications
+    SettingsPage.THREADS -> R.string.settings_threads
+    SettingsPage.RECENT -> R.string.settings_recent
+    SettingsPage.WATCHED -> R.string.settings_watched
+    SettingsPage.BACKUP -> R.string.settings_backup
+}
+
+/** The list's line under each page; null for Account and Notifications, which show their state instead. */
+private fun pageSummary(page: SettingsPage): Int? = when (page) {
+    SettingsPage.ACCOUNT, SettingsPage.NOTIFICATIONS -> null
+    SettingsPage.GENERAL -> R.string.settings_general_summary
+    SettingsPage.THREADS -> R.string.settings_threads_summary
+    SettingsPage.RECENT -> R.string.settings_recent_summary
+    SettingsPage.WATCHED -> R.string.settings_watched_summary
+    SettingsPage.BACKUP -> R.string.settings_backup_summary
 }
 
 /** A section of settings: a heading and its rows, as one card in styles with [Surfaces.CARDS]. */
@@ -173,15 +245,15 @@ private fun paletteLabel(palette: Palette): String =
     if (palette.isWallpaper) stringResource(R.string.settings_palette_wallpaper) else styleLabel(palette.name, palette.credit)
 
 @Composable
-private fun Group(title: String, content: @Composable ColumnScope.() -> Unit) {
+private fun Group(title: String?, content: @Composable ColumnScope.() -> Unit) {
     val layout = LocalAppStyle.current.layout
     if (layout.lists != Surfaces.CARDS) {
-        Section(title)
+        title?.let { Section(it) }
         Column(content = content)
         return
     }
     val shape = RoundedCornerShape(layout.cornerDp)
-    SectionHeading(title)
+    title?.let { SectionHeading(it) }
     Column(
         Modifier.padding(horizontal = layout.gutterDp).padding(bottom = 12.dp).clip(shape)
             .background(MaterialTheme.colorScheme.surface).border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),

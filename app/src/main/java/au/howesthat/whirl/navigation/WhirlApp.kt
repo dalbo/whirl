@@ -69,6 +69,8 @@ import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 import au.howesthat.whirl.feature.forums.ForumsScreen
 import au.howesthat.whirl.feature.news.NewsScreen
 import au.howesthat.whirl.feature.settings.CheckHistoryScreen
+import au.howesthat.whirl.feature.settings.SettingsPageRoute
+import au.howesthat.whirl.feature.settings.SettingsPageScreen
 import au.howesthat.whirl.feature.settings.SettingsScreen
 import au.howesthat.whirl.feature.thread.ThreadNav
 import au.howesthat.whirl.feature.thread.ThreadRoute
@@ -208,8 +210,10 @@ fun WhirlApp(
         entry<UserRoute>(metadata = listMeta) { ListPane(it) { UserScreen(it, backIcon, listNav) } }
         entry<SearchRoute>(metadata = listMeta) { ListPane(it) { SearchScreen(it, backIcon, listNav) } }
         entry<ForumsRoute>(metadata = listMeta) { ListPane(it) { ForumsScreen(drawerIcon, onOpenForum = listNav.openForum, onSearch = { words -> listNav.openSearch(SearchRoute(query = words)) }) } }
-        entry<SettingsRoute> {
-            SettingsScreen(
+        entry<SettingsRoute> { SettingsScreen(onBack = { backStack.pop() }, onOpenPage = { backStack.push(SettingsPageRoute(it)) }) }
+        entry<SettingsPageRoute> {
+            SettingsPageScreen(
+                it.page,
                 onBack = { backStack.pop() },
                 // Signing out clears setupDone, and MainActivity swaps this whole tree for the setup wizard.
                 onSignedOut = {},
