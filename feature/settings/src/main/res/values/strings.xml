@@ -81,7 +81,7 @@
     <string name="settings_backup_what">Backed up by Android</string>
     <string name="settings_backup_what_summary">Your settings, favourite forums and API key, while Android\'s backup is on (in the phone\'s Settings, under System or Google). Cached threads and posts are not: a new phone fetches them again.</string>
     <string name="settings_backup_all">This phone</string>
-    <string name="settings_backup_all_summary">All of the above is backed up. Your API key is end-to-end encrypted with your screen lock, so Google cannot read it.</string>
+    <string name="settings_backup_all_summary">All of the above is backed up. Your API key goes only end-to-end encrypted with your screen lock (Google\'s backup does this), so Google cannot read it; a backup service that cannot encrypt it leaves the key out.</string>
     <string name="settings_backup_no_lock">This phone has no screen lock</string>
     <string name="settings_backup_nothing_summary">Android backs up Whirl\'s settings only on phones with a screen lock, so nothing is backed up. Moving straight to a new phone with a cable or Wi-Fi still copies them.</string>
     <string name="settings_backup_no_key_summary">Your settings and favourite forums are backed up, but not your API key: it is backed up only end-to-end encrypted, which needs a screen lock.</string>

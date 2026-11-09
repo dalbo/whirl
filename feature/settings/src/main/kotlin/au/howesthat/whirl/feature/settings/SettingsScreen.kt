@@ -48,6 +48,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.howesthat.whirl.core.data.Homepage
 import au.howesthat.whirl.core.data.NotifyStyle
@@ -203,8 +204,12 @@ fun SettingsPageScreen(
 @Composable
 private fun BackupPage() {
     val context = LocalContext.current
-    val note = remember(context) {
-        backupNote(Build.VERSION.SDK_INT, context.getSystemService(KeyguardManager::class.java).isDeviceSecure)
+    fun read() = backupNote(Build.VERSION.SDK_INT, context.getSystemService(KeyguardManager::class.java).isDeviceSecure)
+    var note by remember(context) { mutableStateOf(read()) }
+    // Read again on return: the user may have just set a screen lock in the phone's settings.
+    LifecycleResumeEffect(context) {
+        note = read()
+        onPauseOrDispose {}
     }
     SettingRow(stringResource(R.string.settings_backup_what), stringResource(R.string.settings_backup_what_summary))
     val (title, summary) = when (note) {
@@ -270,7 +275,7 @@ private fun Section(title: String) {
 @Composable
 private fun SettingRow(title: String, summary: String? = null, onClick: (() -> Unit)? = null) {
     Column(
-        Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).padding(16.dp, 12.dp),
+        Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier).padding(16.dp, 12.dp),
     ) {
         Text(title, style = MaterialTheme.typography.bodyLarge)
         summary?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
