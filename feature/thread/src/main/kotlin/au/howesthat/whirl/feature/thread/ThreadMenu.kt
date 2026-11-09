@@ -25,6 +25,9 @@ import au.howesthat.whirl.core.ui.style
 internal fun ThreadMenu(
     isWatched: Boolean,
     onWatchAction: (WatchAction) -> Unit,
+    /** Whirl's own "Don't notify" for a watched thread. */
+    isMuted: Boolean,
+    onSetMuted: (Boolean) -> Unit,
     myUserId: Long?,
     onUsersPosts: (Long) -> Unit,
     onOpPosts: () -> Unit,
@@ -48,6 +51,10 @@ internal fun ThreadMenu(
         if (isWatched) {
             DropdownMenuItem(text = { Text(stringResource(R.string.mark_read)) }, onClick = { open = false; onWatchAction(WatchAction.MARK_READ) })
             DropdownMenuItem(text = { Text(stringResource(R.string.unwatch)) }, onClick = { open = false; onWatchAction(WatchAction.UNWATCH) })
+            DropdownMenuItem(
+                text = { Text(stringResource(if (isMuted) R.string.unmute else R.string.mute)) },
+                onClick = { open = false; onSetMuted(!isMuted) },
+            )
         } else {
             DropdownMenuItem(text = { Text(stringResource(R.string.watch)) }, onClick = { open = false; onWatchAction(WatchAction.WATCH) })
         }

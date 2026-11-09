@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import au.howesthat.whirl.core.data.ArchiveRepository
 import au.howesthat.whirl.core.data.DefaultDispatcher
 import au.howesthat.whirl.core.data.Settings
+import au.howesthat.whirl.core.data.LibraryRepository
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository.Companion.LAST_PAGE
@@ -126,6 +127,7 @@ class ScrollThreadViewModel @AssistedInject constructor(
     private val settingsRepo: SettingsRepository,
     private val watchedRepo: WatchedRepository,
     private val watchQueue: WatchQueue,
+    private val library: LibraryRepository,
     private val savedState: SavedStateHandle,
     @DefaultDispatcher private val parsing: CoroutineDispatcher,
 ) : ViewModel() {
@@ -386,6 +388,13 @@ class ScrollThreadViewModel @AssistedInject constructor(
     private suspend fun autoMarkRead() {
         if (route.fromWatched || !settingsRepo.settings.first().watchedAutoMarkAsRead) return
         if (watchedRepo.isWatched(threadId).first()) watchQueue.perform(WatchAction.MARK_READ, listOf(threadId), undoable = false)
+    }
+
+    /** This watched thread never notifies (Whirl's own mute). */
+    val isMuted: StateFlow<Boolean> = library.mutedThreads.map { threadId in it }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setMuted(muted: Boolean) {
+        viewModelScope.launch { library.setMuted(listOf(threadId), muted) }
     }
 
     fun perform(action: WatchAction) {

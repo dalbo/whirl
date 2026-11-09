@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
 import au.howesthat.whirl.core.data.AccountGeneration
 import au.howesthat.whirl.core.data.ForumRepository
+import au.howesthat.whirl.core.data.LibraryRepository
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository
 import au.howesthat.whirl.core.model.WatchAction
@@ -92,7 +93,7 @@ class ThreadViewModelTest {
         val queue = WatchQueue(api, store, lists, WatchSendScheduler.None, Dispatchers.Default, appScope)
 
         fun viewModel(route: ThreadRoute, repo: ThreadPageRepository, saved: SavedStateHandle = SavedStateHandle()) =
-            ThreadViewModel(route, repo, settings, lists, queue, saved, Dispatchers.Default)
+            ThreadViewModel(route, repo, settings, lists, queue, LibraryRepository(ApplicationProvider.getApplicationContext(), db.forumDao()), saved, Dispatchers.Default)
     }
 
     @Before

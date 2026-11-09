@@ -32,6 +32,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.Icons
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -139,6 +147,7 @@ fun ThreadListBody(
     val now = rememberNow()
     // Read so rows recompose when a watch action changes what they offer.
     val watchedIds by viewModel.watchedIds.collectAsStateWithLifecycle()
+    val mutedIds by viewModel.mutedIds.collectAsStateWithLifecycle()
     val selected = LocalSelectedThread.current
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = onRefresh, modifier = modifier.fillMaxSize()) {
         when {
@@ -188,6 +197,8 @@ fun ThreadListBody(
                                 onOpenForum = item.forum?.takeIf { showForum }?.let { forum -> { nav.openForum(forum.copy(groupId = null)) } },
                                 watchActions = remember(item, watchedIds) { viewModel.watchActions(item) },
                                 onWatchAction = { action -> viewModel.perform(action, item) },
+                                muted = remember(item, watchedIds, mutedIds) { viewModel.muted(item) },
+                                onSetMuted = { viewModel.setMuted(item, it) },
                                 selected = selected != null && item.openId == selected,
                             )
                         }
@@ -210,6 +221,9 @@ fun ThreadRowItem(
     onOpenForum: (() -> Unit)?,
     watchActions: List<WatchAction> = emptyList(),
     onWatchAction: (WatchAction) -> Unit = {},
+    /** A watched thread's notifications off (true) or on (false); null for a thread that is not watched. */
+    muted: Boolean? = null,
+    onSetMuted: (Boolean) -> Unit = {},
     /** The thread open beside the list (two panes). */
     selected: Boolean = false,
 ) {
@@ -217,6 +231,7 @@ fun ThreadRowItem(
     val openable = item.openId != null
     val inactive = item.kind != RowKind.THREAD
     val actions = watchActions.map { action -> MenuAction(watchActionLabel(action)) { onWatchAction(action) } } +
+        listOfNotNull(muted?.let { MenuAction(stringResource(if (it) R.string.row_unmute else R.string.row_mute)) { onSetMuted(!it) } }) +
         MenuAction(stringResource(R.string.row_last_post), enabled = openable, onClick = onLastPost) +
         MenuAction(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser), onClick = onOpenInBrowser) +
         listOfNotNull(onOpenForum?.let { MenuAction(stringResource(R.string.row_go_to_forum, item.forum?.title.orEmpty()), onClick = it) })
@@ -263,25 +278,11 @@ fun ThreadRowItem(
                 )
             },
             supportingContent = { Text(details(item, now), maxLines = 2, overflow = TextOverflow.Ellipsis) },
-            trailingContent = if (item.unreadCount > 0) {
+            trailingContent = if (item.unreadCount > 0 || muted == true) {
                 {
-                    val unread = pluralStringResource(R.plurals.row_unread, item.unreadCount, item.unreadCount)
-                    if (accent) {
-                        Surface(
-                            Modifier.clearAndSetSemantics { contentDescription = unread },
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        ) {
-                            Text(
-                                stringResource(R.string.row_new_count, item.unreadCount),
-                                Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                    } else {
-                        Badge(Modifier.clearAndSetSemantics { contentDescription = unread }) { Text(item.unreadCount.toString()) }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (muted == true) MutedMark()
+                        if (item.unreadCount > 0) UnreadCount(item.unreadCount, accent)
                     }
                 }
             } else {
@@ -290,6 +291,46 @@ fun ThreadRowItem(
         )
         ActionsMenu(menu, onDismiss = { menu = false }, actions)
     }
+}
+
+/** A watched row's unread posts: "N new" in the accent style, else a badge. */
+@Composable
+private fun UnreadCount(count: Int, accent: Boolean) {
+    val unread = pluralStringResource(R.plurals.row_unread, count, count)
+    if (accent) {
+        Surface(
+            Modifier.clearAndSetSemantics { contentDescription = unread },
+            shape = RoundedCornerShape(6.dp),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ) {
+            Text(
+                stringResource(R.string.row_new_count, count),
+                Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    } else {
+        Badge(Modifier.clearAndSetSemantics { contentDescription = unread }) { Text(count.toString()) }
+    }
+}
+
+/** A bell with a line through it: this watched thread does not notify. */
+@Composable
+private fun MutedMark() {
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    val label = stringResource(R.string.row_muted)
+    Icon(
+        Icons.Default.Notifications,
+        contentDescription = label,
+        modifier = Modifier.size(18.dp).drawWithContent {
+            drawContent()
+            val stroke = 2.dp.toPx()
+            drawLine(color, Offset(stroke, stroke), Offset(size.width - stroke, size.height - stroke), stroke, StrokeCap.Round)
+        },
+        tint = color,
+    )
 }
 
 @Composable

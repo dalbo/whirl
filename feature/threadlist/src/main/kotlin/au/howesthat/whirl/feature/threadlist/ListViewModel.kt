@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import au.howesthat.whirl.core.data.ForumRepository
+import au.howesthat.whirl.core.data.LibraryRepository
 import au.howesthat.whirl.core.data.OpenThread
 import au.howesthat.whirl.core.data.OpenedFrom
 import au.howesthat.whirl.core.data.Settings
@@ -33,6 +34,7 @@ class ListDeps @Inject constructor(
     val forums: ForumRepository,
     val watched: WatchedRepository,
     val watchQueue: WatchQueue,
+    val library: LibraryRepository,
     val savedState: SavedStateHandle,
 )
 
@@ -44,6 +46,9 @@ abstract class ListViewModel(protected val deps: ListDeps, private val from: Ope
 
     /** Watched threads (both lists, plus actions waiting out their Undo window), to offer Watch or Unwatch. */
     val watchedIds: StateFlow<Set<ThreadId>> = deps.watched.watchedIds.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    /** Watched threads that never notify (Whirl's own, in the library store). */
+    val mutedIds: StateFlow<Set<ThreadId>> = deps.library.mutedThreads.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     private val screen = ListScreenState(viewModelScope, deps.savedState)
     val refreshing: StateFlow<Boolean> = screen.refreshing
@@ -90,6 +95,18 @@ abstract class ListViewModel(protected val deps: ListDeps, private val from: Ope
             item.unreadCount > 0 -> listOf(WatchAction.MARK_READ, WatchAction.UNWATCH)
             else -> listOf(WatchAction.UNWATCH)
         }
+    }
+
+    /** Whether a watched row's notifications are off; null for a thread that is not watched (nothing to mute). */
+    fun muted(item: ThreadItem): Boolean? {
+        val id = item.openId ?: return null
+        if (item.watched == null && id !in watchedIds.value) return null
+        return id in mutedIds.value
+    }
+
+    fun setMuted(item: ThreadItem, muted: Boolean) {
+        val id = item.openId ?: return
+        viewModelScope.launch { deps.library.setMuted(listOf(id), muted) }
     }
 
     fun perform(action: WatchAction, item: ThreadItem) {

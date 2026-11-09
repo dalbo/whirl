@@ -35,6 +35,9 @@
         <item quantity="other">Mark %1$d shown as read</item>
     </plurals>
     <string name="row_unwatch">Unwatch</string>
+    <string name="row_mute">Don\'t notify</string>
+    <string name="row_unmute">Notify again</string>
+    <string name="row_muted">Notifications off</string>
     <string name="row_last_post">Jump to last post</string>
     <string name="row_go_to_forum">Go to %1$s</string>
     <string name="row_sticky">Sticky</string>
