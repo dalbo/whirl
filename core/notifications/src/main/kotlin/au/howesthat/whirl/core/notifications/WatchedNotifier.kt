@@ -24,7 +24,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -70,10 +71,13 @@ class WatchedNotifier @Inject constructor(
         if (!canNotify()) return CheckOutcome(CheckResult.BLOCKED)
         val me = settings.account.first()?.userId
         val before = notified.all().associate { it.threadId to it.lastDate }
-        val plan = planAlert(watched.fetchUnread(), before, me, s.ignoreOwnRepliesWatched, library.mutedThreads.first())
+        val unread = watched.fetchUnread()
+        val plan = planAlert(unread, before, me, s.ignoreOwnRepliesWatched, library.mutedThreads.first())
         posting.withLock { render(plan.threads, plan.newIds, s) }
-        notified.put(plan.threads.map { NotifiedEntity(it.id.value, it.lastDate.toInstant().toEpochMilli()) })
-        notified.keepOnly(plan.threads.map { it.id.value })
+        // Muted threads are recorded too, so one unmuted later alerts only for a reply newer than this.
+        val seen = notifiable(unread, me, s.ignoreOwnRepliesWatched)
+        notified.put(seen.map { NotifiedEntity(it.id.value, it.lastDate.toInstant().toEpochMilli()) })
+        notified.keepOnly(seen.map { it.id.value })
         return CheckOutcome(CheckResult.OK, unreadThreads = plan.threads.size, newThreads = plan.newIds.size)
     }
 
@@ -93,13 +97,12 @@ class WatchedNotifier @Inject constructor(
             combine(watched.watched(unreadOnly = true).map { it.value }.distinctUntilChanged(), shape, library.mutedThreads) { unread, _, _ -> unread }
                 .collect { sync(it) }
         }
-        // A mute lasts while the thread is watched: each fetch of the All list forgets the others. Keyed on the fetch
-        // time, so an Unwatch waiting out its Undo (gone from the list, not yet sent) never drops a mute.
+        // A mute lasts while the thread is watched: each new fetch of the All list forgets the others. Only a fetch made
+        // after start counts (the cached list can be stale: a thread watched on the website since is missing), and the
+        // fetch time is written in the transaction that stores the list, so the list read here is the new one.
         scope.launch {
-            watched.watched(unreadOnly = false)
-                .filter { it.updatedAt != null }
-                .distinctUntilChanged { a, b -> a.updatedAt == b.updatedAt }
-                .collect { list -> library.keepMutedOnly(list.value.mapTo(mutableSetOf()) { it.id }) }
+            watched.allFetchedAt.distinctUntilChanged().drop(1).filterNotNull()
+                .collect { library.keepMutedOnly(watched.watchedAsFetched()) }
         }
     }
 
