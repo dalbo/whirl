@@ -38,6 +38,9 @@ private val Context.accountStore: DataStore<Preferences> by preferencesDataStore
 const val SETTINGS_STORE = "settings"
 const val ACCOUNT_STORE = "account"
 
+/** Every DataStore file, so a test can check the backup rules classify each one. */
+val DATASTORE_FILES: List<String> get() = listOf(SETTINGS_STORE, ACCOUNT_STORE, LIBRARY_STORE)
+
 /** What the account store holds. Up to v1.8 these were in the settings store. */
 private object AccountKeys {
     val apiKey = stringPreferencesKey("api_key")
