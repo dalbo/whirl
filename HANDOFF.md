@@ -114,37 +114,21 @@ unit tests. Per-release checks: `docs/device-checklist.md`.
   `ConnectivityManager.restrictBackgroundStatus` is `ENABLED`, linking to the app's data usage setting
   (`Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS`).
 - **Mute a watched thread** (idea, Dallin 2026-11-08): stays in Watched (and its Unread tab) but never notifies.
-  Whirlpool has no such flag, so it is local: a `muted_threads` table (Room schema bump), set from the row and thread
+  Whirlpool has no such flag, so it is local: a `muted_threads` table (Room schema bump; or the library store if
+  `docs/plans/settings-backup.md` step 2 lands first), set from the row and thread
   menus ("Don't notify" / "Notify again") and from the notification itself. Filter in `notifiable()`
   (`core/notifications/.../AlertPlan.kt`), so the alert, the summary's thread and post counts and the per-thread
   notifications all leave muted threads out. Show a bell-off mark on the row. Drop the mute when the thread is unwatched,
   but only after a successful watched fetch, as `notified.keepOnly` does. Small: could ride along with the Data Saver note.
-- **Settings and key restored on a new phone** (idea, Dallin 2026-11-08; do before export/import, it covers the common
-  case with no user steps). Today Android's backup skips all settings (`res/xml/data_extraction_rules.xml` and
-  `backup_rules.xml` exclude `datastore/` and shared prefs) because the API key lives in the settings DataStore.
-  - Move the key to its own DataStore file (migrate on upgrade). Back up the settings file everywhere (cloud and
-    device transfer). Back up the key file in the cloud only with `requireFlags="clientSideEncryption"` (Android 9+:
-    end-to-end encrypted with the screen lock; Google cannot read it), and always in `<device-transfer>` (never
-    leaves the phones).
-  - minSdk is 26 and API 26–27 ignore `requireFlags` (the key would go up unencrypted): `res/xml/backup_rules.xml`
-    excludes the key, `res/xml-v28/backup_rules.xml` includes it with the flag; `data_extraction_rules.xml` (API 31+)
-    carries the flag in `<cloud-backup>`.
-  - Re-arm the check alarm after a restore (alarms do not survive; `NotificationScheduler` on app start already
-    does via `ensure`, check it). A restored key that fails (`Bad API key?`) goes back to the key screen with a message.
-  - Mark the key field on setup as a password (`ContentType.Password` / autofill hint) so password managers offer to
-    save and fill it: covers people with backup off.
-  - Not used: Android Keystore encryption (hardware-bound, so it blocks restore), `EncryptedSharedPreferences`
-    (deprecated, same problem), Google Block Store (Play services: F-Droid would reject it), Google Drive (OAuth,
-    Drive scope, app verification).
-  - Test on the phone with `adb shell bmgr backupnow au.howesthat.whirl.debug`, uninstall, reinstall, and
-    `bmgr restore`; unit-test the rules files' contents and the key migration.
-- **Export and import settings** (idea, Dallin 2026-11-08): Settings › Export writes a JSON file through the system
-  file picker (`CreateDocument`, no storage permission); Import reads one (`OpenDocument`). Contents: every
-  `SettingsRepository` setting, favourite forums, muted threads (above). **Never the API key** (HANDOFF hard rules; a
-  shared file must be safe to post). Shape: `{"app":"whirl","format":1,"exportedFrom":"<versionName>",
-  "settings":{…},"favouriteForums":[…],"mutedThreads":[…]}`, thread ids as strings. Import validates each value, ignores
-  unknown keys (a newer export into an older app) and keeps the current value for missing ones; show what changed.
-  Re-arm the alarm after import (notification interval). Tests: round trip, a file from a later format, bad values.
+- **Settings restored on a new phone, then export/import** (ideas, Dallin 2026-11-08; plan
+  `docs/plans/settings-backup.md`, reviewed): the API key moves to its own DataStore (cloud backup only end-to-end
+  encrypted), settings and favourite forums are backed up, and `whirl.db` leaves backup and transfer (caches; the
+  archive can push it past Auto Backup's 25 MB cap, which skips the whole backup). Export/import is a JSON file
+  without the key, the release after.
+- **Split Settings into pages** (idea, 2026-11-09): `SettingsScreen.kt` is one scrolling page of six groups and about
+  30 rows, and Backup will add more. A top-level list (Account, Appearance, Notifications, Threads, Recent and
+  Watched, Backup), each row opening its own page, is the usual Android shape and gives each group room for summaries.
+  The `Group` composable and the rows stay as they are; only the navigation changes. Do it before or with Backup.
 - **Post writer** (idea, `docs/plans/post-writer.md`): write a reply with collected quotes, a formatting bar and a live
   preview, then copy it into Whirlpool's reply page. Probably after v1.8.
 - **Guest mode** (idea, `docs/plans/guest.md`): browse public pages with no API key. Ask the moderators first.
