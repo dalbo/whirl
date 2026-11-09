@@ -46,7 +46,8 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
     behaviour, never copy from it.
 
 ## Commands
-- Full check, as CI runs it: `./gradlew :app:lintDebug test assembleDebug` (2–12 minutes; a `:core:ui` change reruns
+- Full check, as CI runs it: `./gradlew :app:lintDebug test assembleDebug` (CI runs the three as parallel jobs, and a
+  PR that changes only Markdown, `docs/` or `site/` skips them; the required check `build` sums them up) (2–12 minutes; a `:core:ui` change reruns
   every module's tests). The daemon is pinned to JDK 17 (`gradle/gradle-daemon-jvm.properties`; `~/.jdks`).
 - Versions: `gradle/libs.versions.toml` (check Maven before adding a library). Conventions: `build-logic/convention`
   (`whirl.jvm.library`, `whirl.android.library` with one Robolectric SDK in `build-logic/robolectric/`,
