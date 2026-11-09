@@ -22,7 +22,6 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.IOException
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -111,22 +110,40 @@ class AccountStoreTest {
     }
 
     @Test
-    fun `a removal that fails is retried, and the key stays readable`() = runBlocking {
+    fun `a removal that keeps failing does not stop the app, and is done on a later start`() = runBlocking {
         v18Store()
-        var failures = 1
-        val s = Stores { real -> FailingEdits(real) { failures-- > 0 } }
+        val s = Stores { real -> FailingEdits(real) { true } } // a full disk, for the whole run
         withTimeout(5_000) {
-            assertFailsWith<IOException> { s.account.data.first() }
-            // The repository retries the read, which retries the removal.
             assertEquals("1234-5678", s.repo.apiKey())
-            assertEquals(setOf("theme", "stored_defaults_dropped"), keys(s.settings))
+            assertTrue(s.repo.isSetupDone.first())
+            assertTrue("api_key" in keys(s.settings), "still in the settings file")
         }
         s.close()
 
-        // And on a later start, had the retry failed too: nothing is copied again.
-        failures = 0
         val again = Stores()
-        withTimeout(5_000) { assertEquals("1234-5678", again.repo.apiKey()) }
+        withTimeout(5_000) {
+            assertEquals("1234-5678", again.repo.apiKey())
+            assertEquals(setOf("theme", "stored_defaults_dropped"), keys(again.settings))
+        }
+    }
+
+    @Test
+    fun `keys left in the settings file are never copied again over a sign-out`() = runBlocking {
+        v18Store()
+        val s = Stores { real -> FailingEdits(real) { true } }
+        withTimeout(5_000) {
+            s.repo.signOut()
+            assertNull(s.repo.apiKey())
+            assertTrue("api_key" in keys(s.settings), "the removal failed")
+        }
+        s.close()
+
+        val again = Stores()
+        withTimeout(5_000) {
+            assertNull(again.repo.apiKey(), "the old key does not come back")
+            assertFalse(again.repo.isSetupDone.first())
+            assertEquals(setOf("theme", "stored_defaults_dropped"), keys(again.settings))
+        }
     }
 
     /** A settings store whose writes throw while [fail] says so, as a full disk would. */
