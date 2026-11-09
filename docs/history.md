@@ -121,6 +121,31 @@ Open ideas, roughly by value:
 ## Next: v1.7 tidy-up, then v1.8 archive reader (agreed 2026-11-05)
 **`docs/plans/v1.7.md`** is the plan: no new features in v1.7 (fixes from the 2026-11-05 review, dead code including the in-app post filter, build/CI, a shorter HANDOFF); the archive reader with search within a thread and posts by a user is v1.8 (§8 there).
 
+## v1.8.0 (2026-11-09)
+- **The archive reader** (`docs/plans/v1.8.md`; #129–#134, merged as a stack): threads read from `/archive/` pages
+  (800 posts each) as one scroll, behind Settings › Threads › Read threads as one scroll (off by default) or a
+  per-thread switch in the menu. `ArchivePageParser` reads the page list and splits multi-part threads (post numbers
+  restart at 1 in each part; a part starts at an address without `-N`); post N is on page ceil(N/800) of its part,
+  exactly. Schema v7: `archive_threads`, `archive_pages` (`complete` when every body is kept), `archive_posts`,
+  `archive_index` (who wrote what, for filters as SQL), `posts.rep_of`. `ArchiveRepository.open` reads the newest post
+  number from `?p=-1` and fetches `/archive/<slug>-K` directly (entry page for multi-part threads or after a 404);
+  `openCached` shows a cached page at once; up to 20 new posts are appended from the last thread page instead of
+  refetching the archive page. `scan` serves filters and whole-thread find, one page a second, 60 pages per thread
+  a day, keeping only matching bodies. The reader holds at most three archive pages of parsed posts.
+- **Filters in the app**: Posts by me / OP / moderators / reps / a poster no longer open the browser. Moderators by
+  user group (`Moderator`, `Section Moderator`, `Benevolent Dictator`), reps by `ISP Representative` and
+  `span.reptag` (found in Leaptel and Aussie Broadband threads).
+- **Draggable scroll thumb** (#133, both readers): a drag that starts on the visible thumb moves the list in
+  proportion to what is left in that direction (an absolute mapping jittered and crawled on 20-post pages); a step
+  longer than a screen jumps with `requestScrollToItem` (pixel scrolling froze on fast drags over 800 long posts).
+  Tuned on Dallin's phone.
+- **Found on the Windows emulator** (cold boot `-no-snapshot`; a snapshot boot froze) and fixed: archive times were an
+  hour behind in daylight saving (the text always says AEST; times now come from `datePublished`); pull to refresh
+  at the top reopened at the end and a leftover scroll request fired on the next Load earlier.
+- **Review**: an architecture review (agent) before building caught the multi-part numbering, the cache size of a
+  whole-thread search and the reader's memory, and reshaped §3–§5 of the plan.
+- Not yet checked on the phone: TalkBack, process death and offline (device checklist, v1.8).
+
 ## v1.7.1 (2026-11-07)
 - **Notifications on time in Doze** (#123): Dallin's Check history for 6 Nov showed checks 30–73 min apart on a 30-min interval; battery history showed nearly every check starting within seconds of the phone leaving deep Doze (Android 17 enters it ~2 min after the screen goes off on a still phone; windows of an hour and more), and battery saver held it entirely. `CheckAlarm` sets an allow-while-idle alarm one interval after the last check; `CheckAlarmReceiver` starts `WatchedCheckWorker` as expedited work (Android 12+). The periodic work stays as the fallback; a run within an interval less the 5-min flex of the last check is skipped and not recorded, under one lock (the alarm's temporary Doze exemption let the overdue fallback start in the same second, seen on the phone). Checked on the phone in forced deep Doze: alarm at 08:41:33 inside its window, expedited check OK with network. The alarm is inexact: it can land up to ¾ of an interval late. Whirldroid 2.14.12 used FirebaseJobDispatcher through Play services (Doze-exempt), not an option for F-Droid.
 - **Lists switched in place start at the top** (#122): since #114 row keys are the same in every list, so one shared scroll state kept a row in view across Watched's tabs; Search pages, forum groups and Recent's days had the same problem from before. `ListState.listKey` gives each list its own saved scroll state. Not checked on the phone.

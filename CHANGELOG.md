@@ -2,6 +2,15 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.8.0
+Read a whole thread as one scroll, and filter it in the app.
+- Settings › Threads › "Read threads as one scroll" opens threads from Whirlpool's archive as one list of up to 800 posts, instead of pages of 20. "Load earlier posts" and "Load later posts" bring in the 800 before or after. Any thread can switch from its ⋮ menu ("Read as one scroll" / "Read in pages") and keeps your place.
+- Posts by me, by the OP, by moderators and by reps, and a post's "Posts by … in this thread", now filter in the app instead of opening the browser. They start with the posts loaded; "Search earlier pages" looks further back through the thread, about a page a second, with Stop.
+- Find in the scroll view offers "Search earlier pages" too, to search the whole thread.
+- The scroll bar can be dragged: while it shows, press it and drag to move through a long thread, with the post number beside it. Also in pages.
+- Threads you have read before open at once from the saved copy while Whirl checks for new posts, and a few new posts are added without downloading the whole archive page again.
+- Reps' posts show their company ("ISP Representative · Leaptel").
+
 ## v1.7.1
 Watched-thread notifications on time, and lists that start at the top.
 - Watched-thread notifications arrive close to the interval you chose, even while the phone sits idle. Android's Doze used to hold the check back for an hour or more, so a notification often turned up only when you picked the phone up or opened Whirl. The check is now started by an alarm Android lets through Doze, with the old schedule kept as a backup.
