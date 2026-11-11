@@ -164,8 +164,8 @@ class ListViewModelTest {
         assertEquals(1, vm.fetches)
 
         canned.code = 200
-        canned.body = """{"ALERT":"","AUTH":{"NAME":"d@llin","ID":216903},"DOCS":"","ERROR":""}"""
-        keyed.user("8765-4321") // setup's check of the new key
+        canned.body = """{"ALERT":"","AUTH":{"NAME":"d@llin","ID":216903},"DOCS":"","ERROR":"","FORUM":[]}"""
+        keyed.keyReplaced() // AccountRepository.signIn, once the new key is stored
         waitFor { vm.fetches == 2 }
     }
 

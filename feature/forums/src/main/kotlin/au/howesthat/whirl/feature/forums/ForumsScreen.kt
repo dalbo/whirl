@@ -38,6 +38,7 @@ import au.howesthat.whirl.core.data.LibraryRepository
 import au.howesthat.whirl.core.data.ForumRepository
 import au.howesthat.whirl.core.model.ForumRef
 import au.howesthat.whirl.core.model.TextQuery
+import au.howesthat.whirl.core.network.WhirlpoolApi
 import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.ui.rememberNow
 import au.howesthat.whirl.core.ui.ActionsMenu
@@ -99,8 +100,9 @@ class ForumsViewModel @Inject constructor(
     private val repo: ForumRepository,
     private val library: LibraryRepository,
     savedState: SavedStateHandle,
+    api: WhirlpoolApi,
 ) : ViewModel() {
-    private val screen = ListScreenState(viewModelScope, savedState)
+    private val screen = ListScreenState(viewModelScope, savedState).apply { retryWhenKeyAccepted(api.keyRejected) { repo.refresh(force = true) } }
     val query: StateFlow<String?> = screen.query
     val refreshing: StateFlow<Boolean> = screen.refreshing
     val error: StateFlow<Throwable?> = screen.error

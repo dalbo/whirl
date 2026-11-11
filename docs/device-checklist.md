@@ -22,7 +22,7 @@ theme and favourites carry over. Then, on the debug app:
   new key" opens the key step over the app: Cancel and back return to the same screen; the real key passes, the
   banner goes, an open list showing the key error fetches again by itself, and settings, favourites and mutes are as
   before (a key for another account clears the cached lists, as signing in always has). Then the same in landscape.
-  2026-11-11, same phone: all but landscape.
+  2026-11-11, same phone: all but landscape; Watched and Forums fetched again by themselves.
 - [ ] Key field: the password manager offers to save the key after Log in (2026-11-11: Bitwarden offered), and offers to fill it in the key step
   (setup on a fresh install, or "Enter a new key").
 - [ ] Mute: a watched thread's row menu and thread menu offer Don't notify; the row shows a crossed-out bell; the next

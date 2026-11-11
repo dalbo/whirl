@@ -1,10 +1,12 @@
 package au.howesthat.whirl.core.ui
 
 import androidx.lifecycle.SavedStateHandle
+import au.howesthat.whirl.core.model.WhirlpoolError
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -72,6 +74,14 @@ class ListScreenState(private val scope: CoroutineScope, private val savedState:
         job = next
         next.invokeOnCompletion { if (job === next) _refreshing.value = false }
         next.start()
+    }
+
+    /**
+     * Fetches again once a rejected key is replaced ([keyRejected] going false, from the "key not accepted" banner)
+     * while this screen's last failure was that key, so the old error does not stay up until Retry.
+     */
+    fun retryWhenKeyAccepted(keyRejected: Flow<Boolean>, fetch: suspend () -> Unit) {
+        scope.launch { keyRejected.collect { rejected -> if (!rejected && _error.value is WhirlpoolError.BadKey) refresh(fetch) } }
     }
 
     private companion object {

@@ -29,7 +29,8 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
    int, `THREADS.UNREAD` a boolean; always pass `watchedmode`.
 6. **This machine cannot reach Whirlpool** (Cloudflare blocks curl, desktop OkHttp and headless browsers). Captures go
    through `tools/capture/` (headed Playwright); live checks run on Dallin's phone. Unit tests never touch the network.
-7. **The API key** is in `~/.config/whirldroid/apikey` (mode 600): read it in scripts, never print, log or commit it.
+7. **The API key** is in `~/.config/whirldroid/apikey` (mode 600), and the test account's (`whirl-app`, the one the
+   phone's debug app uses) in `~/.config/whirldroid/testapikey`: read them in scripts, never print, log or commit them.
    Same for `~/.config/whirldroid/release.jks` and `release-signing.env`.
 8. **Releases come only from the tag-driven workflow** (`release.yml`; PLAN.md §6). Never publish a local build. A
    release PR bumps `app/version.properties`, adds `## vX.Y.Z` to CHANGELOG.md and
