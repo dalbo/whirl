@@ -26,6 +26,8 @@
     <string name="notify_style_summary">One for all watched threads</string>
     <string name="notify_style_per_thread">One per thread</string>
     <string name="settings_notify_keep">Keep the notification up until its threads are read</string>
+    <string name="settings_data_saver">Checks wait for Wi-Fi</string>
+    <string name="settings_data_saver_summary">Background mobile data is off for Whirl, or Data Saver is on, so Android checks your watched threads only on Wi-Fi. Tap to allow background data.</string>
     <string name="settings_check_history">Check history</string>
     <string name="settings_check_history_summary">When Whirl last checked your watched threads, and what can delay the checks</string>
     <string name="check_history_title">Check history</string>
