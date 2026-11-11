@@ -244,6 +244,7 @@ private fun ThreadPager(
     val myUserId by viewModel.myUserId.collectAsStateWithLifecycle()
     val firstUnread by viewModel.firstUnread.collectAsStateWithLifecycle()
     val isWatched by viewModel.isWatched.collectAsStateWithLifecycle()
+    val isMuted by viewModel.isMuted.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val browser = rememberOpenInBrowser()
     var picking by remember { mutableStateOf(false) }
@@ -303,6 +304,8 @@ private fun ThreadPager(
                 ThreadMenu(
                     isWatched = isWatched,
                     onWatchAction = viewModel::perform,
+                    isMuted = isMuted,
+                    onSetMuted = viewModel::setMuted,
                     myUserId = myUserId,
                     onUsersPosts = { viewModel.showMyPosts() },
                     onOpPosts = viewModel::showOpPosts,

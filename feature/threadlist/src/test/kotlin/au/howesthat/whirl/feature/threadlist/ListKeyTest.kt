@@ -12,6 +12,7 @@ import androidx.test.core.app.ApplicationProvider
 import au.howesthat.whirl.core.data.AccountGeneration
 import au.howesthat.whirl.core.data.AppVisits
 import au.howesthat.whirl.core.data.ForumRepository
+import au.howesthat.whirl.core.data.LibraryRepository
 import au.howesthat.whirl.core.data.ForumThreadsRepository
 import au.howesthat.whirl.core.data.RecentRepository
 import au.howesthat.whirl.core.data.ScrapedList
@@ -70,7 +71,7 @@ class ListKeyTest {
     private val lists = WatchedRepository(api, store)
     private val forums = ForumRepository(api, db.forumDao(), db.fetchLogDao(), clock)
     private val settings = SettingsRepository(ApplicationProvider.getApplicationContext())
-    private val deps = ListDeps(settings, forums, lists, WatchQueue(api, store, lists, WatchSendScheduler.None, Dispatchers.Default, appScope), SavedStateHandle())
+    private val deps = ListDeps(settings, forums, lists, WatchQueue(api, store, lists, WatchSendScheduler.None, Dispatchers.Default, appScope), LibraryRepository(ApplicationProvider.getApplicationContext(), db.forumDao()), SavedStateHandle())
     private val scraped = ScrapedListRepository(web, forums, clock, Dispatchers.Default)
 
     private val viewModels = ViewModelStore()
@@ -88,7 +89,7 @@ class ListKeyTest {
     @Before
     fun setUp() {
         // Settings live in one DataStore per JVM; read it once in wall-clock time.
-        runBlocking { withTimeout(10_000) { settings.settings.first(); settings.account.first() } }
+        runBlocking { withTimeout(10_000) { settings.settings.first(); settings.account.first(); deps.library.mutedThreads.first() } }
         Dispatchers.setMain(UnconfinedTestDispatcher())
     }
 

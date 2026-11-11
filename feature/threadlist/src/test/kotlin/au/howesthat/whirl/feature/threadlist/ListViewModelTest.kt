@@ -12,6 +12,7 @@ import au.howesthat.whirl.core.data.AccountGeneration
 import au.howesthat.whirl.core.data.OpenThread
 import au.howesthat.whirl.core.data.AppVisits
 import au.howesthat.whirl.core.data.ForumRepository
+import au.howesthat.whirl.core.data.LibraryRepository
 import au.howesthat.whirl.core.data.OpenedFrom
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.model.WatchAction
@@ -82,7 +83,7 @@ class ListViewModelTest {
         ForumRepository(api, db.forumDao(), db.fetchLogDao(), clock),
         lists,
         watched,
-        SavedStateHandle(),
+        LibraryRepository(ApplicationProvider.getApplicationContext(), db.forumDao()), SavedStateHandle(),
     )
 
     /** A list whose fetches wait until the test completes them. */
@@ -117,7 +118,7 @@ class ListViewModelTest {
     @Before
     fun setUp() {
         // DataStore reads each file once (settings, account); do it here in wall-clock time, not on a test dispatcher.
-        runBlocking { withTimeout(10_000) { deps.settings.settings.first(); deps.settings.account.first() } }
+        runBlocking { withTimeout(10_000) { deps.settings.settings.first(); deps.settings.account.first(); deps.library.mutedThreads.first() } }
         Dispatchers.setMain(dispatcher)
     }
 
@@ -176,6 +177,21 @@ class ListViewModelTest {
         watched.perform(WatchAction.WATCH, listOf(row.id))
         vm.watchedIds.first { row.id in it }
         assertEquals(listOf(WatchAction.UNWATCH), vm.watchActions(row))
+    }
+
+    @Test
+    fun `a watched row offers Don't notify, then Notify again`() = TestScope(dispatcher).runTest {
+        val vm = held { Blocking(deps) }
+        val row = ThreadItem(ThreadId("3pxj858k"), ThreadId("3pxj858k"), "NBN", forum = ForumRef(92, "Choosing an ISP"))
+        deps.library.setMuted(listOf(row.id), muted = false) // one library store per JVM
+        assertNull(vm.muted(row), "not watched: nothing to mute")
+        val watchedRow = row.copy(unreadCount = 3, watched = WatchedPosition(1, 1, 3))
+        assertEquals(false, vm.muted(watchedRow))
+        vm.setMuted(watchedRow, true)
+        vm.mutedIds.first { row.id in it }
+        assertEquals(true, vm.muted(watchedRow))
+        vm.setMuted(watchedRow, false)
+        vm.mutedIds.first { row.id !in it }
     }
 
     @Test

@@ -11,6 +11,7 @@ import androidx.test.core.app.ApplicationProvider
 import au.howesthat.whirl.core.data.AccountGeneration
 import au.howesthat.whirl.core.data.ArchiveRepository
 import au.howesthat.whirl.core.data.ForumRepository
+import au.howesthat.whirl.core.data.LibraryRepository
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.ThreadPageRepository
 import au.howesthat.whirl.core.data.WatchQueue
@@ -99,7 +100,7 @@ class ScrollThreadViewModelTest {
 
     private fun viewModel(route: ThreadRoute, saved: SavedStateHandle = SavedStateHandle()): ScrollThreadViewModel {
         val factory = viewModelFactory {
-            initializer { ScrollThreadViewModel(route, archive, pages, settings, lists, queue, saved, Dispatchers.Default) }
+            initializer { ScrollThreadViewModel(route, archive, pages, settings, lists, queue, LibraryRepository(ApplicationProvider.getApplicationContext(), db.forumDao()), saved, Dispatchers.Default) }
         }
         return ViewModelProvider.create(viewModels, factory)["vm${count++}", ScrollThreadViewModel::class].also { created += it }
     }

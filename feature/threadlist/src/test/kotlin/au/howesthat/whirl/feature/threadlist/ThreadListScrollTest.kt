@@ -20,6 +20,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import au.howesthat.whirl.core.data.AccountGeneration
 import au.howesthat.whirl.core.data.ForumRepository
+import au.howesthat.whirl.core.data.LibraryRepository
 import au.howesthat.whirl.core.data.OpenedFrom
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.WatchQueue
@@ -67,7 +68,7 @@ class ThreadListScrollTest {
         ForumRepository(api, db.forumDao(), db.fetchLogDao(), clock),
         lists,
         WatchQueue(api, store, lists, WatchSendScheduler.None, Dispatchers.Default, appScope),
-        SavedStateHandle(),
+        LibraryRepository(ApplicationProvider.getApplicationContext(), db.forumDao()), SavedStateHandle(),
     )
     private val viewModels = ViewModelStore()
 
@@ -80,7 +81,7 @@ class ThreadListScrollTest {
     @Before
     fun setUp() {
         // Settings live in one DataStore per JVM; read it once in wall-clock time.
-        runBlocking { withTimeout(10_000) { deps.settings.settings.first(); deps.settings.account.first() } }
+        runBlocking { withTimeout(10_000) { deps.settings.settings.first(); deps.settings.account.first(); deps.library.mutedThreads.first() } }
     }
 
     @After

@@ -115,13 +115,6 @@ unit tests. Per-release checks: `docs/device-checklist.md`.
   header showed "data saver ON"). Show a note under the notification settings when
   `ConnectivityManager.restrictBackgroundStatus` is `ENABLED`, linking to the app's data usage setting
   (`Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS`).
-- **Mute a watched thread** (idea, Dallin 2026-11-08): stays in Watched (and its Unread tab) but never notifies.
-  Whirlpool has no such flag, so it is local: a `muted_threads` table (Room schema bump; or the library store if
-  `docs/plans/settings-backup.md` step 2 lands first), set from the row and thread
-  menus ("Don't notify" / "Notify again") and from the notification itself. Filter in `notifiable()`
-  (`core/notifications/.../AlertPlan.kt`), so the alert, the summary's thread and post counts and the per-thread
-  notifications all leave muted threads out. Show a bell-off mark on the row. Drop the mute when the thread is unwatched,
-  but only after a successful watched fetch, as `notified.keepOnly` does. Small: could ride along with the Data Saver note.
 - **Settings restored on a new phone, then export/import** (ideas, Dallin 2026-11-08; plan
   `docs/plans/settings-backup.md`, reviewed; steps 1–3 in PRs #138–#140, Settings now in pages): the API key moves to its own DataStore (cloud backup only end-to-end
   encrypted), settings and favourite forums are backed up, and `whirl.db` leaves backup and transfer (caches; the

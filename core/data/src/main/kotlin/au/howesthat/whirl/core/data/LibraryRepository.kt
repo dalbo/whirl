@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import au.howesthat.whirl.core.database.ForumDao
+import au.howesthat.whirl.core.model.ThreadId
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -29,12 +30,14 @@ private const val TAG = "LibraryRepository"
 private object LibraryKeys {
     /** Forum ids, as strings (a Preferences set holds strings only). */
     val favouriteForums = stringSetPreferencesKey("favourite_forums")
+    /** Watched threads that never notify (ids are strings, as everywhere). */
+    val mutedThreads = stringSetPreferencesKey("muted_threads")
     /** Set once v1.8's favourites (Room's `favourite_forums`) have been copied in. */
     val movedFromRoom = booleanPreferencesKey("favourites_moved_from_room")
 }
 
 /**
- * The user's own lists, kept apart from the cache: favourite forums. Up to v1.8 favourites were in Room; they are
+ * The user's own lists, kept apart from the cache: favourite forums and muted watched threads. Up to v1.8 favourites were in Room; they are
  * copied in once, before the first read or change.
  */
 @Singleton
@@ -64,6 +67,26 @@ class LibraryRepository internal constructor(private val store: DataStore<Prefer
         } catch (e: Exception) {
             // A full disk or a closed database: the list still shows, and the move is tried again next time.
             Log.w(TAG, "Favourites not moved from Room yet", e)
+        }
+    }
+
+    /** Watched threads that stay in Watched but never notify. Whirlpool has no such flag: this is Whirl's own. */
+    val mutedThreads: Flow<Set<ThreadId>> = store.data.map { p -> p[LibraryKeys.mutedThreads].orEmpty().mapTo(mutableSetOf(), ::ThreadId) }
+
+    suspend fun setMuted(ids: Collection<ThreadId>, muted: Boolean) {
+        store.edit { p ->
+            val current = p[LibraryKeys.mutedThreads].orEmpty()
+            val changed = ids.map { it.value }
+            p[LibraryKeys.mutedThreads] = if (muted) current + changed else current - changed.toSet()
+        }
+    }
+
+    /** Forgets the mutes of threads no longer watched; [watched] is a freshly fetched All list. */
+    suspend fun keepMutedOnly(watched: Set<ThreadId>) {
+        val keep = watched.mapTo(mutableSetOf()) { it.value }
+        store.edit { p ->
+            val current = p[LibraryKeys.mutedThreads] ?: return@edit
+            if (!keep.containsAll(current)) p[LibraryKeys.mutedThreads] = current intersect keep
         }
     }
 

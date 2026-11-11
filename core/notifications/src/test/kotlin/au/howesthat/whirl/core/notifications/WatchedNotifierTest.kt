@@ -14,6 +14,7 @@ import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import au.howesthat.whirl.core.data.Account
 import au.howesthat.whirl.core.data.AccountGeneration
+import au.howesthat.whirl.core.data.LibraryRepository
 import au.howesthat.whirl.core.data.NotifyStyle
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.model.WatchAction
@@ -33,6 +34,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -47,6 +50,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.OffsetDateTime
 import kotlin.test.assertEquals
+import kotlin.time.Duration
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -66,7 +70,9 @@ class WatchedNotifierTest {
     private val api = WhirlpoolApi(WhirlpoolHttp.client("Whirl/test"), settings::apiKey, server.url("/api/"), RetryPolicy.NONE)
     private val store = WatchedStore(db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), Clock.systemUTC())
     private val watched = WatchedRepository(api, store)
-    private val notifier = WatchedNotifier(context, settings, watched, WatchQueue(api, store, watched, WatchSendScheduler.None, Dispatchers.Default, appScope), db.notifiedDao())
+    private val library = LibraryRepository(context, db.forumDao())
+    private val queue = WatchQueue(api, store, watched, WatchSendScheduler.None, Dispatchers.Default, appScope)
+    private val notifier = WatchedNotifier(context, settings, watched, queue, db.notifiedDao(), library)
     private val manager = context.getSystemService(NotificationManager::class.java)
 
     @Before
@@ -74,6 +80,7 @@ class WatchedNotifierTest {
         shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         settings.signIn("k", Account(216903, "d@llin"))
         settings.update { it.copy(watchedNotify = true, ignoreOwnRepliesWatched = false, notifyStyle = NotifyStyle.SUMMARY, notifyKeepUntilRead = false) }
+        library.setMuted(library.mutedThreads.first(), muted = false) // one library store per JVM
     }
 
     @After
@@ -129,6 +136,82 @@ class WatchedNotifierTest {
         enqueue(unreadTwo)
         notifier.check()
         assertNull(shown())
+    }
+
+    @Test
+    fun `a muted thread stays out of the notification and never alerts`() = runTest {
+        library.setMuted(listOf(ThreadId("9q684xp3")), muted = true)
+        enqueue(unreadTwo)
+        notifier.check()
+        val n = assertNotNull(shown())
+        assertEquals("Bike Riding", n.extras.getString(NotificationCompat.EXTRA_TITLE))
+        assertEquals(setOf("9yvx1663", "9q684xp3"), db.notifiedDao().all().map { it.threadId }.toSet(), "both recorded, so an unmute alerts only for newer replies")
+        assertEquals(2, cachedUnread().size, "still in Watched")
+
+        // Bike muted too: nothing left to show.
+        library.setMuted(listOf(ThreadId("9yvx1663")), muted = true)
+        notifier.sync(cachedUnread())
+        assertNull(shown())
+    }
+
+    @Test
+    fun `a thread's Don't notify button mutes it and removes its notification`() = runTest {
+        settings.update { it.copy(notifyStyle = NotifyStyle.PER_THREAD) }
+        enqueue(unreadTwo)
+        notifier.check()
+        val bike = assertNotNull(thread("9yvx1663"))
+        assertEquals(listOf("Mark read", "Unwatch", "Don't notify"), bike.actions.map { it.title.toString() })
+        val (action, ids) = assertNotNull(NotificationActionReceiver.parse(shadowOf(bike.actions[2].actionIntent).savedIntent))
+        assertNull(action, "local, nothing to send")
+        notifier.mute(ids)
+        assertEquals(setOf(ThreadId("9yvx1663")), library.mutedThreads.first())
+        assertNull(thread("9yvx1663"))
+        assertEquals(listOf("Electric Vehicles (17527)"), lines(assertNotNull(groupSummary())))
+    }
+
+    @Test
+    fun `a thread unmuted alerts only for replies after the ones it missed`() = runTest {
+        library.setMuted(listOf(ThreadId("9q684xp3")), muted = true)
+        enqueue(unreadTwo)
+        notifier.check()
+        library.setMuted(listOf(ThreadId("9q684xp3")), muted = false)
+        manager.cancelAll()
+        enqueue(unreadTwo)
+        notifier.check()
+        assertNull(shown(), "no new reply in either thread: nothing alerts")
+    }
+
+    private fun muted() = runBlocking { library.mutedThreads.first().map { it.value }.toSet() }
+
+    /** Waits (in real time: the collectors run on [appScope]) until the mutes are [expected]. */
+    private fun awaitMuted(expected: Set<String>) = runBlocking { withTimeout(5_000) { library.mutedThreads.first { m -> m.map { it.value }.toSet() == expected } } }
+
+    @Test
+    fun `mutes are forgotten after a new fetch of the All list, never against the cache at start`() = runTest {
+        enqueue(fixture("api_watched_mode1.json"))
+        watched.refresh(unreadOnly = false, force = true)
+        // "9zzzzzzz" stands for a thread watched on the website since the cached All list was fetched.
+        library.setMuted(listOf(ThreadId("9yvx1663"), ThreadId("9zzzzzzz")), muted = true)
+        notifier.keepInSync(appScope)
+        Thread.sleep(300)
+        assertEquals(setOf("9yvx1663", "9zzzzzzz"), muted(), "the cached list is not a fresh fetch")
+
+        enqueue(fixture("api_watched_mode1.json"))
+        watched.refresh(unreadOnly = false, maxAge = Duration.ZERO)
+        awaitMuted(setOf("9yvx1663"))
+    }
+
+    @Test
+    fun `an Unwatch waiting for Undo keeps its mute`() = runTest {
+        enqueue(fixture("api_watched_mode1.json"))
+        watched.refresh(unreadOnly = false, force = true)
+        library.setMuted(listOf(ThreadId("9yvx1663"), ThreadId("9zzzzzzz")), muted = true)
+        notifier.keepInSync(appScope)
+        queue.perform(WatchAction.UNWATCH, listOf(ThreadId("9yvx1663")), undoable = true)
+
+        enqueue(fixture("api_watched_mode1.json"))
+        watched.refresh(unreadOnly = false, maxAge = Duration.ZERO)
+        awaitMuted(setOf("9yvx1663"))
     }
 
     @Test
@@ -209,7 +292,7 @@ class WatchedNotifierTest {
 
         server.takeRequest()
         enqueue(fixture("api_watched_mode1.json").replace("\"UNREAD\":683", "\"UNREAD\":0").replace("\"UNREAD\":17527", "\"UNREAD\":0"))
-        assertTrue(notifier.act(action, ids))
+        assertTrue(notifier.act(assertNotNull(action), ids))
         assertEquals("9yvx1663,9q684xp3", server.takeRequest().url.queryParameter("watchedread"))
         assertNull(shown())
         assertEquals(emptyList(), watched.watched(unreadOnly = true).first().value)

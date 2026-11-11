@@ -9,6 +9,7 @@ import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
 import au.howesthat.whirl.core.data.Account
 import au.howesthat.whirl.core.data.AccountGeneration
+import au.howesthat.whirl.core.data.LibraryRepository
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.WatchSendScheduler
 import au.howesthat.whirl.core.data.WatchedRepository
@@ -50,7 +51,8 @@ class NotificationSchedulerTest {
     private val api = WhirlpoolApi(WhirlpoolHttp.client("t"), { null })
     private val store = WatchedStore(db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), clock)
     private val watched = WatchedRepository(api, store)
-    private val notifier = WatchedNotifier(context, settings, watched, WatchQueue(api, store, watched, WatchSendScheduler.None, Dispatchers.Default, appScope), db.notifiedDao())
+    private val library = LibraryRepository(context, db.forumDao())
+    private val notifier = WatchedNotifier(context, settings, watched, WatchQueue(api, store, watched, WatchSendScheduler.None, Dispatchers.Default, appScope), db.notifiedDao(), library)
     private val alarm = CheckAlarm(context, db.checkLogDao(), clock)
     private val scheduler = NotificationScheduler(context, settings, notifier, alarm, appScope)
 

@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
- * The notification's Mark read and Unwatch buttons: sends the action for every thread the notification listed (ids are
+ * The notification's Mark read and Unwatch buttons, and a thread's Don't notify (local: [WatchedNotifier.mute]). The first two send the action for every thread the notification listed (ids are
  * a String array; 2.14.12 crashed reading them with the wrong type), then removes the notification. On failure the
  * notification stays and a toast says so.
  */
@@ -31,7 +31,9 @@ class NotificationActionReceiver : BroadcastReceiver() {
         val result = goAsync()
         scope.launch {
             try {
-                if (!notifier.act(action, ids)) {
+                if (action == null) {
+                    notifier.mute(ids)
+                } else if (!notifier.act(action, ids)) {
                     withContext(Dispatchers.Main) { Toast.makeText(context, R.string.notify_action_failed, Toast.LENGTH_LONG).show() }
                 }
             } finally {
@@ -43,12 +45,16 @@ class NotificationActionReceiver : BroadcastReceiver() {
     companion object {
         const val ACTION_MARK_READ = "au.howesthat.whirl.action.MARK_READ"
         const val ACTION_UNWATCH = "au.howesthat.whirl.action.UNWATCH"
+        /** Don't notify: local, so nothing is sent. */
+        const val ACTION_MUTE = "au.howesthat.whirl.action.MUTE"
         const val EXTRA_IDS = "au.howesthat.whirl.extra.THREAD_IDS"
 
-        internal fun parse(intent: Intent): Pair<WatchAction, List<ThreadId>>? {
+        /** The action (null for [ACTION_MUTE]) and its threads. */
+        internal fun parse(intent: Intent): Pair<WatchAction?, List<ThreadId>>? {
             val action = when (intent.action) {
                 ACTION_MARK_READ -> WatchAction.MARK_READ
                 ACTION_UNWATCH -> WatchAction.UNWATCH
+                ACTION_MUTE -> null
                 else -> return null
             }
             val ids = intent.getStringArrayExtra(EXTRA_IDS)?.map(::ThreadId)?.takeIf { it.isNotEmpty() } ?: return null

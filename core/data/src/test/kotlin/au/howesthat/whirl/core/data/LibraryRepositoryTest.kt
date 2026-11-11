@@ -7,6 +7,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import au.howesthat.whirl.core.database.ForumDao
 import au.howesthat.whirl.core.database.WhirlDatabase
+import au.howesthat.whirl.core.model.ThreadId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -95,6 +96,18 @@ class LibraryRepositoryTest {
         withTimeout(5_000) {
             assertEquals(emptySet(), s.repo.favouriteForums.first(), "the list still shows")
             assertEquals(setOf(92), s.repo.favouriteForums.first(), "and the next read moves them")
+        }
+    }
+
+    @Test
+    fun `mutes are set, cleared, and forgotten for threads no longer watched`() = runBlocking {
+        val s = Opened()
+        withTimeout(5_000) {
+            s.repo.setMuted(listOf(ThreadId("a"), ThreadId("b"), ThreadId("c")), muted = true)
+            s.repo.setMuted(listOf(ThreadId("c")), muted = false)
+            assertEquals(setOf(ThreadId("a"), ThreadId("b")), s.repo.mutedThreads.first())
+            s.repo.keepMutedOnly(setOf(ThreadId("b"), ThreadId("z")))
+            assertEquals(setOf(ThreadId("b")), s.repo.mutedThreads.first())
         }
     }
 
