@@ -2,6 +2,16 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.9.0
+Your settings come with you to a new phone, and mute for watched threads.
+- Android's backup now keeps Whirl's settings, favourite forums and muted threads, and your API key. The key goes up only end-to-end encrypted with your screen lock, so on a new phone Whirl starts signed in, in your theme, with your favourites. Cached threads and posts are never backed up: a new phone fetches them again. Settings › Backup says what this phone backs up.
+- Mute a watched thread: "Don't notify" in its menu, or on its notification. It stays in Watched, marked with a crossed-out bell, but never notifies. "Notify again" turns it back on.
+- If Whirlpool stops accepting your API key, a banner says so, with "Enter a new key". Whirl never signs you out by itself, and your settings, favourites and mutes stay.
+- After moving to a new phone, Whirl asks once for permission to show notifications, since Android does not carry it over.
+- Password managers offer to save the API key, and to fill it in on another phone.
+- Settings is split into pages: General, Notifications, Threads, Recent threads, Watched threads and Backup.
+- Settings › Notifications says "Checks wait for Wi-Fi" when Data Saver, or Whirl's own background data setting, holds back the watched-thread check on mobile data.
+
 ## v1.8.0
 Read a whole thread as one scroll, and filter it in the app.
 - Settings › Threads › "Read threads as one scroll" opens threads from Whirlpool's archive as one list of up to 800 posts, instead of pages of 20. "Load earlier posts" and "Load later posts" bring in the 800 before or after. Any thread can switch from its ⋮ menu ("Read as one scroll" / "Read in pages") and keeps your place.
