@@ -9,22 +9,10 @@ import androidx.room.Transaction
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
-data class ForumWithFavourite(
-    val id: Int,
-    val title: String,
-    val section: String,
-    val sort: Int,
-    @ColumnInfo(name = "is_private") val isPrivate: Boolean,
-    @ColumnInfo(name = "is_favourite") val isFavourite: Boolean,
-)
-
 @Dao
 interface ForumDao {
-    @Query(
-        """SELECT f.id, f.title, f.section, f.sort, f.is_private, (fav.forum_id IS NOT NULL) AS is_favourite
-           FROM forums f LEFT JOIN favourite_forums fav ON fav.forum_id = f.id ORDER BY f.sort""",
-    )
-    fun observeAll(): Flow<List<ForumWithFavourite>>
+    @Query("SELECT * FROM forums ORDER BY sort")
+    fun observeAll(): Flow<List<ForumEntity>>
 
     @Query("SELECT id FROM forums WHERE is_private = 1")
     suspend fun privateIds(): List<Int>
@@ -49,11 +37,9 @@ interface ForumDao {
     @Query("UPDATE forums SET is_private = 0")
     suspend fun clearPrivate()
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun addFavourite(favourite: FavouriteForumEntity)
-
-    @Query("DELETE FROM favourite_forums WHERE forum_id = :forumId")
-    suspend fun removeFavourite(forumId: Int)
+    /** v1.8's favourites, read once to move them to the library store (`LibraryRepository`). */
+    @Query("SELECT forum_id FROM favourite_forums")
+    suspend fun favouriteIds(): List<Int>
 }
 
 /** The columns `get=threads` and `get=recent` provide. */

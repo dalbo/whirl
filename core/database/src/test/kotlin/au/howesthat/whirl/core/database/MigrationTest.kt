@@ -40,7 +40,7 @@ class MigrationTest {
         try {
             val forums = db.forumDao().observeAll().first()
             assertEquals(listOf(92), forums.map { it.id })
-            assertEquals(true, forums.single().isFavourite)
+            assertEquals(listOf(92), db.forumDao().favouriteIds())
             assertEquals(4, db.threadDao().get("3pxj858k")?.unreadCount)
             assertEquals(listOf("3pxj858k"), db.threadDao().observeSource(ThreadSource.WATCHED, "all").first().map { it.id })
             assertEquals(123L, db.fetchLogDao().fetchedAt("forums"))

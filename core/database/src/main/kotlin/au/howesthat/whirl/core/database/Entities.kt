@@ -19,7 +19,10 @@ data class ForumEntity(
     @ColumnInfo(name = "is_private", defaultValue = "0") val isPrivate: Boolean = false,
 )
 
-/** Kept apart from [ForumEntity] so refreshing the forum list never loses favourites. */
+/**
+ * v1.8's favourite forums. Since v1.9 they live in the library DataStore (backed up, unlike this database); the table
+ * is read once to move them and is dropped in a later version.
+ */
 @Entity(tableName = "favourite_forums")
 data class FavouriteForumEntity(
     @PrimaryKey @ColumnInfo(name = "forum_id") val forumId: Int,

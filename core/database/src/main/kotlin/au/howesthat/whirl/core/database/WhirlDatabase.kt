@@ -64,7 +64,7 @@ abstract class WhirlDatabase : RoomDatabase() {
     abstract fun pendingWatchDao(): PendingWatchDao
     abstract fun archiveDao(): ArchiveDao
 
-    /** Clears everything tied to the signed-in account (on log out or key change), in one transaction. Favourites are kept. */
+    /** Clears everything tied to the signed-in account (on log out or key change), in one transaction. */
     suspend fun clearAccountData() = withTransaction {
         threadDao().clearSource(ThreadSource.WATCHED, "unread")
         threadDao().clearSource(ThreadSource.WATCHED, "all")

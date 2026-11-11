@@ -1,15 +1,18 @@
 package au.howesthat.whirl.feature.forums
 
+import au.howesthat.whirl.core.data.Cached
 import au.howesthat.whirl.core.data.ForumListItem
 import au.howesthat.whirl.core.model.Forum
 import au.howesthat.whirl.core.model.TextQuery
 import org.junit.Test
+import java.time.Instant
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ForumSectionsTest {
-    private fun f(id: Int, section: String, fav: Boolean = false) = ForumListItem(Forum(id, "F$id", section), fav, isPrivate = false)
+    private fun f(id: Int, section: String, fav: Boolean = false) = ForumListItem(Forum(id, "F$id", section), isPrivate = false, isFavourite = fav)
 
     @Test
     fun `favourites lead, then API sections in order`() {
@@ -18,6 +21,13 @@ class ForumSectionsTest {
         assertTrue(sections.first().isFavourites)
         assertEquals(listOf(92, 71), sections.first().forums.map { it.forum.id })
         assertEquals(listOf(92, 7), sections[2].forums.map { it.forum.id }, "favourites stay in their own section too")
+    }
+
+    @Test
+    fun `the library's favourites mark the cached forums`() {
+        val cached = Cached(listOf(f(92, "ISPs"), f(7, "ISPs")), Instant.EPOCH)
+        assertEquals(listOf(92 to true, 7 to false), forumsState(cached, setOf(92, 100)).forums?.map { it.forum.id to it.isFavourite })
+        assertNull(forumsState(Cached(emptyList(), null), setOf(92)).forums, "nothing fetched yet")
     }
 
     @Test
