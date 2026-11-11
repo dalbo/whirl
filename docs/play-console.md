@@ -180,8 +180,12 @@ One-time setup (before the first run):
 2. The token's attribute condition (§7, step 3) allows only `v…` tags. Let this one workflow, on main, through too
    (Cloud Shell, project `whirl-release`):
 
-       gcloud iam workload-identity-pools providers update-oidc whirl --location=global --workload-identity-pool=github \
-         --attribute-condition="assertion.repository=='dalbo/whirl' && (assertion.ref.startsWith('refs/tags/v') || assertion.workflow_ref=='dalbo/whirl/.github/workflows/promote.yml@refs/heads/main')"
+       COND="assertion.repository=='dalbo/whirl' && (assertion.ref.startsWith('refs/tags/v') || assertion.workflow_ref=='dalbo/whirl/.github/workflows/promote.yml@refs/heads/main')"
+       gcloud iam workload-identity-pools providers update-oidc whirl \
+         --location=global --workload-identity-pool=github \
+         --project=whirl-release --attribute-condition="$COND"
+
+   (Paste the long `COND=` line on its own: a wrapped command line runs as two commands.) Done 2026-11-12.
 
    `main` is protected, so only a reviewed `promote.yml` gets a token this way; other workflows on main still get none.
 3. Try it with `check_only=true` first. "Sign in to Google Cloud" failing is step 2; 403 from the Play API, step 1.
