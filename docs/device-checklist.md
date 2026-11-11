@@ -4,7 +4,10 @@ Run on a real phone before tagging a release (PLAN.md §8). Debug builds install
 
 ## v1.9 (settings backup; docs/plans/settings-backup.md)
 Upgrade over v1.8 first (install the v1.8 release, set a theme, star two forums, then install the new build): the key,
-theme and favourites carry over. Then, on the debug app:
+theme and favourites carry over.
+2026-11-11, on the debug app (v1.8.0 built from the tag, set up on the test account, Dark, two favourites, then this
+build over it): passed; the key and account moved to the account file and the favourites to the library file, no
+setup, and the notification prompt showed (a fresh install had no permission). Then, on the debug app:
 - [ ] `adb shell bmgr enabled` is true; `adb shell bmgr backupnow au.howesthat.whirl.debug` succeeds.
 - [ ] `adb shell dumpsys backup` (or the transport's file list) shows the three `datastore/*.preferences_pb` files and no `whirl.db`.
 - [ ] Uninstall, reinstall (`adb install`; Auto Backup restores on install): no setup screen; theme, palette and favourite forums back; the watched list fetches again.
@@ -24,13 +27,13 @@ theme and favourites carry over. Then, on the debug app:
   new key" opens the key step over the app: Cancel and back return to the same screen; the real key passes, the
   banner goes, an open list showing the key error fetches again by itself, and settings, favourites and mutes are as
   before (a key for another account clears the cached lists, as signing in always has). Then the same in landscape.
-  2026-11-11, same phone: all but landscape; Watched and Forums fetched again by themselves.
+  2026-11-11, same phone: all of it, landscape too; Watched and Forums fetched again by themselves.
 - [ ] Key field: the password manager offers to save the key after Log in (2026-11-11: Bitwarden offered), and offers to fill it in the key step
   (setup on a fresh install, or "Enter a new key").
 - [x] Mute: a watched thread's row menu and thread menu offer Don't notify; the row shows a crossed-out bell; the next
   check leaves it out of the notification (summary and per thread); a per-thread notification's Don't notify removes
   it at once; Notify again brings it back on its next reply; unwatching it and refreshing Watched › All forgets the mute.
-  2026-11-11: the check left out two muted unread threads (summary and per thread); the notification's Don't notify cleared both notifications and muted the thread; row menu Notify again and Don't notify with the bell. Not run: the thread menu (a chat bubble sat over its button), Notify again on the next reply, unwatch forgets the mute.
+  2026-11-11: the check left out two muted unread threads (summary and per thread); the notification's Don't notify cleared both notifications and muted the thread; row menu Notify again and Don't notify with the bell. The thread menu's Don't notify too. Not run: Notify again on the next reply, unwatch forgets the mute.
 - [x] Data Saver on (Whirl not unrestricted), or Whirl's own Background data off: Settings › Notifications shows "Checks wait for Wi-Fi"; tapping it
   opens Whirl's data usage setting; allowing unrestricted data and coming back hides the note.
 
