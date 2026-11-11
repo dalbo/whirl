@@ -104,17 +104,21 @@ debugging reconnects by its mDNS name once paired. Debug builds install as `au.h
 dropping adb: `cmd connectivity set-chain3-enabled true` and
 `set-package-networking-enabled false au.howesthat.whirl.debug` (turn both back). The phone locks often: ask Dallin to
 unlock it rather than changing its settings. It stays one pane in landscape (448 dp tall); two panes are checked in
-unit tests. Per-release checks: `docs/device-checklist.md`.
+unit tests. Per-release checks: `docs/device-checklist.md`. `tools/phone/` taps by label, picks from long-press menus
+and lists the debug app's stored key names (never values); its tap scripts refuse when Whirl is not in front (calls
+and chat bubbles pop up).
 
 ## Open ideas
 - **v1.8: the archive reader** (released 2026-11-09; `docs/plans/v1.8.md`, history in `docs/history.md`): still to
   check on the phone are §7's TalkBack, process-death and offline items. Follow-ups: a moderator view of whole-thread
   search (the note in `docs/play-console.md` mentions it), "tap a filtered post to see it in context".
-- **Settings restored on a new phone, then export/import** (ideas, Dallin 2026-11-08; plan
-  `docs/plans/settings-backup.md`, reviewed; steps 1–3 in PRs #138–#140, Settings now in pages): the API key moves to its own DataStore (cloud backup only end-to-end
-  encrypted), settings and favourite forums are backed up, and `whirl.db` leaves backup and transfer (caches; the
-  archive can push it past Auto Backup's 25 MB cap, which skips the whole backup). Export/import is a JSON file
-  without the key, the release after.
+- **Next: settings backup steps 4 and 5, then release v1.9** (plan `docs/plans/settings-backup.md`). Merged
+  2026-11-11: the key in its own DataStore, settings and favourite forums backed up (`whirl.db` never), Settings in
+  pages with a Backup page (#138–#140), mute a watched thread (#141), the Data Saver note (#142); the restore test
+  passed on the phone. Left before release: step 4 (a notification-permission prompt when a restore skips setup, a
+  "key rejected" banner instead of signing out) and step 5 (the key field as a password for autofill). Then the
+  device checklist (v1.9 section). After: Part 2 (export/import), and drop Room's unused `favourite_forums` table
+  (v8 migration) the release after v1.9.
 - **Post writer** (idea, `docs/plans/post-writer.md`): write a reply with collected quotes, a formatting bar and a live
   preview, then copy it into Whirlpool's reply page. Probably after v1.8.
 - **Guest mode** (idea, `docs/plans/guest.md`): browse public pages with no API key. Ask the moderators first.

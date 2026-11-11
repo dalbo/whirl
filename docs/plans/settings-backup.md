@@ -1,8 +1,29 @@
 # Plan: settings and key restored on a new phone, then export and import
 
-Status: **Part 1 steps 1–3 built** (PRs #138 account store, #139 library store, #140 backup rules and a Backup
-page, with Settings split into pages); steps 4–5 and Part 2 to come. Was: planned (ideas from Dallin, 2026-11-08; planned 2026-11-09). Two releases' worth: the
-restore first (it covers the common case with no user steps), export/import after.
+Status: **Part 1 steps 1–3 merged** (2026-11-11: #138 account store, #139 library store, #140 backup rules and a
+Backup page, with Settings split into pages), with mute (#141) and the Data Saver note (#142). **Next: steps 4 and 5,
+then release** (Dallin, 2026-11-11: hold the release for them; see "Why steps 4–5 before release"). Part 2 after.
+Ideas from Dallin, 2026-11-08; planned 2026-11-09.
+
+### Why steps 4–5 before release
+v1.8's backups hold no settings (the old rules excluded `datastore/`), so nothing can be restored until this version
+has backed up, about a day after it is installed. From then on, a move to a new Android 13+ phone restores the key, so
+setup (the only place that asks for notification permission) is skipped and the checks run with nothing to show, unless
+Android restores the permission grant itself (not checked: it needs a second phone). The fixes are small and ride in the
+same release and checklist pass.
+
+### Restore test, done (2026-11-09)
+On the Pixel 9 Pro XL with Google's backup transport: `bmgr backupnow` (about 5 KB, no database), uninstall,
+`adb install` (restored on install). The three DataStore files came back byte for byte in size, with no `databases/` or
+`shared_prefs/`. The app started signed in, in the restored Dark theme, with both favourite forums and the muted thread,
+and armed its check alarm at the restored interval. Recorded on #140. `tools/phone/` has the scripts used.
+
+### Found on the phone: background data off for the app itself
+The Data Saver note showed with Data Saver off. The debug app's uid had `REJECT_METERED_BACKGROUND` (per-app
+background mobile data blocked), as did about 50 other apps on the phone. Android reports this the same way as Data
+Saver (`RESTRICT_BACKGROUND_STATUS_ENABLED`) and holds the check back the same way, so the note now says "Checks wait
+for Wi-Fi" and names both causes. Odd: the app's Mobile data page showed Background data on while the policy was set;
+a reinstall (a new uid) cleared it. `adb shell dumpsys netpolicy | grep 'UID=<uid> policy'` shows it.
 
 ## Where things live today
 | What | Where | Backed up today? |
