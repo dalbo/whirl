@@ -35,7 +35,8 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 8. **Releases come only from the tag-driven workflow** (`release.yml`; PLAN.md §6). Never publish a local build. A
    release PR bumps `app/version.properties`, adds `## vX.Y.Z` to CHANGELOG.md and
    `fastlane/metadata/android/en-AU/changelogs/<versionCode>.txt` (≤500 characters), copied to `en-US`. Ask Dallin
-   before tagging. `v0.*` tags are GitHub pre-releases, `v1.*` "Latest".
+   before tagging. `v0.*` tags are GitHub pre-releases, `v1.*` "Latest". A tag reaches Play's alpha track;
+   `promote.yml` (run on main, by hand) moves it to production (`docs/play-console.md` §8). Ask Dallin before promoting.
 9. **`main` is protected:** branch, PR, green CI on an up-to-date branch, squash merge. Merge only when Dallin says so
    in the session. Tags are pushed from a commit on `main`.
 10. **No Whirlpool web session in the app** (no login, cookies, posting or site AJAX) until Whirlpool's moderators

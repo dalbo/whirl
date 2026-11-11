@@ -1,0 +1,74 @@
+name: Promote to production
+
+# Moves a release that release.yml already uploaded to the alpha track onto Google Play's production track. Nothing is
+# built here: Play gets the same bundle the testers had. Run it from Actions (or
+# `gh workflow run promote.yml -f version=v1.9.0`), always on main: Google Cloud only issues this workflow a token when
+# it runs from main (docs/play-console.md §8).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release to promote, e.g. v1.9.0 (must already be on the alpha track)'
+        required: true
+      rollout:
+        description: 'Percentage of users (100 = everyone; less is a staged rollout, run again later to raise it)'
+        required: true
+        default: '100'
+      check_only:
+        description: 'Check only: validate the change with Play, then discard it'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: play-production
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Only from main
+        run: |
+          [ "$GITHUB_REF" = refs/heads/main ] || { echo "Run this workflow on main, not $GITHUB_REF"; exit 1; }
+
+      - uses: actions/checkout@v7
+
+      - name: Version and release notes from the tag
+        id: version
+        env:
+          VERSION: ${{ inputs.version }}
+          ROLLOUT: ${{ inputs.rollout }}
+        run: |
+          [[ "$VERSION" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || { echo "version must be vMAJOR.MINOR.PATCH, not '$VERSION'"; exit 1; }
+          code=$((BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3]))
+          [[ "$ROLLOUT" =~ ^[0-9]+$ ]] && [ "$ROLLOUT" -ge 1 ] && [ "$ROLLOUT" -le 100 ] ||
+            { echo "rollout must be a whole number from 1 to 100, not '$ROLLOUT'"; exit 1; }
+          git fetch --quiet --depth=1 origin "refs/tags/$VERSION:refs/tags/$VERSION" || { echo "No tag $VERSION"; exit 1; }
+          # The notes the testers saw: the changelog as it was at the tag.
+          git show "$VERSION:fastlane/metadata/android/en-AU/changelogs/$code.txt" > "$RUNNER_TEMP/notes.txt" ||
+            { echo "The tag has no changelogs/$code.txt"; exit 1; }
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Sign in to Google Cloud
+        id: gcloud
+        # v3.0.0, pinned by commit because it mints the Play credentials (same as release.yml).
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          workload_identity_provider: ${{ vars.PLAY_WIF_PROVIDER }}
+          service_account: ${{ vars.PLAY_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+          access_token_lifetime: 600s
+
+      - name: Promote on Google Play
+        env:
+          PLAY_TOKEN: ${{ steps.gcloud.outputs.access_token }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+          ROLLOUT: ${{ inputs.rollout }}
+          CHECK_ONLY: ${{ inputs.check_only }}
+        run: .github/scripts/play-promote.sh "$RUNNER_TEMP/notes.txt"
