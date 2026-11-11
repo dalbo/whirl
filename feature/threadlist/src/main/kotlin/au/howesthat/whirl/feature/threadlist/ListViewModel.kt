@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import au.howesthat.whirl.core.network.WhirlpoolApi
+import au.howesthat.whirl.core.model.WhirlpoolError
 import javax.inject.Inject
 
 /**
@@ -36,6 +38,7 @@ class ListDeps @Inject constructor(
     val watchQueue: WatchQueue,
     val library: LibraryRepository,
     val savedState: SavedStateHandle,
+    val api: WhirlpoolApi,
 )
 
 /** Refresh state, errors and thread opening shared by every thread list screen. */
@@ -66,6 +69,10 @@ abstract class ListViewModel(protected val deps: ListDeps, private val from: Ope
     init {
         // Outside Watched, the rows only know what is watched if the All list has been fetched.
         if (from != OpenedFrom.WATCHED) viewModelScope.launch { deps.watched.ensureKnown() }
+        // A new key from the "key not accepted" banner: a list showing the old key's error fetches again by itself.
+        viewModelScope.launch {
+            deps.api.keyRejected.collect { rejected -> if (!rejected && screen.error.value is WhirlpoolError.BadKey) refresh() }
+        }
     }
 
     /** Refreshes what is on screen; the latest call wins ([ListScreenState.refresh]). */

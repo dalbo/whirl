@@ -11,15 +11,19 @@ theme and favourites carry over. Then, on the debug app:
 - [ ] After the restore, the check alarm is set (`adb shell dumpsys alarm | grep whirl`) and the first check alerts unread watched threads as after a fresh setup.
 - [ ] Settings › Backup says what is backed up; with the screen lock removed (only on a spare phone or emulator), it says nothing is backed up.
 - [ ] An API 27 emulator: settings and favourites restore, setup asks for the key with the restored settings shown.
-- [ ] Notification permission after a restore (watched-thread alerts on): revoke it first if Android restored it
+- [x] Notification permission after a restore (watched-thread alerts on): revoke it first if Android restored it
   (`adb shell pm revoke au.howesthat.whirl.debug android.permission.POST_NOTIFICATIONS`, and note whether it came back
   by itself). On start, "Allow notifications?" shows once: Allow grants it; Not now (or tapping outside) and a restart
   do not show it again; Settings › Notifications still offers "Notifications are blocked".
-- [ ] Key rejected: `tools/phone/break-key.sh`, open Whirl, refresh Watched. The red banner "Whirlpool did not accept
+  2026-11-11, Pixel 9 Pro XL, Android 17, Wi-Fi: the permission was not granted after the earlier restore (Android did
+  not restore it); the prompt, Allow, Not now and the restart all as above. The "blocked" line not rechecked.
+- [x] Key rejected: `tools/phone/break-key.sh`, open Whirl, refresh Watched. The red banner "Whirlpool did not accept
   your API key" sits under the status bar (icons readable) and stays over every screen; nothing signs out. "Enter a
   new key" opens the key step over the app: Cancel and back return to the same screen; the real key passes, the
-  banner goes, and settings, favourites and mutes are as before. Then the same in landscape.
-- [ ] Key field: the password manager offers to save the key after Log in, and offers to fill it in the key step
+  banner goes, an open list showing the key error fetches again by itself, and settings, favourites and mutes are as
+  before (a key for another account clears the cached lists, as signing in always has). Then the same in landscape.
+  2026-11-11, same phone: all but landscape.
+- [ ] Key field: the password manager offers to save the key after Log in (2026-11-11: Bitwarden offered), and offers to fill it in the key step
   (setup on a fresh install, or "Enter a new key").
 - [ ] Mute: a watched thread's row menu and thread menu offer Don't notify; the row shows a crossed-out bell; the next
   check leaves it out of the notification (summary and per thread); a per-thread notification's Don't notify removes

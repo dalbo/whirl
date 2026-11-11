@@ -68,7 +68,7 @@ class ThreadListScrollTest {
         ForumRepository(api, db.forumDao(), db.fetchLogDao(), clock),
         lists,
         WatchQueue(api, store, lists, WatchSendScheduler.None, Dispatchers.Default, appScope),
-        LibraryRepository(ApplicationProvider.getApplicationContext(), db.forumDao()), SavedStateHandle(),
+        LibraryRepository(ApplicationProvider.getApplicationContext(), db.forumDao()), SavedStateHandle(), api,
     )
     private val viewModels = ViewModelStore()
 

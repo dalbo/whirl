@@ -15,7 +15,7 @@ broken, n = re.subn(rb"\d+(?:-\d+){2,}", lambda m: re.sub(rb"\d", b"0", m.group(
 if n != 1: sys.exit(f"expected one key-shaped value, found {n}; nothing changed")
 sys.stdout.buffer.write(broken)
 ' > "$SHOTS/account-broken.pb"
-adbs push "$(wslpath -w "$SHOTS/account-broken.pb")" "$TMP" >/dev/null
+adbs push "$(wslpath -w "$SHOTS/account-broken.pb")" "$TMP" >/dev/null 2>&1
 adbs shell chmod 644 "$TMP"
 adbs shell run-as "$PKG" cp "$TMP" "$FILE"
 adbs shell rm "$TMP"

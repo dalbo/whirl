@@ -71,7 +71,7 @@ class ListKeyTest {
     private val lists = WatchedRepository(api, store)
     private val forums = ForumRepository(api, db.forumDao(), db.fetchLogDao(), clock)
     private val settings = SettingsRepository(ApplicationProvider.getApplicationContext())
-    private val deps = ListDeps(settings, forums, lists, WatchQueue(api, store, lists, WatchSendScheduler.None, Dispatchers.Default, appScope), LibraryRepository(ApplicationProvider.getApplicationContext(), db.forumDao()), SavedStateHandle())
+    private val deps = ListDeps(settings, forums, lists, WatchQueue(api, store, lists, WatchSendScheduler.None, Dispatchers.Default, appScope), LibraryRepository(ApplicationProvider.getApplicationContext(), db.forumDao()), SavedStateHandle(), api)
     private val scraped = ScrapedListRepository(web, forums, clock, Dispatchers.Default)
 
     private val viewModels = ViewModelStore()
