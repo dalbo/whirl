@@ -135,11 +135,11 @@ and chat bubbles pop up).
   - Unknown: how many threads people watch and how often they alert, so the data cost per day.
 - **Guest mode** (idea, `docs/plans/guest.md`): browse public pages with no API key. Ask the moderators first.
 - Waiting on others: Whirlpool's moderators (gates the community posts, `docs/community.md`, and the F-Droid merge
-  request, `docs/fdroid/`); Play's closed test (12+ testers for 14 days, then production; `docs/play-console.md`).
+  request, `docs/fdroid/`).
 - Housekeeping: targetSdk 37 before August 2027; Google developer verification (2027); re-check reproducibility when
   the build changes (`docs/fdroid/README.md`).
-- Small: the poster's name is a tap target under 48 dp; draggable scroll thumb; find scrolls to the post, not the
-  match; linked images; an app widget.
+- Small: the poster's name is a tap target under 48 dp; find scrolls to the post, not the match; linked images; an
+  app widget.
 - Unknowns:
   - `get=recent` when not empty: assumed to have the `THREADS` shape; the Recent screen must cope with it failing as
     `Drift`.
