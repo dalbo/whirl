@@ -12,25 +12,43 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.retryWhen
+import java.io.IOException
 import java.time.LocalTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Lives in files/datastore/, which backup_rules.xml and data_extraction_rules.xml exclude: the API key never leaves the device.
+/** The settings: [SETTING_FIELDS] and nothing secret, so it can be backed up and exported. */
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
-    name = "settings",
+    name = SETTINGS_STORE,
     produceMigrations = { listOf(DropStoredDefaults) },
 )
 
-/** What the store holds besides [Settings]: the account, and v1.0's colour switch. */
-private object Keys {
+/** The API key and its account, apart from the settings so the backup rules can treat them differently. */
+private val Context.accountStore: DataStore<Preferences> by preferencesDataStore(
+    name = ACCOUNT_STORE,
+    produceMigrations = { context -> listOf(MoveAccountOut(context.dataStore)) },
+)
+
+/** The DataStore files (`files/datastore/<name>.preferences_pb`); the backup rules name each one. */
+const val SETTINGS_STORE = "settings"
+const val ACCOUNT_STORE = "account"
+
+/** What the account store holds. Up to v1.8 these were in the settings store. */
+private object AccountKeys {
     val apiKey = stringPreferencesKey("api_key")
     val userId = longPreferencesKey("user_id")
     val userName = stringPreferencesKey("user_name")
     val setupDone = booleanPreferencesKey("setup_done")
+    val all = listOf(apiKey, userId, userName, setupDone)
+}
+
+/** What the settings store holds besides [Settings]: v1.0's colour switch. */
+private object Keys {
     /** v1.0's "Use wallpaper colours"; read only, to choose the first palette. */
     val dynamicColor = booleanPreferencesKey("dynamic_color")
 }
@@ -142,47 +160,92 @@ internal object DropStoredDefaults : DataMigration<Preferences> {
 }
 
 /**
- * Settings and the API key, in Preferences DataStore. The key is never logged; [apiKey] exists for the network layer
- * and nothing else should read it.
+ * Once (v1.9), on the account store: copies the key and account out of the settings store, then removes them there,
+ * so the settings file holds nothing secret. The copy runs once (the marker); the removal is retried on a later start
+ * if it failed, and never copies again, so it cannot bring back an account signed out since.
+ */
+internal class MoveAccountOut(private val settings: DataStore<Preferences>) : DataMigration<Preferences> {
+    override suspend fun shouldMigrate(currentData: Preferences) =
+        currentData[moved] != true || AccountKeys.all.any { it in settings.data.first() }
+
+    override suspend fun migrate(currentData: Preferences): Preferences {
+        if (currentData[moved] == true) return currentData
+        val old = settings.data.first()
+        return currentData.toMutablePreferences().apply {
+            AccountKeys.all.forEach { copy(old, it) }
+            this[moved] = true
+        }
+    }
+
+    /**
+     * A failure here is swallowed: DataStore would otherwise fail every read and write of the account store until it
+     * succeeded (a full disk would stop the app starting). [shouldMigrate] sees the keys still in the settings file and
+     * tries the removal again on a later start.
+     */
+    override suspend fun cleanUp() {
+        try {
+            settings.edit { p -> AccountKeys.all.forEach { p.remove(it) } }
+        } catch (_: IOException) {
+            // Retried on a later start.
+        }
+    }
+
+    private fun <T> MutablePreferences.copy(from: Preferences, key: Preferences.Key<T>) {
+        from[key]?.let { this[key] = it }
+    }
+
+    private companion object {
+        val moved = booleanPreferencesKey("moved_from_settings")
+    }
+}
+
+/**
+ * Settings, and the API key with its account, in two Preferences DataStores. The key is never logged; [apiKey] exists
+ * for the network layer and nothing else should read it.
  */
 @Singleton
-class SettingsRepository internal constructor(private val store: DataStore<Preferences>) {
+class SettingsRepository internal constructor(
+    private val store: DataStore<Preferences>,
+    private val accountStore: DataStore<Preferences>,
+) {
 
-    @Inject constructor(@ApplicationContext context: Context) : this(context.dataStore)
-
+    @Inject constructor(@ApplicationContext context: Context) : this(context.dataStore, context.accountStore)
 
     val settings: Flow<Settings> = store.data.map { it.toSettings() }
 
+    /**
+     * The account store, its read retried a few times on a passing I/O error (a failed [MoveAccountOut] copy fails the
+     * read until the next attempt).
+     */
+    private val accountData: Flow<Preferences> = accountStore.data.retryWhen { cause, attempt ->
+        (cause is IOException && attempt < 3).also { if (it) delay(100L shl attempt.toInt()) }
+    }
+
     /** The signed-in account, or null before setup / after log out. */
-    val account: Flow<Account?> = store.data.map { p ->
-        val id = p[Keys.userId]
-        if (p[Keys.apiKey] != null && id != null) Account(id, p[Keys.userName].orEmpty()) else null
+    val account: Flow<Account?> = accountData.map { p ->
+        val id = p[AccountKeys.userId]
+        if (p[AccountKeys.apiKey] != null && id != null) Account(id, p[AccountKeys.userName].orEmpty()) else null
     }
 
     /** True once the setup wizard has finished; the app starts in setup until then. */
-    val isSetupDone: Flow<Boolean> = store.data.map { it[Keys.setupDone] == true && it[Keys.apiKey] != null }
+    val isSetupDone: Flow<Boolean> = accountData.map { it[AccountKeys.setupDone] == true && it[AccountKeys.apiKey] != null }
 
-    suspend fun apiKey(): String? = store.data.first()[Keys.apiKey]
+    suspend fun apiKey(): String? = accountData.first()[AccountKeys.apiKey]
 
     suspend fun signIn(key: String, account: Account) {
-        store.edit {
-            it[Keys.apiKey] = key
-            it[Keys.userId] = account.userId
-            it[Keys.userName] = account.userName
+        accountStore.edit {
+            it[AccountKeys.apiKey] = key
+            it[AccountKeys.userId] = account.userId
+            it[AccountKeys.userName] = account.userName
         }
     }
 
     suspend fun signOut() {
-        store.edit {
-            it.remove(Keys.apiKey)
-            it.remove(Keys.userId)
-            it.remove(Keys.userName)
-            it.remove(Keys.setupDone)
-        }
+        accountStore.edit { p -> AccountKeys.all.forEach { p.remove(it) } }
     }
 
     suspend fun setSetupDone() {
-        store.edit { it[Keys.setupDone] = true }
+        accountStore.edit { it[AccountKeys.setupDone] = true }
     }
 
     /**
@@ -193,6 +256,4 @@ class SettingsRepository internal constructor(private val store: DataStore<Prefe
     suspend fun update(change: (Settings) -> Settings) {
         store.edit { p -> p.writeSettings(change(p.toSettings())) }
     }
-
-
 }

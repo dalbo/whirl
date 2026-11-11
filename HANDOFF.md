@@ -77,7 +77,9 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 - **Room:** a new version needs a migration and a `MigrationTest` case; build once so the schema JSON exists before
   the test can see it.
 - **Settings:** one table (`SETTING_FIELDS`, `SettingsRepository.kt`); only values that differ from the default are
-  stored. A new setting is a field in `Settings` and a row in the table (a test checks they match).
+  stored. A new setting is a field in `Settings` and a row in the table (a test checks they match). The API key, the
+  account and `setup_done` live in a separate `account` DataStore (v1.9), so the settings file holds nothing secret
+  and can be backed up (`docs/plans/settings-backup.md`); never put anything secret in the settings store.
 - **Watched threads and account switches** (v1.7, docs/plans/v1.7.md §11.2):
   - `WatchedRepository` has the lists; `WatchQueue` makes, stores, sends and undoes actions; `WatchedStore` holds
     what both share. Lock order: `sending`, then `mutex`, then the database transaction; every section under

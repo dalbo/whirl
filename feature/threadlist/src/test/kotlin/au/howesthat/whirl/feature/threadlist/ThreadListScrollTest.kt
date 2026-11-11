@@ -80,7 +80,7 @@ class ThreadListScrollTest {
     @Before
     fun setUp() {
         // Settings live in one DataStore per JVM; read it once in wall-clock time.
-        runBlocking { withTimeout(10_000) { deps.settings.settings.first() } }
+        runBlocking { withTimeout(10_000) { deps.settings.settings.first(); deps.settings.account.first() } }
     }
 
     @After
