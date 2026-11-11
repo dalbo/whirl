@@ -112,13 +112,13 @@ and chat bubbles pop up).
 - **v1.8: the archive reader** (released 2026-11-09; `docs/plans/v1.8.md`, history in `docs/history.md`): still to
   check on the phone are §7's TalkBack, process-death and offline items. Follow-ups: a moderator view of whole-thread
   search (the note in `docs/play-console.md` mentions it), "tap a filtered post to see it in context".
-- **Next: settings backup steps 4 and 5, then release v1.9** (plan `docs/plans/settings-backup.md`). Merged
+- **Next: release v1.9** after the device checklist's v1.9 section (plan `docs/plans/settings-backup.md`). Merged
   2026-11-11: the key in its own DataStore, settings and favourite forums backed up (`whirl.db` never), Settings in
   pages with a Backup page (#138–#140), mute a watched thread (#141), the Data Saver note (#142); the restore test
-  passed on the phone. Left before release: step 4 (a notification-permission prompt when a restore skips setup, a
-  "key rejected" banner instead of signing out) and step 5 (the key field as a password for autofill). Then the
-  device checklist (v1.9 section). After: Part 2 (export/import), and drop Room's unused `favourite_forums` table
-  (v8 migration) the release after v1.9.
+  passed on the phone. Steps 4–5 (a one-time notification-permission prompt when a restore skips setup, a "key not
+  accepted" banner with "Enter a new key" instead of signing out, the key field as a password for autofill) are built
+  and wait for their phone checks (`tools/phone/break-key.sh` breaks the stored key for the banner). After: Part 2
+  (export/import), and drop Room's unused `favourite_forums` table (v8 migration) the release after v1.9.
 - **Post writer** (idea, `docs/plans/post-writer.md`): write a reply with collected quotes, a formatting bar and a live
   preview, then copy it into Whirlpool's reply page. Probably after v1.8.
 - **Guest mode** (idea, `docs/plans/guest.md`): browse public pages with no API key. Ask the moderators first.

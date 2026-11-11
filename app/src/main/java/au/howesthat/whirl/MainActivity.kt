@@ -13,6 +13,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -66,12 +73,15 @@ class MainActivity : ComponentActivity() {
         setContent {
             val state by viewModel.state.collectAsStateWithLifecycle()
             val loaded = state ?: return@setContent
+            val keyRejected by viewModel.keyRejected.collectAsStateWithLifecycle()
+            val banner = keyRejected && loaded.setupDone
             val dark = isDark(loaded.settings)
             val palette = remember(loaded.settings.palette) { Styles.palette(this, loaded.settings.palette) }
             val layout = remember(loaded.settings.layout) { Styles.layout(this, loaded.settings.layout).layout }
             // The bars follow the app's theme, not the system's (Dark in the app with a light phone kept dark icons);
             // the status bar sits over the top app bar, so a palette's dark top bar wants light icons.
-            val darkTopBar = palette.takeUnless { usesWallpaper(it) }?.extra("topBar", dark)?.let { it.luminance() < 0.5f } ?: dark
+            // The key banner is errorContainer, dark in a dark theme and light in a light one.
+            val darkTopBar = if (banner) dark else palette.takeUnless { usesWallpaper(it) }?.extra("topBar", dark)?.let { it.luminance() < 0.5f } ?: dark
             DisposableEffect(dark, darkTopBar) {
                 val status = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTopBar }
                 val navigation = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark }
@@ -88,20 +98,35 @@ class MainActivity : ComponentActivity() {
                     // Fixed while this tree lives: a changed homepage setting must not re-route an open NavHost.
                     val startRoute = remember { loaded.settings.homepage.route() }
                     val link by viewModel.link.collectAsStateWithLifecycle()
-                    CompositionLocalProvider(LocalBrowserApp provides loaded.settings.browserApp, LocalFindRequests provides findRequests) {
-                        WhirlApp(
-                            startRoute = startRoute,
-                            account = account,
-                            alert = alert,
-                            link = link,
-                            onLinkHandled = viewModel::linkHandled,
-                            animations = loaded.settings.screenAnimations,
-                            twoPane = loaded.settings.twoPane,
-                            twoPaneLandscapeOnly = loaded.settings.twoPaneLandscapeOnly,
-                            scrollThreads = loaded.settings.readThreadsAsScroll,
-                        ) { host ->
-                            WatchSnackbars(host, viewModel.watchEvents, loaded.settings.undoSeconds, viewModel::undo, viewModel::commit)
+                    val askNotifications by viewModel.askNotifications.collectAsStateWithLifecycle()
+                    var newKey by rememberSaveable { mutableStateOf(false) }
+                    // The app stays composed under the key step, so cancelling it comes back to the same screens.
+                    Box(Modifier.fillMaxSize()) {
+                        Column(if (newKey) Modifier.clearAndSetSemantics {} else Modifier) {
+                            if (banner) KeyRejectedBanner(onNewKey = { newKey = true })
+                            // The banner took the status bar's inset; the screens below must not pad for it again.
+                            Box(Modifier.weight(1f).then(if (banner) Modifier.consumeWindowInsets(BannerTopInsets) else Modifier)) {
+                                CompositionLocalProvider(LocalBrowserApp provides loaded.settings.browserApp, LocalFindRequests provides findRequests) {
+                                    WhirlApp(
+                                        startRoute = startRoute,
+                                        account = account,
+                                        alert = alert,
+                                        link = link,
+                                        onLinkHandled = viewModel::linkHandled,
+                                        animations = loaded.settings.screenAnimations,
+                                        twoPane = loaded.settings.twoPane,
+                                        twoPaneLandscapeOnly = loaded.settings.twoPaneLandscapeOnly,
+                                        scrollThreads = loaded.settings.readThreadsAsScroll,
+                                    ) { host ->
+                                        WatchSnackbars(host, viewModel.watchEvents, loaded.settings.undoSeconds, viewModel::undo, viewModel::commit)
+                                    }
+                                }
+                            }
                         }
+                        if (newKey) SetupScreen(onNewKeyClosed = { newKey = false })
+                    }
+                    if (!newKey && askNotifications && loaded.settings.watchedNotify) {
+                        NotificationPermissionPrompt(onAsked = viewModel::notificationsAsked)
                     }
                 }
             }

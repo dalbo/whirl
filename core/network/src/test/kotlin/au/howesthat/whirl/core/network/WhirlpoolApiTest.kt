@@ -72,6 +72,47 @@ class WhirlpoolApiTest {
     }
 
     @Test
+    fun `a rejected stored key is published until a call succeeds`() = runTest {
+        assertFalse(api.keyRejected.value)
+        enqueue("api_badkey.json", code = 403)
+        assertFailsWith<WhirlpoolError.BadKey> { api.forums() }
+        assertTrue(api.keyRejected.value)
+        enqueue("api_forum.json")
+        api.forums()
+        assertFalse(api.keyRejected.value)
+    }
+
+    @Test
+    fun `an AUTH id of 0 from the user call counts as rejected too`() = runTest {
+        server.enqueue(MockResponse.Builder().body("""{"ALERT":"","AUTH":{"NAME":"","ID":0},"DOCS":"","ERROR":""}""").build())
+        assertFailsWith<WhirlpoolError.BadKey> { api.user() }
+        assertTrue(api.keyRejected.value)
+    }
+
+    @Test
+    fun `a key being checked in setup never raises the banner`() = runTest {
+        enqueue("api_badkey.json", code = 403)
+        assertFailsWith<WhirlpoolError.BadKey> { api.user("0000-0000-0000-00") }
+        assertFalse(api.keyRejected.value)
+    }
+
+    @Test
+    fun `a new key accepted in setup clears the banner`() = runTest {
+        enqueue("api_badkey.json", code = 403)
+        assertFailsWith<WhirlpoolError.BadKey> { api.watched(unreadOnly = true) }
+        enqueue("api_user.json")
+        api.user("1111-2222-3333-44")
+        assertFalse(api.keyRejected.value)
+    }
+
+    @Test
+    fun `no key at all is not a rejection`() = runTest {
+        val noKey = WhirlpoolApi(WhirlpoolHttp.client("t"), { null }, server.url("/api/"))
+        assertFailsWith<WhirlpoolError.BadKey> { noKey.forums() }
+        assertFalse(noKey.keyRejected.value)
+    }
+
+    @Test
     fun `missing key fails before any request`() = runTest {
         val noKey = WhirlpoolApi(WhirlpoolHttp.client("t"), { null }, server.url("/api/"))
         assertFailsWith<WhirlpoolError.BadKey> { noKey.forums() }

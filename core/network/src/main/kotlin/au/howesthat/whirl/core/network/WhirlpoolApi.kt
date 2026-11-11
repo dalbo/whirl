@@ -46,11 +46,24 @@ class WhirlpoolApi(
     /** The latest non-error `ALERT` text from the API (empty when none). Shown verbatim. */
     val alert: StateFlow<String> = _alert.asStateFlow()
 
+    private val _keyRejected = MutableStateFlow(false)
+
+    /**
+     * Whirlpool turned down the stored key on the last call that used it; the next call that succeeds clears it. Only
+     * published, never acted on here: `BadKey` comes from any reply with `AUTH.ID` 0, a passing server fault included,
+     * so the app shows a banner instead of signing out (docs/plans/settings-backup.md, step 4). A key passed in
+     * explicitly (setup checking a new one) never sets it.
+     */
+    val keyRejected: StateFlow<Boolean> = _keyRejected.asStateFlow()
+
     /** Validates a key: returns its user or throws [WhirlpoolError.BadKey]. Used by the setup wizard. */
     suspend fun user(key: String? = null): ApiUser {
         val env = call(setOf("user"), key = key)
         val auth = env.auth ?: throw WhirlpoolError.Drift("API response has no AUTH")
-        if (auth.id == 0L) throw WhirlpoolError.BadKey(env.error.ifEmpty { "Not authenticated. Bad API key?" })
+        if (auth.id == 0L) {
+            if (key == null) _keyRejected.value = true
+            throw WhirlpoolError.BadKey(env.error.ifEmpty { "Not authenticated. Bad API key?" })
+        }
         return ApiUser(auth.id, auth.name)
     }
 
@@ -134,12 +147,15 @@ class WhirlpoolApi(
         val response = client.fetch(Request.Builder().url(url).build(), retry, io)
         val env = withContext(io) { decode(response) }
         when {
-            response.code == 403 || (env.auth?.id == 0L && env.error.isNotEmpty()) ->
+            response.code == 403 || (env.auth?.id == 0L && env.error.isNotEmpty()) -> {
+                if (key == null) _keyRejected.value = true
                 throw WhirlpoolError.BadKey(env.error.ifEmpty { "Not authenticated. Bad API key?" })
+            }
             env.error.isNotEmpty() -> throw WhirlpoolError.Api(env.error, response.code)
             response.code !in 200..299 -> throw WhirlpoolError.Api("HTTP ${response.code}", response.code)
         }
         _alert.value = env.alert
+        if (env.auth?.id != 0L) _keyRejected.value = false
         return env
     }
 
