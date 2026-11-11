@@ -2,8 +2,8 @@
 
 Status: **Part 1 steps 1–3 merged** (2026-11-11: #138 account store, #139 library store, #140 backup rules and a
 Backup page, with Settings split into pages), with mute (#141) and the Data Saver note (#142). **Steps 4 and 5 built**
-(2026-11-11, one PR; phone checks in `docs/device-checklist.md` v1.9). **Next: the device checklist, then release**
-(Dallin, 2026-11-11: hold the release for them; see "Why steps 4–5 before release"). Part 2 after.
+(2026-11-11, one PR; phone checks in `docs/device-checklist.md` v1.9). **Released in v1.9.0** (2026-11-11) after the
+device checklist. Part 2 next.
 Ideas from Dallin, 2026-11-08; planned 2026-11-09.
 
 ### Why steps 4–5 before release

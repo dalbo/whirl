@@ -121,6 +121,29 @@ Open ideas, roughly by value:
 ## Next: v1.7 tidy-up, then v1.8 archive reader (agreed 2026-11-05)
 **`docs/plans/v1.7.md`** is the plan: no new features in v1.7 (fixes from the 2026-11-05 review, dead code including the in-app post filter, build/CI, a shorter HANDOFF); the archive reader with search within a thread and posts by a user is v1.8 (§8 there).
 
+## v1.9.0 (2026-11-11)
+- **Settings backup, Part 1** (`docs/plans/settings-backup.md`; #138–#140, #147): the API key, account and
+  `setup_done` moved to their own `account` DataStore (a `DataMigration` with a `moved_from_settings` marker), and
+  favourite forums (later mutes too) to a `library` DataStore (a one-off copy out of Room with its own marker; the
+  `favourite_forums` table stays unused until a v8 migration). The backup rules became include-only: settings and
+  library everywhere; the account file only under `clientSideEncryption` / `deviceToDeviceTransfer` on API 28–30, and on
+  31+ through `<cloud-backup disableIfNoEncryptionCapabilities="true">` because `requireFlags` is silently dropped
+  there. `whirl.db` and shared prefs are never backed up. `BackupRulesTest` parses the three rules files against the
+  store list. The restore test passed on the phone (2026-11-09; `tools/phone/`).
+- **After a restore** (#147): `WhirlpoolApi.keyRejected` (only calls with the stored key set or clear it; a reply for
+  a key already replaced is ignored) drives a banner with "Enter a new key", the key step over the app; nothing ever
+  signs out on `BadKey`, which a passing server fault can also produce. `AccountRepository.signIn` clears it only
+  after storing the key, and `ListScreenState.retryWhenKeyAccepted` refetches lists that were showing the key error:
+  both found on the phone (the banner came back when screens retried with the old key before it was stored). A
+  one-time notification-permission prompt, its flag in shared prefs so a restore asks again (Android did not restore
+  the grant on the phone). The key field is `ContentType.Password` and commits autofill (Bitwarden offered to save).
+- **Mute** (#141): muted thread ids in the library store; the check leaves them out of the summary and per-thread
+  notifications; row, thread and notification actions. **Data Saver note** (#142): `RESTRICT_BACKGROUND_STATUS_ENABLED`
+  covers both Data Saver and the app's own background-data switch (`REJECT_METERED_BACKGROUND`, set on the debug app
+  and about 50 others on Dallin's phone), so the note names both. **Settings in pages** (#140).
+- Phone pass (device checklist v1.9): the upgrade over a v1.8.0 build migrated the key and favourites with no setup;
+  not run: the API 27 emulator, password-manager fill, mute's "Notify again on the next reply".
+
 ## v1.8.0 (2026-11-09)
 - **The archive reader** (`docs/plans/v1.8.md`; #129–#134, merged as a stack): threads read from `/archive/` pages
   (800 posts each) as one scroll, behind Settings › Threads › Read threads as one scroll (off by default) or a

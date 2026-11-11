@@ -9,7 +9,7 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 |---|---|
 | `PLAN.md` | Target features (from Whirldroid 2.14.12), verified Whirlpool behaviour, architecture, decisions (§5) |
 | `docs/plans/` | The plans since v1.3 (`v1.3.md` also covers v1.4; v1.5 had none) |
-| `docs/history.md` | How each phase and release was built and what it decided, up to v1.8.0 |
+| `docs/history.md` | How each phase and release was built and what it decided, up to v1.9.0 |
 | `fixtures/api/`, `fixtures/html/` | Real API responses and **raw** pages (no key inside); `fixtures/README.md` |
 | `tools/capture/` | Headed Playwright captures, the only way past Cloudflare from this machine |
 | `docs/device-checklist.md` | The phone pass before each release |
@@ -113,13 +113,10 @@ and chat bubbles pop up).
 - **v1.8: the archive reader** (released 2026-11-09; `docs/plans/v1.8.md`, history in `docs/history.md`): still to
   check on the phone are §7's TalkBack, process-death and offline items. Follow-ups: a moderator view of whole-thread
   search (the note in `docs/play-console.md` mentions it), "tap a filtered post to see it in context".
-- **Next: release v1.9** after the device checklist's v1.9 section (plan `docs/plans/settings-backup.md`). Merged
-  2026-11-11: the key in its own DataStore, settings and favourite forums backed up (`whirl.db` never), Settings in
-  pages with a Backup page (#138–#140), mute a watched thread (#141), the Data Saver note (#142); the restore test
-  passed on the phone. Steps 4–5 (a one-time notification-permission prompt when a restore skips setup, a "key not
-  accepted" banner with "Enter a new key" instead of signing out, the key field as a password for autofill) are built
-  and wait for their phone checks (`tools/phone/break-key.sh` breaks the stored key for the banner). After: Part 2
-  (export/import), and drop Room's unused `favourite_forums` table (v8 migration) the release after v1.9.
+- **v1.9: settings backup** (released 2026-11-11; plan `docs/plans/settings-backup.md`, history in
+  `docs/history.md`): settings, favourites, mutes and the key backed up; the key-rejected banner; mute; the Data Saver
+  note. **Next: Part 2** (export and import as JSON, in Settings › Backup), and drop Room's unused
+  `favourite_forums` table (v8 migration) now that v1.9 is out. Not checked: the API 27 emulator, password-manager fill.
 - **Post writer** (idea, `docs/plans/post-writer.md`): write a reply with collected quotes, a formatting bar and a live
   preview, then copy it into Whirlpool's reply page. Probably after v1.8.
 - **Guest mode** (idea, `docs/plans/guest.md`): browse public pages with no API key. Ask the moderators first.
