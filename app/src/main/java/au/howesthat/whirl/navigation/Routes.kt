@@ -3,6 +3,7 @@ package au.howesthat.whirl.navigation
 import androidx.navigation3.runtime.NavKey
 import au.howesthat.whirl.core.data.Homepage
 import au.howesthat.whirl.core.ui.ListPaneRoute
+import au.howesthat.whirl.feature.settings.SettingsPageRoute
 import au.howesthat.whirl.feature.thread.ThreadRoute
 import au.howesthat.whirl.feature.threadlist.ForumRoute
 import au.howesthat.whirl.feature.threadlist.SearchRoute
@@ -39,6 +40,7 @@ val RouteSerializers = SerializersModule {
         subclass(SettingsRoute::class)
         subclass(AboutRoute::class)
         subclass(CheckHistoryRoute::class)
+        subclass(SettingsPageRoute::class)
         subclass(NewsRoute::class)
         subclass(RecentRoute::class)
         subclass(LatestRoute::class)

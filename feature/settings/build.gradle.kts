@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.whirl.android.feature)
+    alias(libs.plugins.whirl.serialization)
 }
 
 android {
@@ -9,4 +10,5 @@ android {
 dependencies {
     implementation(project(":feature:setup"))
     implementation(project(":core:notifications"))
+    implementation(libs.androidx.navigation3.runtime)
 }

@@ -123,14 +123,10 @@ unit tests. Per-release checks: `docs/device-checklist.md`.
   notifications all leave muted threads out. Show a bell-off mark on the row. Drop the mute when the thread is unwatched,
   but only after a successful watched fetch, as `notified.keepOnly` does. Small: could ride along with the Data Saver note.
 - **Settings restored on a new phone, then export/import** (ideas, Dallin 2026-11-08; plan
-  `docs/plans/settings-backup.md`, reviewed): the API key moves to its own DataStore (cloud backup only end-to-end
+  `docs/plans/settings-backup.md`, reviewed; steps 1–3 in PRs #138–#140, Settings now in pages): the API key moves to its own DataStore (cloud backup only end-to-end
   encrypted), settings and favourite forums are backed up, and `whirl.db` leaves backup and transfer (caches; the
   archive can push it past Auto Backup's 25 MB cap, which skips the whole backup). Export/import is a JSON file
   without the key, the release after.
-- **Split Settings into pages** (idea, 2026-11-09): `SettingsScreen.kt` is one scrolling page of six groups and about
-  30 rows, and Backup will add more. A top-level list (Account, Appearance, Notifications, Threads, Recent and
-  Watched, Backup), each row opening its own page, is the usual Android shape and gives each group room for summaries.
-  The `Group` composable and the rows stay as they are; only the navigation changes. Do it before or with Backup.
 - **Post writer** (idea, `docs/plans/post-writer.md`): write a reply with collected quotes, a formatting bar and a live
   preview, then copy it into Whirlpool's reply page. Probably after v1.8.
 - **Guest mode** (idea, `docs/plans/guest.md`): browse public pages with no API key. Ask the moderators first.

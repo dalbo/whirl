@@ -2,6 +2,16 @@
 
 Run on a real phone before tagging a release (PLAN.md §8). Debug builds install beside the release app as `au.howesthat.whirl.debug`. Note the build, the phone and its Android version, and the network (Wi-Fi or mobile data) with the result.
 
+## v1.9 (settings backup; docs/plans/settings-backup.md)
+Upgrade over v1.8 first (install the v1.8 release, set a theme, star two forums, then install the new build): the key,
+theme and favourites carry over. Then, on the debug app:
+- [ ] `adb shell bmgr enabled` is true; `adb shell bmgr backupnow au.howesthat.whirl.debug` succeeds.
+- [ ] `adb shell dumpsys backup` (or the transport's file list) shows the three `datastore/*.preferences_pb` files and no `whirl.db`.
+- [ ] Uninstall, reinstall (`adb install`; Auto Backup restores on install): no setup screen; theme, palette and favourite forums back; the watched list fetches again.
+- [ ] After the restore, the check alarm is set (`adb shell dumpsys alarm | grep whirl`) and the first check alerts unread watched threads as after a fresh setup.
+- [ ] Settings › Backup says what is backed up; with the screen lock removed (only on a spare phone or emulator), it says nothing is backed up.
+- [ ] An API 27 emulator: settings and favourites restore, setup asks for the key with the restored settings shown.
+
 ## v1.8 (archive reader)
 - [ ] Settings › Threads › Read threads as one scroll: a watched thread opens at its first unread post (also when that post was hidden); a long thread opens at its newest posts; ⋮ › Read in pages / Read as one scroll keeps the post at the top.
 - [ ] Load earlier posts keeps your place; the bar shows "Archive page N of M" with its dates; a gap divider where a post was hidden.

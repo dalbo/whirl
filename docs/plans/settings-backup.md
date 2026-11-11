@@ -1,6 +1,7 @@
 # Plan: settings and key restored on a new phone, then export and import
 
-Status: **planned, not scheduled** (ideas from Dallin, 2026-11-08; planned 2026-11-09). Two releases' worth: the
+Status: **Part 1 steps 1–3 built** (PRs #138 account store, #139 library store, #140 backup rules and a Backup
+page, with Settings split into pages); steps 4–5 and Part 2 to come. Was: planned (ideas from Dallin, 2026-11-08; planned 2026-11-09). Two releases' worth: the
 restore first (it covers the common case with no user steps), export/import after.
 
 ## Where things live today
@@ -58,8 +59,9 @@ rule that carries the key also carries settings.
    `forums.sort`), so it is dropped. `ForumWithFavourite` and the LEFT JOIN (`Daos.kt:12–27`) go; the forum list
    becomes a `combine` of the forums and the set, about 100 forums, so no cost. Update `ForumSectionsTest` and the
    "Favourites are kept" comment on `clearAccountData` (`WhirlDatabase.kt:67`).
-   - The copy is a one-off `DataMigration` on the library store reading through `ForumDao`, with a `migrated` marker
-     key: without it, a user who unstars everything would get the old table copied back on every start.
+   - Built as a one-off copy inside `LibraryRepository` (one `edit` with a marker, before the first read or change)
+     rather than a `DataMigration`, so the store keeps the `preferencesDataStore` delegate and needs no Hilt module. A
+     failed copy is logged and the stored favourites shown; the next read tries again. The marker matters: without it, a user who unstars everything would get the old table copied back on every start.
    - The table stays (unused) for one release, then a Room v8 migration drops it, with a `MigrationTest` case. Doing
      both at once would lose favourites if the copy failed part-way.
 3. **Backup rules.** Today the files only exclude. Once there is an `<include>`, only what is included is backed up,

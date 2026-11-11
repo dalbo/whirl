@@ -67,6 +67,26 @@
     <string name="check_result_stopped">Stopped by Android</string>
     <string name="check_result_stopped_why">Stopped by Android (%1$s)</string>
     <string name="settings_threads">Threads</string>
+    <string name="settings_general_summary">Start screen, theme, colours and text size</string>
+    <string name="settings_threads_summary">Pages or one scroll, and the browser</string>
+    <string name="settings_recent_summary">Where they open, and your own replies</string>
+    <string name="settings_watched_summary">Where they open, marking read and Undo</string>
+    <plurals name="settings_notifications_every">
+        <item quantity="one">Watched threads, every minute</item>
+        <item quantity="other">Watched threads, every %1$d minutes</item>
+    </plurals>
+    <string name="settings_notifications_off">Off</string>
+    <string name="settings_backup">Backup</string>
+    <string name="settings_backup_summary">What Android keeps for a new phone</string>
+    <string name="settings_backup_what">Backed up by Android</string>
+    <string name="settings_backup_what_summary">Your settings, favourite forums and API key, while Android\'s backup is on (in the phone\'s Settings, under System or Google). Cached threads and posts are not: a new phone fetches them again.</string>
+    <string name="settings_backup_all">This phone</string>
+    <string name="settings_backup_all_summary">All of the above is backed up. Your API key goes only end-to-end encrypted with your screen lock (Google\'s backup does this), so Google cannot read it; a backup service that cannot encrypt it leaves the key out.</string>
+    <string name="settings_backup_no_lock">This phone has no screen lock</string>
+    <string name="settings_backup_nothing_summary">Android backs up Whirl\'s settings only on phones with a screen lock, so nothing is backed up. Moving straight to a new phone with a cable or Wi-Fi still copies them.</string>
+    <string name="settings_backup_no_key_summary">Your settings and favourite forums are backed up, but not your API key: it is backed up only end-to-end encrypted, which needs a screen lock.</string>
+    <string name="settings_backup_old_android">Android 8</string>
+    <string name="settings_backup_old_android_summary">Your settings and favourite forums are backed up, but not your API key: this Android version cannot encrypt it end to end. Keep the key in a password manager.</string>
     <string name="settings_open_in_browser">Open public forum threads in the browser</string>
     <string name="settings_open_in_browser_summary">Private forum threads always open in the browser, where you are signed in to Whirlpool.</string>
     <string name="settings_public_at_bottom">Open public forum threads at the last page</string>
