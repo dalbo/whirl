@@ -37,15 +37,20 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.platform.LocalAutofillManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -62,25 +67,48 @@ import au.howesthat.whirl.core.ui.errorMessage
 
 private val PROFILE_URL = WhirlpoolUrls().profile().toString()
 
-/** The first-run wizard. Finishing it sets `setupDone`, and MainActivity swaps it for the app. */
+/**
+ * The first-run wizard. Finishing it sets `setupDone`, and MainActivity swaps it for the app.
+ *
+ * With [onNewKeyClosed], only the key step shows, for replacing a key Whirlpool rejected: back cancels it, a key that
+ * passes stores it (switching accounts if it is another user's) and closes it.
+ */
 @Composable
-fun SetupScreen(viewModel: SetupViewModel = hiltViewModel()) {
+fun SetupScreen(
+    onNewKeyClosed: (() -> Unit)? = null,
+    // Activity-scoped, so the new-key screen has its own, apart from a setup finished earlier in this activity.
+    viewModel: SetupViewModel = hiltViewModel(key = if (onNewKeyClosed != null) "new-key" else null),
+) {
+    val newKeyOnly = onNewKeyClosed != null
+    LaunchedEffect(newKeyOnly) { if (newKeyOnly) viewModel.startNewKey() }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // Before the effect above has run, the view model is still at the intro.
+    val step = if (newKeyOnly) SetupStep.KEY else state.step
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val autofill = LocalAutofillManager.current
 
-    BackHandler(enabled = state.step != SetupStep.INTRO) { viewModel.back() }
+    BackHandler(enabled = step != SetupStep.INTRO) { if (onNewKeyClosed != null) onNewKeyClosed() else viewModel.back() }
+    // A key that passed is worth saving: offers it to the password manager, which can fill it in on another phone.
+    LaunchedEffect(state.account) { if (state.account != null) autofill?.commit() }
+    LaunchedEffect(state.closed) {
+        // The live value: a check that passed after an earlier Cancel left it set, and opening again has cleared it.
+        if (viewModel.state.value.closed && onNewKeyClosed != null) {
+            viewModel.startNewKey() // Ready for the next time, with closed cleared.
+            onNewKeyClosed()
+        }
+    }
 
     Scaffold { padding ->
         Column(
             Modifier.padding(padding).fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            when (state.step) {
+            when (step) {
                 SetupStep.INTRO -> Page(stringResource(R.string.setup_intro_title)) {
                     Text(stringResource(R.string.setup_intro_body))
                     NextButton(viewModel::next)
                 }
-                SetupStep.KEY -> KeyStep(state, viewModel)
+                SetupStep.KEY -> KeyStep(state, viewModel, onCancel = onNewKeyClosed)
                 SetupStep.NOTIFICATIONS -> Page(stringResource(R.string.setup_notify_title)) {
                     state.account?.let { Text(stringResource(R.string.setup_logged_in_as, it.userName, it.userId)) }
                     NotificationOptions(settings, viewModel::setWatchedNotify, viewModel::setInterval)
@@ -109,9 +137,10 @@ fun SetupScreen(viewModel: SetupViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun KeyStep(state: SetupState, viewModel: SetupViewModel) {
+private fun KeyStep(state: SetupState, viewModel: SetupViewModel, onCancel: (() -> Unit)?) {
     val context = LocalContext.current
-    Page(stringResource(R.string.setup_key_title)) {
+    Page(stringResource(if (onCancel != null) R.string.setup_new_key_title else R.string.setup_key_title)) {
+        if (onCancel != null) Text(stringResource(R.string.setup_new_key_body))
         Text(stringResource(R.string.setup_key_body))
         TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, PROFILE_URL.toUri())) }) {
             Text(stringResource(R.string.setup_key_open_profile))
@@ -124,7 +153,9 @@ private fun KeyStep(state: SetupState, viewModel: SetupViewModel) {
             enabled = !state.checking,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done, autoCorrectEnabled = false),
             keyboardActions = KeyboardActions(onDone = { viewModel.checkKey() }),
-            modifier = Modifier.fillMaxWidth(),
+            // Password managers offer to save the key and fill it in: the way back on a phone that restored no key
+            // (Android 8, no screen lock, backup off). Left visible: it is long, with dashes, and usually pasted.
+            modifier = Modifier.fillMaxWidth().semantics { contentType = ContentType.Password },
         )
         state.error?.let { Text(errorMessage(it), color = MaterialTheme.colorScheme.error) }
         Button(
@@ -134,6 +165,7 @@ private fun KeyStep(state: SetupState, viewModel: SetupViewModel) {
         ) {
             if (state.checking) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Text(stringResource(R.string.setup_key_check))
         }
+        if (onCancel != null) TextButton(onClick = onCancel, Modifier.fillMaxWidth()) { Text(stringResource(R.string.setup_new_key_cancel)) }
     }
 }
 

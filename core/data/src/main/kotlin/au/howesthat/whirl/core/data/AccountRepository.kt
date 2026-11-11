@@ -29,6 +29,8 @@ class AccountRepository @Inject constructor(
         } else {
             settings.signIn(trimmed, account)
         }
+        // Only now, with the key stored: screens showing the old key's error fetch again on this.
+        api.keyReplaced()
         return account
     }
 

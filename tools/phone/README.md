@@ -8,6 +8,8 @@ go to `build/phone/`.
 - `menu.sh "<row>" "<item>" [shot]`: long-presses a row and picks an item from its menu.
 - `state.sh`: whether the phone is locked, what has focus, and the debug app's stored key names. It prints names only,
   never values: the account file holds the API key.
+- `break-key.sh`: stops the app and zeroes the digits of its stored key, so Whirlpool rejects it and the "key not
+  accepted" banner shows; "Enter a new key" (or the password manager) puts the real one back. Never prints the key.
 
 Both tap scripts refuse when Whirl's window is not in front. That has saved a tap landing on an incoming call and in
 a chat bubble. The phone locks often: ask Dallin to unlock it rather than changing its settings.

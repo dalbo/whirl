@@ -29,6 +29,9 @@ data class SetupState(
     /** Any other failure while checking the key (network, Cloudflare). */
     val error: Throwable? = null,
     val account: Account? = null,
+    /** Only the key step, opened from the "key rejected" banner: a key that passes closes it ([closed]). */
+    val newKeyOnly: Boolean = false,
+    val closed: Boolean = false,
 )
 
 @HiltViewModel
@@ -41,6 +44,9 @@ class SetupViewModel @Inject constructor(
     val state: StateFlow<SetupState> = _state.asStateFlow()
 
     val settings: StateFlow<Settings> = settingsRepository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, Settings())
+
+    /** Starts at the key step for a replacement key; settings, favourites and the cache stay as they are. */
+    fun startNewKey() = _state.update { if (it.checking) it else SetupState(step = SetupStep.KEY, newKeyOnly = true) }
 
     fun next() = _state.update { it.copy(step = SetupStep.entries[minOf(it.step.ordinal + 1, SetupStep.entries.lastIndex)]) }
 
@@ -58,7 +64,10 @@ class SetupViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val account = accounts.signIn(key)
-                _state.update { it.copy(checking = false, account = account, step = SetupStep.NOTIFICATIONS) }
+                _state.update {
+                    if (it.newKeyOnly) it.copy(checking = false, account = account, closed = true)
+                    else it.copy(checking = false, account = account, step = SetupStep.NOTIFICATIONS)
+                }
             } catch (e: WhirlpoolError.BadKey) {
                 _state.update { it.copy(checking = false, rejected = e, key = "") }
             } catch (e: WhirlpoolError) {

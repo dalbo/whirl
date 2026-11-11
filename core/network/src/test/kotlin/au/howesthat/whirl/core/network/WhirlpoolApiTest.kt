@@ -5,7 +5,11 @@ import au.howesthat.whirl.core.model.Forum
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.model.UserRef
 import au.howesthat.whirl.core.model.WhirlpoolError
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runTest
+import java.util.concurrent.TimeUnit
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import org.junit.jupiter.api.AfterEach
@@ -69,6 +73,65 @@ class WhirlpoolApiTest {
         val error = assertFailsWith<WhirlpoolError.BadKey> { api.user() }
         assertEquals("Not authenticated. Bad API key?", error.message)
         assertFalse(error.toString().contains(key), "errors must never carry the key")
+    }
+
+    @Test
+    fun `a rejected stored key is published until a call succeeds`() = runTest {
+        assertFalse(api.keyRejected.value)
+        enqueue("api_badkey.json", code = 403)
+        assertFailsWith<WhirlpoolError.BadKey> { api.forums() }
+        assertTrue(api.keyRejected.value)
+        enqueue("api_forum.json")
+        api.forums()
+        assertFalse(api.keyRejected.value)
+    }
+
+    @Test
+    fun `an AUTH id of 0 from the user call counts as rejected too`() = runTest {
+        server.enqueue(MockResponse.Builder().body("""{"ALERT":"","AUTH":{"NAME":"","ID":0},"DOCS":"","ERROR":""}""").build())
+        assertFailsWith<WhirlpoolError.BadKey> { api.user() }
+        assertTrue(api.keyRejected.value)
+    }
+
+    @Test
+    fun `a key being checked in setup never raises the banner`() = runTest {
+        enqueue("api_badkey.json", code = 403)
+        assertFailsWith<WhirlpoolError.BadKey> { api.user("0000-0000-0000-00") }
+        assertFalse(api.keyRejected.value)
+    }
+
+    @Test
+    fun `a key passing setup's check leaves the banner until it is stored`() = runTest {
+        enqueue("api_badkey.json", code = 403)
+        assertFailsWith<WhirlpoolError.BadKey> { api.watched(unreadOnly = true) }
+        enqueue("api_user.json")
+        api.user("1111-2222-3333-44")
+        assertTrue(api.keyRejected.value, "cleared now, screens would retry with the old key still stored")
+        api.keyReplaced()
+        assertFalse(api.keyRejected.value)
+    }
+
+    @Test
+    fun `a rejection for a key already replaced does not raise the banner`() = runTest {
+        var stored = "1111-1111-1111-11"
+        val switching = WhirlpoolApi(WhirlpoolHttp.client("t"), { stored }, server.url("/api/"), RetryPolicy.NONE)
+        // The reply arrives after the key changed: the call started with the old one.
+        server.enqueue(MockResponse.Builder().code(403).body(fixture("api_badkey.json")).headersDelay(200, TimeUnit.MILLISECONDS).build())
+        coroutineScope {
+            val call = async(Dispatchers.IO) { runCatching { switching.forums() } }
+            server.takeRequest()
+            stored = "2222-2222-2222-22"
+            switching.keyReplaced()
+            assertTrue(call.await().exceptionOrNull() is WhirlpoolError.BadKey)
+        }
+        assertFalse(switching.keyRejected.value)
+    }
+
+    @Test
+    fun `no key at all is not a rejection`() = runTest {
+        val noKey = WhirlpoolApi(WhirlpoolHttp.client("t"), { null }, server.url("/api/"))
+        assertFailsWith<WhirlpoolError.BadKey> { noKey.forums() }
+        assertFalse(noKey.keyRejected.value)
     }
 
     @Test

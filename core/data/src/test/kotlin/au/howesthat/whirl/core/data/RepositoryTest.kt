@@ -113,6 +113,30 @@ class RepositoryTest {
     }
 
     @Test
+    fun `a rejected key is never dropped, and a new key for the same account keeps setup and settings`() = runTest {
+        val generation = AccountGeneration()
+        val account = AccountRepository(api, settings, db, watchQueue(generation, Clock.systemUTC(), backgroundScope))
+        val watched = WatchedRepository(api, WatchedStore(db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), generation, clock))
+        enqueue("api_user.json")
+        account.signIn("1234-5678")
+        settings.setSetupDone()
+        settings.update { it.copy(theme = ThemeMode.DARK) }
+
+        enqueue("api_badkey.json", 403)
+        assertFailsWith<WhirlpoolError.BadKey> { watched.refresh(unreadOnly = true, force = true) }
+        assertTrue(api.keyRejected.value)
+        assertEquals("1234-5678", settings.apiKey(), "a BadKey reply may be a passing fault: the key stays")
+        assertTrue(settings.isSetupDone.first())
+
+        enqueue("api_user.json")
+        account.signIn("8765-4321")
+        assertFalse(api.keyRejected.value)
+        assertEquals("8765-4321", settings.apiKey())
+        assertTrue(settings.isSetupDone.first())
+        assertEquals(ThemeMode.DARK, settings.settings.first().theme)
+    }
+
+    @Test
     fun `settings round trip`() = runTest {
         assertEquals(Settings(), settings.settings.first())
         settings.update { it.copy(theme = ThemeMode.DARK, recentHistoryDays = 14, watchedNotify = true) }

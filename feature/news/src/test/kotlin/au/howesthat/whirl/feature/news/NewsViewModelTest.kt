@@ -72,7 +72,7 @@ class NewsViewModelTest {
 
     @Test
     fun `a pull to refresh while the list is loading is not dropped`() {
-        val vm = NewsViewModel(NewsRepository(api, db.newsDao(), db.fetchLogDao(), Clock.systemUTC()), SavedStateHandle())
+        val vm = NewsViewModel(NewsRepository(api, db.newsDao(), db.fetchLogDao(), Clock.systemUTC()), SavedStateHandle(), api)
         assertTrue(firstHeld.await(5, TimeUnit.SECONDS), "the first load is under way")
         vm.refresh()
         assertTrue(secondCall.await(2, TimeUnit.SECONDS), "the pull to refresh fetches while the first load is still held")
@@ -87,7 +87,7 @@ class NewsViewModelTest {
     @Test
     fun `pulling to refresh again while a refresh is running sends nothing more`() {
         held = 2
-        val vm = NewsViewModel(NewsRepository(api, db.newsDao(), db.fetchLogDao(), Clock.systemUTC()), SavedStateHandle())
+        val vm = NewsViewModel(NewsRepository(api, db.newsDao(), db.fetchLogDao(), Clock.systemUTC()), SavedStateHandle(), api)
         assertTrue(firstHeld.await(5, TimeUnit.SECONDS))
         vm.refresh()
         assertTrue(secondCall.await(2, TimeUnit.SECONDS), "the pull to refresh replaces the opening load")

@@ -1,8 +1,9 @@
 # Plan: settings and key restored on a new phone, then export and import
 
 Status: **Part 1 steps 1–3 merged** (2026-11-11: #138 account store, #139 library store, #140 backup rules and a
-Backup page, with Settings split into pages), with mute (#141) and the Data Saver note (#142). **Next: steps 4 and 5,
-then release** (Dallin, 2026-11-11: hold the release for them; see "Why steps 4–5 before release"). Part 2 after.
+Backup page, with Settings split into pages), with mute (#141) and the Data Saver note (#142). **Steps 4 and 5 built**
+(2026-11-11, one PR; phone checks in `docs/device-checklist.md` v1.9). **Next: the device checklist, then release**
+(Dallin, 2026-11-11: hold the release for them; see "Why steps 4–5 before release"). Part 2 after.
 Ideas from Dallin, 2026-11-08; planned 2026-11-09.
 
 ### Why steps 4–5 before release
@@ -116,10 +117,17 @@ rule that carries the key also carries settings.
      reply with `auth.id == 0` (`WhirlpoolApi.kt:138`), a passing server glitch included, and an automatic sign-out
      would wipe a working key on the original phone too. Show a "Your API key was rejected" banner with "Enter a new
      key" (to the key step, keeping settings and favourites) instead.
+   - Built (2026-11-11): `WhirlpoolApi.keyRejected` is set by a `BadKey` reply to the stored key (never by a key
+     setup is checking, nor by having no key) and cleared by the next call that succeeds; `KeyRejectedBanner` sits above
+     the app in `MainActivity` and opens `SetupScreen(onNewKeyClosed)`, the key step alone, over the app, which stays
+     composed so Cancel returns to the same screen. The permission prompt (`NotificationPermissionPrompt`) shows once
+     per install: its flag is in shared prefs `prompts`, which the backup rules leave out, so a restore asks again.
    - First check on the new phone: `notified` is empty, so `planAlert` (`AlertPlan.kt:21`) alerts every unread
      watched thread, the same as after a fresh setup. Left as is.
 5. **Key field as a password.** Setup's key field gets `ContentType.Password` / autofill hint so password managers
-   offer to save and fill it: covers API 26–27, phones without a screen lock, and people with backup off.
+   offer to save and fill it: covers API 26–27, phones without a screen lock, and people with backup off. Built: the
+   field stays visible (long, dashed, usually pasted), and a key that passes calls `AutofillManager.commit()` so the
+   save is offered then.
 
 ### Not used (and why)
 Android Keystore encryption (hardware-bound, blocks restore); `EncryptedSharedPreferences` (deprecated, same

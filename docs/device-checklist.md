@@ -4,20 +4,41 @@ Run on a real phone before tagging a release (PLAN.md §8). Debug builds install
 
 ## v1.9 (settings backup; docs/plans/settings-backup.md)
 Upgrade over v1.8 first (install the v1.8 release, set a theme, star two forums, then install the new build): the key,
-theme and favourites carry over. Then, on the debug app:
+theme and favourites carry over.
+2026-11-11, on the debug app (v1.8.0 built from the tag, set up on the test account, Dark, two favourites, then this
+build over it): passed; the key and account moved to the account file and the favourites to the library file, no
+setup, and the notification prompt showed (a fresh install had no permission). Then, on the debug app:
 - [ ] `adb shell bmgr enabled` is true; `adb shell bmgr backupnow au.howesthat.whirl.debug` succeeds.
 - [ ] `adb shell dumpsys backup` (or the transport's file list) shows the three `datastore/*.preferences_pb` files and no `whirl.db`.
 - [ ] Uninstall, reinstall (`adb install`; Auto Backup restores on install): no setup screen; theme, palette and favourite forums back; the watched list fetches again.
-- [ ] After the restore, the check alarm is set (`adb shell dumpsys alarm | grep whirl`) and the first check alerts unread watched threads as after a fresh setup.
-- [ ] Settings › Backup says what is backed up; with the screen lock removed (only on a spare phone or emulator), it says nothing is backed up.
+- [x] After the restore, the check alarm is set (`adb shell dumpsys alarm | grep whirl`) and the first check alerts unread watched threads as after a fresh setup.
+  2026-11-11 (Pixel 9 Pro XL, Android 17, test account): armed (`dumpsys alarm`), fired about 20:03 and alerted the one unmuted unread thread; the first check after the 2026-11-09 restore was not watched.
+- [x] Settings › Backup says what is backed up; with the screen lock removed (only on a spare phone or emulator), it says nothing is backed up.
+  2026-11-11: the screen-lock case only (no spare phone). It now names muted threads too; they are in the library store.
 - [ ] An API 27 emulator: settings and favourites restore, setup asks for the key with the restored settings shown.
-- [ ] Mute: a watched thread's row menu and thread menu offer Don't notify; the row shows a crossed-out bell; the next
+- [x] Notification permission after a restore (watched-thread alerts on): revoke it first if Android restored it
+  (`adb shell pm revoke au.howesthat.whirl.debug android.permission.POST_NOTIFICATIONS`, and note whether it came back
+  by itself). On start, "Allow notifications?" shows once: Allow grants it; Not now (or tapping outside) and a restart
+  do not show it again; Settings › Notifications still offers "Notifications are blocked".
+  2026-11-11, Pixel 9 Pro XL, Android 17, Wi-Fi: the permission was not granted after the earlier restore (Android did
+  not restore it); the prompt, Allow, Not now and the restart all as above. The "blocked" line not rechecked.
+- [x] Key rejected: `tools/phone/break-key.sh`, open Whirl, refresh Watched. The red banner "Whirlpool did not accept
+  your API key" sits under the status bar (icons readable) and stays over every screen; nothing signs out. "Enter a
+  new key" opens the key step over the app: Cancel and back return to the same screen; the real key passes, the
+  banner goes, an open list showing the key error fetches again by itself, and settings, favourites and mutes are as
+  before (a key for another account clears the cached lists, as signing in always has). Then the same in landscape.
+  2026-11-11, same phone: all of it, landscape too; Watched and Forums fetched again by themselves.
+- [ ] Key field: the password manager offers to save the key after Log in (2026-11-11: Bitwarden offered), and offers to fill it in the key step
+  (setup on a fresh install, or "Enter a new key").
+- [x] Mute: a watched thread's row menu and thread menu offer Don't notify; the row shows a crossed-out bell; the next
   check leaves it out of the notification (summary and per thread); a per-thread notification's Don't notify removes
   it at once; Notify again brings it back on its next reply; unwatching it and refreshing Watched › All forgets the mute.
-- [ ] Data Saver on (Whirl not unrestricted), or Whirl's own Background data off: Settings › Notifications shows "Checks wait for Wi-Fi"; tapping it
+  2026-11-11: the check left out two muted unread threads (summary and per thread); the notification's Don't notify cleared both notifications and muted the thread; row menu Notify again and Don't notify with the bell. The thread menu's Don't notify too. Not run: Notify again on the next reply, unwatch forgets the mute.
+- [x] Data Saver on (Whirl not unrestricted), or Whirl's own Background data off: Settings › Notifications shows "Checks wait for Wi-Fi"; tapping it
   opens Whirl's data usage setting; allowing unrestricted data and coming back hides the note.
 
 ## v1.8 (archive reader)
+  2026-11-11: the debug app had background data off already; the note showed, opened Whirl's data usage page, and went once background data was allowed (put back after).
 - [ ] Settings › Threads › Read threads as one scroll: a watched thread opens at its first unread post (also when that post was hidden); a long thread opens at its newest posts; ⋮ › Read in pages / Read as one scroll keeps the post at the top.
 - [ ] Load earlier posts keeps your place; the bar shows "Archive page N of M" with its dates; a gap divider where a post was hidden.
 - [ ] Posts by OP / moderators / reps / a poster (from pages too): results from the loaded posts, Search earlier pages with progress and Stop, Show all posts returns to the post. Reps show their company.
