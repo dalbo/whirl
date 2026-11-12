@@ -30,11 +30,12 @@ F-Droid builds Whirl from the source at each `vX.Y.Z` tag. Everything it needs i
   Temurin 17) with F-Droid's own tool: `apksigcopier copy whirl-v0.2.1.apk app-release-unsigned.apk out.apk` then
   `apksigner verify out.apk`. That is the check F-Droid runs for `Binaries`. Re-run it before each release if the
   build changes (new AGP, R8 rules, baseline profiles). Re-checked on `v1.0.0` (2026-10-21): passes.
-- **In CI (v1.7):** Actions › "Reproducible build check" › Run workflow (`.github/workflows/reproducible.yml`). It
-  builds a ref unsigned twice on clean runners in different directories, compares the APKs and transplants a
-  throwaway signature from one onto the other, and copies the signature of a published release (the latest by
-  default) onto a fresh build of its tag. Run it before tagging, and
-  once more with the new tag after the release is published.
+- **In CI (v1.7):** "Reproducible build check" (`.github/workflows/reproducible.yml`) builds a commit unsigned
+  twice on clean runners in different directories, compares the APKs and transplants a throwaway signature from one
+  onto the other, and copies the signature of a published release onto a fresh build of its tag. It runs by itself
+  after each published release (on the new tag) and on pull requests that change the build (Gradle files, plugins,
+  dependencies, R8 rules), so a build bump that breaks it shows before it is merged. Nothing waits on it; a red run
+  after a release means F-Droid will fail that tag too. Actions › Run workflow checks any ref or release by hand.
 
 ## Signing
 `AllowedAPKSigningKeys` is the SHA-256 of Whirl's release certificate,
