@@ -280,6 +280,15 @@ class WhirlpoolApiTest {
     }
 
     @Test
+    fun `the maintenance page is maintenance, not a challenge`() = runTest {
+        // Captured 2026-11-14 during maintenance: every API call answered this 503 HTML page, which carries a Cloudflare
+        // challenge-platform script tag.
+        repeat(3) { server.enqueue(MockResponse.Builder().code(503).body(fixture("api_maintenance_503.html")).build()) }
+        assertEquals(503, assertFailsWith<WhirlpoolError.Maintenance> { api.watched(unreadOnly = true) }.httpCode)
+        assertEquals(3, server.requestCount)
+    }
+
+    @Test
     fun `alert text is published`() = runTest {
         server.enqueue(MockResponse.Builder().body("""{"ALERT":"Maintenance at 2am","AUTH":{"NAME":"d@llin","ID":216903},"DOCS":"","ERROR":"","USER":{"ID":216903,"NAME":"d@llin"}}""").build())
         api.user()
