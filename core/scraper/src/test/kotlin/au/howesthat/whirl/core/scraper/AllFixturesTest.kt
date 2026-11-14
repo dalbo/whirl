@@ -18,6 +18,11 @@ class AllFixturesTest {
                 "Not signed in" in html.substringBefore("</title>") -> assertFailsWith<WhirlpoolError.NotSignedIn> {
                     if (name.startsWith("thread_")) ThreadPageParser.parse(html) else ThreadListParser.parse(html)
                 }
+                // A 503, so WhirlpoolHttp stops it before a parser; if it ever came as a 200, it must be drift.
+                name.startsWith("maintenance_") -> {
+                    assertFailsWith<WhirlpoolError.Drift> { ThreadPageParser.parse(html) }
+                    assertFailsWith<WhirlpoolError.Drift> { ThreadListParser.parse(html) }
+                }
                 name.startsWith("thread_") -> assertTrue(ThreadPageParser.parse(html).posts.isNotEmpty())
                 name.startsWith("archive_") -> assertTrue(ArchivePageParser.parse(html).posts.isNotEmpty())
                 name.startsWith("forum_index") -> assertTrue(ForumIndexParser.parse(html).sections.isNotEmpty())
