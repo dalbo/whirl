@@ -20,16 +20,6 @@ data class ForumEntity(
 )
 
 /**
- * v1.8's favourite forums. Since v1.9 they live in the library DataStore (backed up, unlike this database); the table
- * is read once to move them and is dropped in a later version.
- */
-@Entity(tableName = "favourite_forums")
-data class FavouriteForumEntity(
-    @PrimaryKey @ColumnInfo(name = "forum_id") val forumId: Int,
-    @ColumnInfo(name = "added_at") val addedAt: Long,
-)
-
-/**
  * One row per thread, merged from every source. Each source writes only the columns it knows (partial upserts in
  * [ThreadDao]); dates are epoch milliseconds. Thread ids are strings.
  */

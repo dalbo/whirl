@@ -11,4 +11,6 @@ dependencies {
     implementation(project(":feature:setup"))
     implementation(project(":core:notifications"))
     implementation(libs.androidx.navigation3.runtime)
+
+    testImplementation(project(":core:database"))
 }

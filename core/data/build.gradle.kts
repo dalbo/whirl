@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.whirl.android.library)
     alias(libs.plugins.whirl.hilt)
+    alias(libs.plugins.whirl.serialization)
 }
 
 android {

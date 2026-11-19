@@ -10,6 +10,8 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import au.howesthat.whirl.core.data.Account
 import au.howesthat.whirl.core.data.AccountGeneration
 import au.howesthat.whirl.core.data.LibraryRepository
+import au.howesthat.whirl.core.data.Settings
+import au.howesthat.whirl.core.data.SettingsFile
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.WatchSendScheduler
 import au.howesthat.whirl.core.data.WatchedRepository
@@ -101,5 +103,21 @@ class NotificationSchedulerTest {
         until { work().any { it.state == WorkInfo.State.ENQUEUED && it.periodicityInfo?.repeatIntervalMillis == TimeUnit.MINUTES.toMillis(30) } }
         settings.update { it.copy(watchedNotify = false) }
         until { work().all { it.state == WorkInfo.State.CANCELLED } }
+    }
+
+    @Test
+    fun `an imported interval re-arms the check like the switch does`() = runTest {
+        settings.signIn("k", Account(216903, "d@llin"))
+        settings.setSetupDone()
+        settings.update { it.copy(watchedNotify = true, notifyIntervalMinutes = 60) }
+        scheduler.start()
+        suspend fun until(check: () -> Boolean) = withContext(Dispatchers.Default) { withTimeout(10_000) { while (!check()) delay(20) } }
+        fun every(minutes: Long) = work().any { it.state == WorkInfo.State.ENQUEUED && it.periodicityInfo?.repeatIntervalMillis == TimeUnit.MINUTES.toMillis(minutes) }
+        until { every(60) }
+
+        val read = SettingsFile.read(SettingsFile.write(Settings(watchedNotify = true, notifyIntervalMinutes = 240), emptySet(), emptySet(), "1.10.0"))
+        val import = (read as SettingsFile.Read.Imported).import
+        settings.update { import.applyTo(it) } // as Settings › Backup's Apply does
+        until { every(240) }
     }
 }
