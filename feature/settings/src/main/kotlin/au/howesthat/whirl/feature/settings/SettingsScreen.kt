@@ -6,6 +6,8 @@ import android.content.Intent
 import android.net.ConnectivityManager
 import android.os.Build
 import android.text.format.DateFormat
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +30,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,6 +39,7 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,7 +47,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -58,6 +62,7 @@ import au.howesthat.whirl.core.data.Homepage
 import au.howesthat.whirl.core.data.NotifyStyle
 import au.howesthat.whirl.core.data.PostFontSize
 import au.howesthat.whirl.core.data.Settings
+import au.howesthat.whirl.core.data.SettingsFile
 import au.howesthat.whirl.core.data.TextScale
 import au.howesthat.whirl.core.data.ThemeMode
 import au.howesthat.whirl.core.ui.LocalAppStyle
@@ -68,13 +73,19 @@ import au.howesthat.whirl.core.ui.Surfaces
 import au.howesthat.whirl.core.ui.whirlTopBarColors
 import au.howesthat.whirl.feature.setup.NotificationOptions
 import au.howesthat.whirl.feature.setup.themeLabel
+import java.time.LocalDate
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsScaffold(title: String, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+private fun SettingsScaffold(
+    title: String,
+    onBack: () -> Unit,
+    snackbarHost: @Composable () -> Unit = {},
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Scaffold(
+        snackbarHost = snackbarHost,
         topBar = {
             TopAppBar(
                 colors = whirlTopBarColors(),
@@ -126,8 +137,9 @@ fun SettingsPageScreen(
     val palettes = remember(context) { Styles.palettes(context) }
     val account by viewModel.account.collectAsStateWithLifecycle()
     val update = viewModel::update
+    val snackbar = remember { SnackbarHostState() }
 
-    SettingsScaffold(stringResource(pageTitle(page)), onBack) {
+    SettingsScaffold(stringResource(pageTitle(page)), onBack, { SnackbarHost(snackbar) }) {
         // Shown once read from disk (a moment): toggles drawn from the defaults would act on the wrong values.
         val settings = loaded ?: return@SettingsScaffold
         Group(null) {
@@ -200,7 +212,7 @@ fun SettingsPageScreen(
                         update { it.copy(undoSeconds = v) }
                     }
                 }
-                SettingsPage.BACKUP -> BackupPage()
+                SettingsPage.BACKUP -> BackupPage(viewModel, snackbar)
             }
         }
     }
@@ -235,7 +247,7 @@ internal fun DataSaverNote() {
 }
 
 @Composable
-private fun BackupPage() {
+private fun BackupPage(viewModel: SettingsViewModel, snackbar: SnackbarHostState) {
     val context = LocalContext.current
     fun read() = backupNote(Build.VERSION.SDK_INT, context.getSystemService(KeyguardManager::class.java).isDeviceSecure)
     var note by remember(context) { mutableStateOf(read()) }
@@ -252,7 +264,104 @@ private fun BackupPage() {
         BackupNote.NO_KEY_ON_THIS_VERSION -> R.string.settings_backup_old_android to R.string.settings_backup_old_android_summary
     }
     SettingRow(stringResource(title), stringResource(summary))
+
+    // Export and import: a file the user keeps or moves themselves. No storage permission: the system picker grants
+    // access to the one file.
+    val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(SETTINGS_FILE_TYPE)) { uri -> uri?.let(viewModel::exportTo) }
+    val import = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(viewModel::importFrom) }
+    SettingRow(stringResource(R.string.backup_export), stringResource(R.string.backup_export_summary)) {
+        export.launch(settingsFileName(LocalDate.now()))
+    }
+    SettingRow(stringResource(R.string.backup_import), stringResource(R.string.backup_import_summary)) {
+        // Files arrive by chat or email typed as anything: the reader checks what is inside.
+        import.launch(arrayOf(SETTINGS_FILE_TYPE, "text/*", "application/octet-stream"))
+    }
+
+    var refused by remember { mutableStateOf<BackupResult?>(null) }
+    val exported = stringResource(R.string.backup_exported)
+    val exportFailed = stringResource(R.string.backup_export_failed)
+    val imported = stringResource(R.string.backup_imported)
+    LaunchedEffect(viewModel) {
+        viewModel.results.collect { result ->
+            when (result) {
+                BackupResult.Exported -> snackbar.showSnackbar(exported)
+                BackupResult.ExportFailed -> snackbar.showSnackbar(exportFailed)
+                BackupResult.Imported -> snackbar.showSnackbar(imported)
+                BackupResult.ReadFailed, is BackupResult.Refused -> refused = result
+            }
+        }
+    }
+    refused?.let { result ->
+        val message = when (result) {
+            is BackupResult.Refused -> when (result.problem) {
+                SettingsFile.Problem.NOT_JSON, SettingsFile.Problem.NOT_WHIRL -> R.string.backup_refused_not_whirl
+                SettingsFile.Problem.NEWER_FORMAT -> R.string.backup_refused_newer
+                SettingsFile.Problem.TOO_LARGE -> R.string.backup_refused_too_large
+            }
+            else -> R.string.backup_read_failed
+        }
+        AlertDialog(
+            onDismissRequest = { refused = null },
+            title = { Text(stringResource(R.string.backup_import)) },
+            text = { Text(stringResource(message)) },
+            confirmButton = { TextButton(onClick = { refused = null }) { Text(stringResource(R.string.ok)) } },
+        )
+    }
+
+    val preview by viewModel.preview.collectAsStateWithLifecycle()
+    preview?.let { ImportDialog(it, onApply = viewModel::applyImport, onCancel = viewModel::cancelImport) }
 }
+
+/** What an import would change, before anything is written. */
+@Composable
+private fun ImportDialog(preview: ImportPreview, onApply: () -> Unit, onCancel: () -> Unit) {
+    val lines = buildList {
+        preview.changes.forEach { add(changeLine(it)) }
+        if (preview.newFavourites > 0) add(pluralStringResource(R.plurals.backup_new_favourites, preview.newFavourites, preview.newFavourites))
+        if (preview.newMutes > 0) add(pluralStringResource(R.plurals.backup_new_mutes, preview.newMutes, preview.newMutes))
+    }
+    val skipped = preview.import.skipped.map { key ->
+        when (key) {
+            "favouriteForums" -> stringResource(R.string.backup_skipped_favourites)
+            "mutedThreads" -> stringResource(R.string.backup_skipped_mutes)
+            else -> settingName(key)
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text(stringResource(R.string.backup_import_title)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                if (preview.changesNothing) {
+                    Text(stringResource(R.string.backup_import_nothing))
+                } else {
+                    lines.forEach { Text("• $it", Modifier.padding(bottom = 4.dp)) }
+                }
+                if (skipped.isNotEmpty()) {
+                    Text(
+                        stringResource(R.string.backup_import_skipped, skipped.joinToString(", ")),
+                        Modifier.padding(top = 8.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (preview.changesNothing) {
+                TextButton(onClick = onCancel) { Text(stringResource(R.string.ok)) }
+            } else {
+                TextButton(onClick = onApply) { Text(stringResource(R.string.backup_apply)) }
+            }
+        },
+        dismissButton = if (preview.changesNothing) null else ({ TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) } }),
+    )
+}
+
+private const val SETTINGS_FILE_TYPE = "application/json"
+
+/** `whirl-settings-2026-11-19.json`. */
+internal fun settingsFileName(date: LocalDate) = "whirl-settings-$date.json"
 
 private fun pageTitle(page: SettingsPage) = when (page) {
     SettingsPage.ACCOUNT -> R.string.settings_account
@@ -276,10 +385,10 @@ private fun pageSummary(page: SettingsPage): Int? = when (page) {
 
 /** A section of settings: a heading and its rows, as one card in styles with [Surfaces.CARDS]. */
 @Composable
-private fun styleLabel(name: String, credit: String?): String = credit?.let { stringResource(R.string.settings_style_credit, name, it) } ?: name
+internal fun styleLabel(name: String, credit: String?): String = credit?.let { stringResource(R.string.settings_style_credit, name, it) } ?: name
 
 @Composable
-private fun paletteLabel(palette: Palette): String =
+internal fun paletteLabel(palette: Palette): String =
     if (palette.isWallpaper) stringResource(R.string.settings_palette_wallpaper) else styleLabel(palette.name, palette.credit)
 
 @Composable
@@ -363,8 +472,7 @@ private fun TimeSetting(title: String, time: LocalTime, onSet: (LocalTime) -> Un
     var open by remember { mutableStateOf(false) }
     // The phone's 12/24-hour setting, not the locale's default.
     val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
-    val pattern = DateFormat.getBestDateTimePattern(LocalConfiguration.current.locales[0], if (is24Hour) "Hm" else "hma")
-    SettingRow(title, time.format(DateTimeFormatter.ofPattern(pattern))) { open = true }
+    SettingRow(title, timeLabel(time)) { open = true }
     if (open) {
         val state = rememberTimePickerState(time.hour, time.minute, is24Hour)
         AlertDialog(
@@ -380,7 +488,7 @@ private fun TimeSetting(title: String, time: LocalTime, onSet: (LocalTime) -> Un
 }
 
 @Composable
-private fun homepageLabel(h: Homepage) = stringResource(
+internal fun homepageLabel(h: Homepage) = stringResource(
     when (h) {
         Homepage.NEWS -> R.string.home_news
         Homepage.RECENT -> R.string.home_recent
@@ -392,7 +500,7 @@ private fun homepageLabel(h: Homepage) = stringResource(
 )
 
 @Composable
-private fun fontLabel(f: PostFontSize) = stringResource(
+internal fun fontLabel(f: PostFontSize) = stringResource(
     when (f) {
         PostFontSize.SMALLEST -> R.string.font_smallest
         PostFontSize.SMALLER -> R.string.font_smaller
@@ -404,7 +512,7 @@ private fun fontLabel(f: PostFontSize) = stringResource(
 )
 
 @Composable
-private fun styleLabel(s: NotifyStyle) = stringResource(
+internal fun styleLabel(s: NotifyStyle) = stringResource(
     when (s) {
         NotifyStyle.SUMMARY -> R.string.notify_style_summary
         NotifyStyle.PER_THREAD -> R.string.notify_style_per_thread
@@ -412,7 +520,7 @@ private fun styleLabel(s: NotifyStyle) = stringResource(
 )
 
 @Composable
-private fun scaleLabel(t: TextScale) = stringResource(
+internal fun scaleLabel(t: TextScale) = stringResource(
     when (t) {
         TextScale.DEFAULT -> R.string.font_normal
         TextScale.LARGE -> R.string.font_large

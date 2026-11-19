@@ -79,7 +79,7 @@
     </plurals>
     <string name="settings_notifications_off">Off</string>
     <string name="settings_backup">Backup</string>
-    <string name="settings_backup_summary">What Android keeps for a new phone</string>
+    <string name="settings_backup_summary">What Android keeps for a new phone, and a file of your own</string>
     <string name="settings_backup_what">Backed up by Android</string>
     <string name="settings_backup_what_summary">Your settings, favourite forums, muted threads and API key, while Android\'s backup is on (in the phone\'s Settings, under System or Google). Cached threads and posts are not: a new phone fetches them again.</string>
     <string name="settings_backup_all">This phone</string>
@@ -124,4 +124,42 @@
     <string name="font_largest">Largest</string>
     <string name="cancel">Cancel</string>
     <string name="ok">OK</string>
+    <string name="backup_export">Export settings</string>
+    <string name="backup_export_summary">Save your settings, favourite forums and muted threads to a file, to keep or to move to another phone. Your API key is not in it, so the file is safe to share.</string>
+    <string name="backup_import">Import settings</string>
+    <string name="backup_import_summary">Read a file exported from Whirl. You see what it would change first. Favourite forums and muted threads are added to yours; none are removed.</string>
+    <string name="backup_exported">Settings exported</string>
+    <string name="backup_export_failed">Couldn\'t save the file</string>
+    <string name="backup_imported">Settings imported</string>
+    <string name="backup_refused_not_whirl">This isn\'t a Whirl settings file.</string>
+    <string name="backup_refused_newer">This file is from a newer version of Whirl. Update Whirl, then import it again.</string>
+    <string name="backup_refused_too_large">This file is too large to be a Whirl settings file.</string>
+    <string name="backup_read_failed">Couldn\'t read the file.</string>
+    <string name="backup_import_title">Import these settings?</string>
+    <string name="backup_import_nothing">This file matches what you have: nothing would change.</string>
+    <string name="backup_import_skipped">Left out, as this version can\'t use them: %1$s</string>
+    <string name="backup_skipped_favourites">some favourite forums</string>
+    <string name="backup_skipped_mutes">some muted threads</string>
+    <string name="backup_apply">Apply</string>
+    <string name="backup_change">%1$s: %2$s → %3$s</string>
+    <string name="backup_setting_name">%1$s › %2$s</string>
+    <string name="backup_on">On</string>
+    <string name="backup_off">Off</string>
+    <string name="backup_recent_days">Days shown</string>
+    <plurals name="backup_minutes">
+        <item quantity="one">Every minute</item>
+        <item quantity="other">Every %d minutes</item>
+    </plurals>
+    <plurals name="backup_days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <plurals name="backup_new_favourites">
+        <item quantity="one">Favourite forums: 1 added</item>
+        <item quantity="other">Favourite forums: %d added</item>
+    </plurals>
+    <plurals name="backup_new_mutes">
+        <item quantity="one">Muted threads: 1 added</item>
+        <item quantity="other">Muted threads: %d added</item>
+    </plurals>
 </resources>
