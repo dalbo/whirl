@@ -23,6 +23,8 @@ class AllFixturesTest {
                     assertFailsWith<WhirlpoolError.Drift> { ThreadPageParser.parse(html) }
                     assertFailsWith<WhirlpoolError.Drift> { ThreadListParser.parse(html) }
                 }
+                // The WhirlCode wiki page: no app screen parses it; :core:whirlcode's tests read its tables.
+                name.startsWith("wiki_") -> assertTrue("<table>" in html)
                 name.startsWith("thread_") -> assertTrue(ThreadPageParser.parse(html).posts.isNotEmpty())
                 name.startsWith("archive_") -> assertTrue(ArchivePageParser.parse(html).posts.isNotEmpty())
                 name.startsWith("forum_index") -> assertTrue(ForumIndexParser.parse(html).sections.isNotEmpty())

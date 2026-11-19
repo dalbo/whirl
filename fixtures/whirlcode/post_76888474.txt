@@ -1,0 +1,52 @@
+Formatting test for Whirl (please ignore). Every Whirlcode from the wiki page, so the app can be checked against it.
+
+Inline: [*bold*], [/italic/], [(small)], [-strike-], [#monospace#], [~serif~], H[\2\]O, 500m[^2^], [*[/bold italic/]*], and dashes - like this -- and this.
+
+HTML: <b>b</b> <strong>strong</strong> <i>i</i> <em>em</em> <small>small</small> <strike>strike</strike> <tt>tt</tt> <sub>sub</sub> <sup>sup</sup> <a href="https://www.google.com.au">Google</a>
+
+Quotes inline: ["forum quote"], ['external quote'], [`alternate quote`]. Spoiler: [_hidden text_]
+
+Links: [?whirlpool android?], [[whirlcode]], [[whirlcode|Whirlcode help]], https://example.com, someone@example.com, https://whrl.pl/RgCnTb, [.*not bold*.]
+
+: An indented line
+> Reply quote
+>> Reply quote, two deep
+>>> Reply quote, three deep
+> Back to one deep, with an ['external quote'] inside
+
+> * Bullet inside a quote
+> ** Bullet two deep inside a quote
+>> # Number inside a two-deep quote
+: > Quote inside an indent
+
+* Bullet
+** Bullet two deep
+*** Bullet three deep
+* Bullet again
+
+# Number
+## Number two deep
+### Number three deep
+# Number again
+
+* Bullet with
+## a numbered list under it
+
+$ Preformatted line    with    spaces
+
+$$
+fenced code block
+  indented line
+$$
+
+-----
+
+| Left | Centre | Right
+| :--- | :---: | ---:
+| a | b | c
+
+| a | b | c | d
+
+@76888415 Jump link to a reply
+
+Last line.
