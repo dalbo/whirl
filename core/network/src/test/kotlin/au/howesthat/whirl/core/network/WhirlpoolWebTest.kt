@@ -64,6 +64,19 @@ class WhirlpoolWebTest {
     }
 
     @Test
+    fun `the maintenance page is maintenance, not a challenge`() = runTest {
+        // Captured 2026-11-14: thread pages, profiles and search answered 503 with this page (lists still came from
+        // Cloudflare's cache).
+        MockWebServer().use { server ->
+            server.start()
+            val html = File(System.getProperty("whirl.fixtures"), "html/maintenance_503.html").readText()
+            server.enqueue(MockResponse.Builder().code(503).body(html).build())
+            val web = WhirlpoolWeb(WhirlpoolHttp.client("Whirl/test"), retry = RetryPolicy.NONE)
+            assertEquals(503, assertFailsWith<WhirlpoolError.Maintenance> { web.get(server.url("/thread/3pxj858k")) }.httpCode)
+        }
+    }
+
+    @Test
     fun `resolve follows redirects`() = runTest {
         MockWebServer().use { server ->
             server.start()
