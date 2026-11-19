@@ -32,13 +32,13 @@ private object LibraryKeys {
     val favouriteForums = stringSetPreferencesKey("favourite_forums")
     /** Watched threads that never notify (ids are strings, as everywhere). */
     val mutedThreads = stringSetPreferencesKey("muted_threads")
-    /** Set once v1.8's favourites (Room's `favourite_forums`) have been copied in. */
+    /** Set once v1.8's favourites (Room's `favourite_forums`, dropped since) have been copied in. */
     val movedFromRoom = booleanPreferencesKey("favourites_moved_from_room")
 }
 
 /**
  * The user's own lists, kept apart from the cache: favourite forums and muted watched threads. Up to v1.8 favourites were in Room; they are
- * copied in once, before the first read or change.
+ * copied in once, before the first read or change, and Room's table is then dropped.
  */
 @Singleton
 class LibraryRepository internal constructor(private val store: DataStore<Preferences>, private val forums: ForumDao) {
@@ -57,6 +57,12 @@ class LibraryRepository internal constructor(private val store: DataStore<Prefer
             val ids = p[LibraryKeys.favouriteForums].orEmpty()
             p[LibraryKeys.favouriteForums] = if (favourite) ids + forumId.toString() else ids - forumId.toString()
         }
+    }
+
+    /** Adds [forumIds] to the favourites (an import: favourites are merged, never removed). */
+    suspend fun addFavourites(forumIds: Collection<Int>) {
+        tryMoveFromRoomOnce()
+        store.edit { p -> p[LibraryKeys.favouriteForums] = p[LibraryKeys.favouriteForums].orEmpty() + forumIds.map(Int::toString) }
     }
 
     private suspend fun tryMoveFromRoomOnce() {
@@ -91,16 +97,25 @@ class LibraryRepository internal constructor(private val store: DataStore<Prefer
     }
 
     /**
-     * Copies Room's favourites in, in one edit with its marker: a failure copies nothing and the next read tries
-     * again, and once done it never runs again (so a favourite removed since cannot come back). The table stays until
-     * a later version drops it.
+     * Copies Room's favourites in, in one edit with its marker, then drops Room's table: a failure copies nothing and
+     * the next read tries again, and once done it never copies again (so a favourite removed since cannot come back).
+     * A failed drop is tried again on a later start; the marker keeps a leftover table from being read.
      */
     internal suspend fun moveFromRoomOnce() {
-        if (store.data.first()[LibraryKeys.movedFromRoom] == true) return
-        store.edit { p ->
-            if (p[LibraryKeys.movedFromRoom] == true) return@edit
-            p[LibraryKeys.favouriteForums] = p[LibraryKeys.favouriteForums].orEmpty() + forums.favouriteIds().map(Int::toString)
-            p[LibraryKeys.movedFromRoom] = true
+        if (store.data.first()[LibraryKeys.movedFromRoom] != true) {
+            val ids = forums.legacyFavouriteIds().orEmpty()
+            store.edit { p ->
+                if (p[LibraryKeys.movedFromRoom] == true) return@edit
+                p[LibraryKeys.favouriteForums] = p[LibraryKeys.favouriteForums].orEmpty() + ids.map(Int::toString)
+                p[LibraryKeys.movedFromRoom] = true
+            }
+        }
+        if (!legacyDropped) {
+            forums.dropLegacyFavourites()
+            legacyDropped = true
         }
     }
+
+    /** Once per process: after the first drop, the table is gone for good. */
+    @Volatile private var legacyDropped = false
 }

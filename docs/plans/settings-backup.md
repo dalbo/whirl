@@ -3,7 +3,7 @@
 Status: **Part 1 steps 1–3 merged** (2026-11-11: #138 account store, #139 library store, #140 backup rules and a
 Backup page, with Settings split into pages), with mute (#141) and the Data Saver note (#142). **Steps 4 and 5 built**
 (2026-11-11, one PR; phone checks in `docs/device-checklist.md` v1.9). **Released in v1.9.0** (2026-11-11) after the
-device checklist. Part 2 next.
+device checklist. **Part 2 built** (2026-11-19, one PR, with the v8 migration below); phone checks still to do.
 Ideas from Dallin, 2026-11-08; planned 2026-11-09.
 
 ### Why steps 4–5 before release
@@ -86,6 +86,10 @@ rule that carries the key also carries settings.
      failed copy is logged and the stored favourites shown; the next read tries again. The marker matters: without it, a user who unstars everything would get the old table copied back on every start.
    - The table stays (unused) for one release, then a Room v8 migration drops it, with a `MigrationTest` case. Doing
      both at once would lose favourites if the copy failed part-way.
+   - *As built (v8, 2026-11-19):* Room stops declaring the table, but `MIGRATION_7_8` keeps it, and
+     `LibraryRepository` drops it (`ForumDao.dropLegacyFavourites`) only after the copy and its marker are stored. A
+     drop in the migration itself would have lost the favourites of anyone updating straight from v1.8 to v1.10,
+     whose copy has not run yet.
 3. **Backup rules.** Today the files only exclude. Once there is an `<include>`, only what is included is backed up,
    and the restoring app's rules also filter old backups. So the include list is what keeps `whirl.db` (and its
    `-wal`/`-shm`) and shared prefs out; their excludes stay as documentation only. One side effect: a v1.8 backup
@@ -166,6 +170,11 @@ through `OpenDocument`. No storage permission.
 - Apply goes through `SettingsRepository.update` and the library store, so `NotificationScheduler`'s flow re-arms the
   alarm on an interval change with no extra code; test that it does.
 - JSON with kotlinx.serialization (`kotlinx-serialization-json` is already in `libs.versions.toml`).
+- *As built:* `SettingsFile` (`:core:data`) and the preview dialog on the Backup page. Ints are checked against
+  their lists (`NOTIFY_INTERVALS`, `RECENT_DAYS`, `UNDO_SECONDS`), strings capped at 64 characters, muted thread
+  ids ASCII letters and digits. A bad favourite or mute is left out and reported once per list. The preview names
+  each setting as "Page › Title: old → new" (`SETTING_LABELS`, checked against `SETTING_KEYS`). Picked files are
+  opened through `BackupFiles`, so the view model test needs no content provider.
 - Tests: round trip of non-default `Settings()` (every field changed, generated from `SETTING_FIELDS` so a new field is
   covered), a file from format 2 with extra keys, bad values, an empty file, not JSON, a 10 MB file (refuse over 1 MB).
 

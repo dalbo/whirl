@@ -5,41 +5,61 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RoomDatabase
 import androidx.room.Transaction
 import androidx.room.Upsert
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 
+/** An abstract class rather than an interface for [legacyFavouriteIds], which reads a table Room no longer declares. */
 @Dao
-interface ForumDao {
+abstract class ForumDao(private val db: RoomDatabase) {
     @Query("SELECT * FROM forums ORDER BY sort")
-    fun observeAll(): Flow<List<ForumEntity>>
+    abstract fun observeAll(): Flow<List<ForumEntity>>
 
     @Query("SELECT id FROM forums WHERE is_private = 1")
-    suspend fun privateIds(): List<Int>
+    abstract suspend fun privateIds(): List<Int>
 
     @Query("DELETE FROM forums")
-    suspend fun deleteAll()
+    abstract suspend fun deleteAll()
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(forums: List<ForumEntity>)
+    abstract suspend fun insertAll(forums: List<ForumEntity>)
 
     /** Replaces the forum list, keeping what has been learned about private forums. */
     @Transaction
-    suspend fun replaceAll(forums: List<ForumEntity>) {
+    open suspend fun replaceAll(forums: List<ForumEntity>) {
         val private = privateIds().toSet()
         deleteAll()
         insertAll(forums.map { if (it.id in private) it.copy(isPrivate = true) else it })
     }
 
     @Query("UPDATE forums SET is_private = :isPrivate WHERE id = :id")
-    suspend fun setPrivate(id: Int, isPrivate: Boolean)
+    abstract suspend fun setPrivate(id: Int, isPrivate: Boolean)
 
     @Query("UPDATE forums SET is_private = 0")
-    suspend fun clearPrivate()
+    abstract suspend fun clearPrivate()
 
-    /** v1.8's favourites, read once to move them to the library store (`LibraryRepository`). */
-    @Query("SELECT forum_id FROM favourite_forums")
-    suspend fun favouriteIds(): List<Int>
+    /**
+     * v1.8's favourites, read once to move them to the library store (`LibraryRepository`); null when the table is
+     * gone (dropped by [dropLegacyFavourites], or never made: installs since v8). Room stopped declaring the table in
+     * v8, but its migration keeps it, so a phone that skipped v1.9 still has its favourites to move.
+     */
+    open suspend fun legacyFavouriteIds(): List<Int>? = db.withTransaction {
+        val sql = db.openHelper.writableDatabase
+        val exists = sql.query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '$LEGACY_FAVOURITES'").use { it.moveToFirst() }
+        if (!exists) return@withTransaction null
+        sql.query("SELECT forum_id FROM $LEGACY_FAVOURITES").use { c -> buildList { while (c.moveToNext()) add(c.getInt(0)) } }
+    }
+
+    /** Drops v1.8's favourites table, once its rows are safely in the library store. */
+    open suspend fun dropLegacyFavourites() = db.withTransaction {
+        db.openHelper.writableDatabase.execSQL("DROP TABLE IF EXISTS $LEGACY_FAVOURITES")
+    }
+
+    private companion object {
+        const val LEGACY_FAVOURITES = "favourite_forums"
+    }
 }
 
 /** The columns `get=threads` and `get=recent` provide. */

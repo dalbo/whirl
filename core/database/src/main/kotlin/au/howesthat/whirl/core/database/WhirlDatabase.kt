@@ -21,7 +21,6 @@ import javax.inject.Singleton
 @Database(
     entities = [
         ForumEntity::class,
-        FavouriteForumEntity::class,
         ThreadEntity::class,
         ThreadSourceEntity::class,
         NewsEntity::class,
@@ -36,7 +35,7 @@ import javax.inject.Singleton
         ArchivePostEntity::class,
         ArchiveIndexEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
     autoMigrations = [
         // v2: thread page cache (thread_pages, posts).
@@ -51,6 +50,7 @@ import javax.inject.Singleton
         // v7 (v1.8): the archive reader's cache (archive_threads, archive_pages, archive_posts, archive_index) and
         // posts.rep_of.
         AutoMigration(from = 6, to = 7),
+        // v8 (MIGRATION_7_8): favourite_forums is no longer declared.
     ],
 )
 abstract class WhirlDatabase : RoomDatabase() {
@@ -116,6 +116,18 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+/**
+ * v8 (v1.10): Room stops declaring v1.8's `favourite_forums` (since v1.9 favourites are in the library DataStore), but
+ * the table is kept here: a phone updating straight from v1.8 has not moved them yet. `LibraryRepository` drops it
+ * once they are moved ([ForumDao.dropLegacyFavourites]).
+ */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) = Unit
+}
+
+/** Every hand-written migration, for the builder and the tests. */
+val MIGRATIONS = arrayOf(MIGRATION_4_5, MIGRATION_7_8)
+
 /** v6 (v1.7): `page_count`, `is_sticky` and `is_closed` were in `threads` from v1 but never written. */
 @DeleteColumn(tableName = "threads", columnName = "page_count")
 @DeleteColumn(tableName = "threads", columnName = "is_sticky")
@@ -128,7 +140,7 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun database(@ApplicationContext context: Context): WhirlDatabase =
-        Room.databaseBuilder(context, WhirlDatabase::class.java, "whirl.db").addMigrations(MIGRATION_4_5).build()
+        Room.databaseBuilder(context, WhirlDatabase::class.java, "whirl.db").addMigrations(*MIGRATIONS).build()
 
     @Provides fun forumDao(db: WhirlDatabase) = db.forumDao()
     @Provides fun threadDao(db: WhirlDatabase) = db.threadDao()

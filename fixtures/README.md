@@ -13,6 +13,7 @@ Raw HTML in `html/` is the server body an HTTP client receives; `html/rendered/`
 | `api_cmd_after_remove.json`, `api_cmd_final.json` | get=watched&watchedmode=1 after the remove | 19 watched, back to the original list |
 | `api_cmd_watchedadd_with_get.json`, `api_cmd_watchedremove_with_get.json` | get=watched&watchedmode=1 combined with the command | the list already reflects the command (20, then 19) |
 | `api_cmd_bogus_id_500.html` | watchedadd=zzzzzzzz (watchedremove identical) | HTTP 500, HTML "Something broke!" page with `Content-Type: application/json` |
+| `api_maintenance_503.html` | get=watched&watchedmode=0 during maintenance (2026-11-14) | HTTP 503, HTML "whirlpool is undergoing maintenance" (title "Black Screen of Death"), `Cache-Control: no-store`; every API call, a bad key included, got it |
 | `api_contacts.json` | get=contacts | [] |
 | `api_forum.json` | get=forum | 54 forums, 8 sections |
 | `api_news.json` | get=news | 30 items |
@@ -47,6 +48,7 @@ Raw HTML in `html/` is the server body an HTTP client receives; `html/rendered/`
 | `forum92_p1.html` | /forum/92 — list, 50 rows: 48 threads, 1 pointer, 1 deleted, select[name=p], no groups | 66203 bytes |
 | `forum92_p2.html` | /forum/92?p=2 — 2 closed | 67558 bytes |
 | `forum_index.html` | / — forum index, 50 public forums | 41337 bytes |
+| `maintenance_503.html` | /thread/3pxj858k during maintenance (2026-11-14) | HTTP 503, the same page as `api_maintenance_503.html` but for its Cloudflare ray id; 1619 bytes |
 | `popular.html` | /forum/?action=popular_views — 36 sections, 183 rows, 2 sticky | 214601 bytes |
 | `search_forum92_nbn.html` | legacy threads_search URL, redirected | 72954 bytes |
 | `search_forum92_title_only.html` | /search?q=nbn&f=92&w=t | 72971 bytes |
@@ -71,3 +73,12 @@ Raw HTML in `html/` is the server body an HTTP client receives; `html/rendered/`
 | `thread_sticky_3q6vxnj9.html` | sticky | 95098 bytes |
 | `user_30703.html` | /user/30703 — recent activity + about table | 14971 bytes |
 | `whirlpool_skin_script.js` | https://whirlpool.net.au/skin/script.js — contains /forum/ajax.cfm actions, pagination builder | 148586 bytes |
+
+## Maintenance, 2026-11-14 (about 12:50 UTC)
+Whirlpool was partly down. Thread pages, user profiles, search and the whole API answered the 503 maintenance page
+(`maintenance_503.html`); it carries a Cloudflare `challenge-platform` script tag but is not a challenge (no
+`cf-mitigated`, no "Just a moment"). Pages Cloudflare caches still loaded, stale: the forum index (`age` 6925 s),
+forum 92 (5551 s) and the home page came as `cf-cache-status: HIT` with a `Last-Modified`; popular and an archive page
+also loaded from the cache (`archive` sends `Cache-Control: public, s-maxage=3600, private, max-age=600`). So during
+maintenance a forum's thread list and Popular show hours-old pages as freshly updated, while threads and everything from the API
+fail with "Whirlpool is unavailable at the moment (HTTP 503)". Not known: whether those lists are cached this long when the site is up.

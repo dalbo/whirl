@@ -35,7 +35,8 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 8. **Releases come only from the tag-driven workflow** (`release.yml`; PLAN.md §6). Never publish a local build. A
    release PR bumps `app/version.properties`, adds `## vX.Y.Z` to CHANGELOG.md and
    `fastlane/metadata/android/en-AU/changelogs/<versionCode>.txt` (≤500 characters), copied to `en-US`. Ask Dallin
-   before tagging. `v0.*` tags are GitHub pre-releases, `v1.*` "Latest".
+   before tagging. `v0.*` tags are GitHub pre-releases, `v1.*` "Latest". A tag reaches Play's alpha track;
+   `promote.yml` (run on main, by hand) moves it to production (`docs/play-console.md` §8). Ask Dallin before promoting.
 9. **`main` is protected:** branch, PR, green CI on an up-to-date branch, squash merge. Merge only when Dallin says so
    in the session. Tags are pushed from a commit on `main`.
 10. **No Whirlpool web session in the app** (no login, cookies, posting or site AJAX) until Whirlpool's moderators
@@ -62,7 +63,7 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 | `:core:model` | `ThreadId`, `WhirlpoolError`, list/thread/post models, `PostBody`, `TextQuery`, `WatchAction`, `WhirlpoolSite` |
 | `:core:scraper` | Pure JVM parsers for the raw pages (`ThreadListParser`, `ThreadPageParser`, `PostBodyParser`, `UserProfileParser`, `WhirlpoolTime`). `ArchivePageParser` (v1.8: `/archive/` pages, parts, exact page mapping). `SearchResultsParser` and `ForumIndexParser` are kept for later |
 | `:core:network` | `WhirlpoolApi`, `WhirlpoolWeb`, `WhirlpoolUrls`; main-safe (bodies read on IO), Cloudflare detection, retries |
-| `:core:database` | Room **v6**, schemas in `core/database/schemas/` |
+| `:core:database` | Room **v8**, schemas in `core/database/schemas/`; hand-written migrations in `MIGRATIONS` |
 | `:core:data` | Repositories, `SettingsRepository` (DataStore), `Refresher`, `WatchedRepository` + `WatchQueue`, dispatchers |
 | `:core:ui` | Theme, styles, `PostBodyView`, find bar, `ListScreenState`, `ListPaneRoute` |
 | `:core:notifications` | Watched-thread check (`CheckAlarm` during Doze, WorkManager fallback), `WatchedNotifier`, notification buttons |
@@ -115,8 +116,10 @@ and chat bubbles pop up).
   search (the note in `docs/play-console.md` mentions it), "tap a filtered post to see it in context".
 - **v1.9: settings backup** (released 2026-11-11; plan `docs/plans/settings-backup.md`, history in
   `docs/history.md`): settings, favourites, mutes and the key backed up; the key-rejected banner; mute; the Data Saver
-  note. **Next: Part 2** (export and import as JSON, in Settings › Backup), and drop Room's unused
-  `favourite_forums` table (v8 migration) now that v1.9 is out. Not checked: the API 27 emulator, password-manager fill.
+  note. **Part 2 built** (2026-11-19, unreleased): export and import as JSON in Settings › Backup, and Room v8, which
+  stops declaring `favourite_forums`; `LibraryRepository` drops the table after moving its rows. Still to do: the phone
+  pass (export, share, import on a second install; a v1.8 → v1.10 update keeps favourites). Not checked: the API 27
+  emulator, password-manager fill.
 - **Post writer** (idea, `docs/plans/post-writer.md`): write a reply with collected quotes, a formatting bar and a live
   preview, then copy it into Whirlpool's reply page. Probably after v1.8.
 - **Notifications with the posts** (idea, 2026-11-12): today a check makes one API call (`get=watched`) and never
@@ -136,8 +139,8 @@ and chat bubbles pop up).
 - **Guest mode** (idea, `docs/plans/guest.md`): browse public pages with no API key. Ask the moderators first.
 - Waiting on others: Whirlpool's moderators (gates the community posts, `docs/community.md`, and the F-Droid merge
   request, `docs/fdroid/`).
-- Housekeeping: targetSdk 37 before August 2027; Google developer verification (2027); re-check reproducibility when
-  the build changes (`docs/fdroid/README.md`).
+- Housekeeping: targetSdk 37 before August 2027; Google developer verification (2027). Reproducibility is checked
+  automatically after each release and on build-changing PRs (`docs/fdroid/README.md`).
 - Small: the poster's name is a tap target under 48 dp; find scrolls to the post, not the match; linked images; an
   app widget.
 - Unknowns:
