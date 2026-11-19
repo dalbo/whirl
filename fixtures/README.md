@@ -71,3 +71,4 @@ Raw HTML in `html/` is the server body an HTTP client receives; `html/rendered/`
 | `thread_sticky_3q6vxnj9.html` | sticky | 95098 bytes |
 | `user_30703.html` | /user/30703 — recent activity + about table | 14971 bytes |
 | `whirlpool_skin_script.js` | https://whirlpool.net.au/skin/script.js — contains /forum/ajax.cfm actions, pagination builder | 148586 bytes |
+| `wiki_whirlcode.html` | https://whirlpool.net.au/wiki/whirlcode — the WhirlCode syntax (2026-11-19). Each row of its first table pairs a code with the HTML the site renders for it: test pairs for the post writer's converter (`docs/plans/post-writer.md`) | 19285 bytes |
