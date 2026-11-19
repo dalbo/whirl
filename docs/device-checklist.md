@@ -2,6 +2,19 @@
 
 Run on a real phone before tagging a release (PLAN.md §8). Debug builds install beside the release app as `au.howesthat.whirl.debug`. Note the build, the phone and its Android version, and the network (Wi-Fi or mobile data) with the result.
 
+## v1.10 (export and import; docs/plans/settings-backup.md Part 2)
+- [ ] Upgrade straight from v1.8 (skipping v1.9): two favourite forums starred in v1.8 are still starred, and
+  `adb shell run-as au.howesthat.whirl.debug sqlite3 databases/whirl.db .tables` (or the database inspector) no longer
+  lists `favourite_forums`.
+- [ ] Settings › Backup › Export settings: the picker suggests `whirl-settings-<date>.json`; "Settings exported"; the
+  file opens in a text viewer, holds every setting, favourites and mutes, and no key, user id or name.
+- [ ] Change the theme, unstar a forum, then Import settings with that file: the dialog lists "General › Theme: … → …"
+  and "Favourite forums: 1 added"; Cancel changes nothing; Apply changes both and says "Settings imported".
+- [ ] Import a file shared through a chat app or Drive (typed as anything): it is read; an unrelated JSON or text file
+  says "This isn't a Whirl settings file."
+- [ ] Import a file whose notification interval differs: `adb shell dumpsys alarm | grep whirl` shows the new interval.
+- [ ] TalkBack reads the Export and Import rows as buttons, and every line of the import dialog.
+
 ## v1.9 (settings backup; docs/plans/settings-backup.md)
 Upgrade over v1.8 first (install the v1.8 release, set a theme, star two forums, then install the new build): the key,
 theme and favourites carry over.

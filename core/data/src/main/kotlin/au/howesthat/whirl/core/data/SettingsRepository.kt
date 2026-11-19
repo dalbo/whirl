@@ -17,6 +17,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.retryWhen
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.intOrNull
 import java.io.IOException
 import java.time.LocalTime
 import javax.inject.Inject
@@ -58,7 +62,8 @@ private object Keys {
 
 /**
  * One setting in the store: its key, its [Settings] field, and how it is stored. Its default is the field's value in
- * `Settings()`; a value equal to the default is not stored.
+ * `Settings()`; a value equal to the default is not stored. A settings file ([SettingsFile]) holds the same stored
+ * form under the same name, as a JSON value.
  */
 internal class SettingField<T, S : Any>(
     val key: Preferences.Key<S>,
@@ -67,6 +72,11 @@ internal class SettingField<T, S : Any>(
     private val encode: (T) -> S,
     /** Null for a value this version does not know (an enum constant since removed): the default is used. */
     private val decode: (S) -> T?,
+    private val toJson: (S) -> JsonPrimitive,
+    /** Null for a JSON value of the wrong type. */
+    private val fromJson: (JsonPrimitive) -> S?,
+    /** What a settings file may set; the app's own choices are always valid. */
+    private val valid: (T) -> Boolean = { true },
 ) {
     fun read(p: Preferences, s: Settings): Settings = p[key]?.let(decode)?.let { s.set(it) } ?: s
 
@@ -74,24 +84,41 @@ internal class SettingField<T, S : Any>(
         val value = get(s)
         if (value == get(DEFAULTS)) p.remove(key) else p[key] = encode(value)
     }
+
+    /** The value in [s], typed, to compare and to show. */
+    fun valueIn(s: Settings): Any = get(s) as Any
+
+    fun json(s: Settings): JsonPrimitive = toJson(encode(get(s)))
+
+    /** [s] with this setting taken from [element], or null when [element] is not a value this version can apply. */
+    fun applyJson(element: JsonElement, s: Settings): Settings? =
+        (element as? JsonPrimitive)?.let(fromJson)?.let(decode)?.takeIf(valid)?.let { s.set(it) }
 }
 
 private val DEFAULTS = Settings()
 
-private fun bool(name: String, get: (Settings) -> Boolean, set: Settings.(Boolean) -> Settings) =
-    SettingField(booleanPreferencesKey(name), get, set, { it }, { it })
+// JSON as strictly as the store: a boolean is true or false, a number is not "60", a string is quoted.
+private fun jsonBool(j: JsonPrimitive) = if (j.isString) null else j.booleanOrNull
+private fun jsonInt(j: JsonPrimitive) = if (j.isString) null else j.intOrNull
+private fun jsonString(j: JsonPrimitive) = if (j.isString) j.content else null
 
-private fun int(name: String, get: (Settings) -> Int, set: Settings.(Int) -> Settings) =
-    SettingField(intPreferencesKey(name), get, set, { it }, { it })
+private fun bool(name: String, get: (Settings) -> Boolean, set: Settings.(Boolean) -> Settings) =
+    SettingField(booleanPreferencesKey(name), get, set, { it }, { it }, { JsonPrimitive(it) }, ::jsonBool)
+
+private fun int(name: String, get: (Settings) -> Int, allowed: List<Int>, set: Settings.(Int) -> Settings) =
+    SettingField(intPreferencesKey(name), get, set, { it }, { it }, { JsonPrimitive(it) }, ::jsonInt, valid = { it in allowed })
 
 private fun string(name: String, get: (Settings) -> String, set: Settings.(String) -> Settings) =
-    SettingField(stringPreferencesKey(name), get, set, { it }, { it })
+    SettingField(stringPreferencesKey(name), get, set, { it }, { it }, { JsonPrimitive(it) }, ::jsonString, valid = { it.length <= 64 })
 
 private fun time(name: String, get: (Settings) -> LocalTime, set: Settings.(LocalTime) -> Settings) =
-    SettingField(stringPreferencesKey(name), get, set, LocalTime::toString) { runCatching { LocalTime.parse(it) }.getOrNull() }
+    SettingField(stringPreferencesKey(name), get, set, LocalTime::toString, { runCatching { LocalTime.parse(it) }.getOrNull() }, { JsonPrimitive(it) }, ::jsonString)
 
 private inline fun <reified E : Enum<E>> enum(name: String, noinline get: (Settings) -> E, noinline set: Settings.(E) -> Settings) =
-    SettingField(stringPreferencesKey(name), get, set, { it.name }, { stored -> enumValues<E>().firstOrNull { it.name == stored } })
+    SettingField(
+        stringPreferencesKey(name), get, set, { it.name }, { stored -> enumValues<E>().firstOrNull { it.name == stored } },
+        { JsonPrimitive(it) }, ::jsonString,
+    )
 
 /** Every setting, once: the stored names are fixed, since they are in users' stores. */
 internal val SETTING_FIELDS: List<SettingField<*, *>> = listOf(
@@ -109,14 +136,14 @@ internal val SETTING_FIELDS: List<SettingField<*, *>> = listOf(
     bool("two_pane_landscape_only", Settings::twoPaneLandscapeOnly) { copy(twoPaneLandscapeOnly = it) },
     bool("browser_app", Settings::browserApp) { copy(browserApp = it) },
     bool("watched_notify", Settings::watchedNotify) { copy(watchedNotify = it) },
-    int("notify_interval", Settings::notifyIntervalMinutes) { copy(notifyIntervalMinutes = it) },
+    int("notify_interval", Settings::notifyIntervalMinutes, Settings.NOTIFY_INTERVALS) { copy(notifyIntervalMinutes = it) },
     enum("notify_style", Settings::notifyStyle) { copy(notifyStyle = it) },
     bool("notify_keep_until_read", Settings::notifyKeepUntilRead) { copy(notifyKeepUntilRead = it) },
     bool("open_threads_in_browser", Settings::openThreadsInBrowser) { copy(openThreadsInBrowser = it) },
     bool("load_public_at_bottom", Settings::loadPublicAtBottom) { copy(loadPublicAtBottom = it) },
     bool("load_private_at_bottom", Settings::loadPrivateAtBottom) { copy(loadPrivateAtBottom = it) },
     bool("read_threads_as_scroll", Settings::readThreadsAsScroll) { copy(readThreadsAsScroll = it) },
-    int("recent_days", Settings::recentHistoryDays) { copy(recentHistoryDays = it) },
+    int("recent_days", Settings::recentHistoryDays, Settings.RECENT_DAYS) { copy(recentHistoryDays = it) },
     bool("load_recent_at_top", Settings::loadRecentAtTop) { copy(loadRecentAtTop = it) },
     bool("ignore_own_replies_recent", Settings::ignoreOwnRepliesRecent) { copy(ignoreOwnRepliesRecent = it) },
     bool("load_watched_at_top", Settings::loadWatchedAtTop) { copy(loadWatchedAtTop = it) },
@@ -124,7 +151,7 @@ internal val SETTING_FIELDS: List<SettingField<*, *>> = listOf(
     bool("watched_auto_mark_read", Settings::watchedAutoMarkAsRead) { copy(watchedAutoMarkAsRead = it) },
     bool("watched_back_to_list", Settings::watchedBackToList) { copy(watchedBackToList = it) },
     bool("watch_undo", Settings::watchUndo) { copy(watchUndo = it) },
-    int("undo_seconds", Settings::undoSeconds) { copy(undoSeconds = it) },
+    int("undo_seconds", Settings::undoSeconds, Settings.UNDO_SECONDS) { copy(undoSeconds = it) },
 )
 
 private val PALETTE = SETTING_FIELDS.single { it.key.name == "palette" }.key
