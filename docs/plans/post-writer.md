@@ -1,6 +1,6 @@
 # Plan: the post writer (v1.11)
 
-Status: **planned and reviewed** (2026-11-19), not started. Idea from Dallin, 2026-11-08; decisions below from
+Status: **planned and reviewed** (2026-11-19); **PR A built** (2026-11-19). Idea from Dallin, 2026-11-08; decisions below from
 2026-11-19. v1.10 is settings export and import (`settings-backup.md` Part 2), so this is the next feature release.
 
 Whirlpool's reply box takes raw WhirlCode or a little HTML, with a preview but no formatting buttons. On a phone, a
@@ -83,6 +83,13 @@ unescaped HTML), not for matching the site.
   - the edge-case post once captured (§1.4);
   - **safety on the HTML string**, not on `PostBody` (the parser ignores attributes such as `onclick`, so a `PostBody`
     comparison cannot catch them): no `<script>`, no attribute but `href` and `class`, no `javascript:` link.
+
+*As built (PR A):* `Inline.kt` (bracket codes by recursive descent, at most 32 deep; allowed tags; entities; dashes),
+`Links.kt` (the link rules: from a survey of every link in the fixtures, external links keep their text, forum links
+show their path, `whrl.pl` drops its scheme, bare `www.` gets `http://`; the "host only" texts were custom labels, not
+shortening) and `WhirlCode.kt` (the line pass). Blank lines end a paragraph but close no quote, list or table, as the
+test post shows; a single newline is `<br>`. Guesses waiting for §1.4: trailing punctuation outside links, an
+unclosed code left as typed, over-limit structural codes as text, one `<pre>` per `$ ` line.
 
 ## 3. Post to WhirlCode, for quoting: PR B
 `WhirlCode.fromBody(body: PostBody): String`, the reverse, so a quote carries the post's formatting and links.

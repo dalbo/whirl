@@ -62,6 +62,7 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 |---|---|
 | `:core:model` | `ThreadId`, `WhirlpoolError`, list/thread/post models, `PostBody`, `TextQuery`, `WatchAction`, `WhirlpoolSite` |
 | `:core:scraper` | Pure JVM parsers for the raw pages (`ThreadListParser`, `ThreadPageParser`, `PostBodyParser`, `UserProfileParser`, `WhirlpoolTime`). `ArchivePageParser` (v1.8: `/archive/` pages, parts, exact page mapping). `SearchResultsParser` and `ForumIndexParser` are kept for later |
+| `:core:whirlcode` | Pure JVM: `WhirlCode.toHtml`, WhirlCode to the site's HTML for the post writer's preview (`docs/plans/post-writer.md`); tested against the test post and the wiki through `PostBodyParser` |
 | `:core:network` | `WhirlpoolApi`, `WhirlpoolWeb`, `WhirlpoolUrls`; main-safe (bodies read on IO), Cloudflare detection, retries |
 | `:core:database` | Room **v8**, schemas in `core/database/schemas/`; hand-written migrations in `MIGRATIONS` |
 | `:core:data` | Repositories, `SettingsRepository` (DataStore), `Refresher`, `WatchedRepository` + `WatchQueue`, dispatchers |
