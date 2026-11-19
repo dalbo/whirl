@@ -120,15 +120,30 @@ and chat bubbles pop up).
   stops declaring `favourite_forums`; `LibraryRepository` drops the table after moving its rows. Still to do: the phone
   pass (export, share, import on a second install; a v1.8 → v1.10 update keeps favourites). Not checked: the API 27
   emulator, password-manager fill.
-- **Post writer** (idea, `docs/plans/post-writer.md`): write a reply with collected quotes, a formatting bar and a live
-  preview, then copy it into Whirlpool's reply page. Probably after v1.8.
+- **Post writer** (v1.11, planned and reviewed 2026-11-19, `docs/plans/post-writer.md`): write a reply with collected
+  quotes, a formatting bar and a live preview, then copy it into Whirlpool's reply page. Starts with step 0 (an
+  edge-case post for Dallin to post) and PR A (WhirlCode to HTML, `:core:whirlcode`).
+- **Notifications with the posts** (idea, 2026-11-12): today a check makes one API call (`get=watched`) and never
+  loads a thread page. Fetching the page with the first unread post would let a notification expand to the next
+  unread post or the recent posters' names, let mute become a filter (only these users, only when OP or a moderator
+  posts, ...), and make the thread open instantly and offline from the notification. What we know:
+  - The site has no ETag or Last-Modified, ignores `If-Modified-Since` (200 every time, `cf-cache-status: DYNAMIC`;
+    checked on a thread page 2026-11-12), and a page is about 90 KB before compression. The API is the change
+    detector instead: fetch a page only when a watched thread's last post date moved, and only the page holding the
+    new posts.
+  - Page fetches go through the website (Cloudflare), unlike the API, and a background check cannot show a challenge;
+    a failed fetch must fall back to today's notification.
+  - Keep the behaviour the same on mobile data and Wi-Fi when it changes what you see or what alerts you (filters,
+    expanded text); only cache-and-speed extras (more pages, offline copies) may wait for Wi-Fi. Data Saver and the
+    background-data restriction already hold the whole check back.
+  - Unknown: how many threads people watch and how often they alert, so the data cost per day.
 - **Guest mode** (idea, `docs/plans/guest.md`): browse public pages with no API key. Ask the moderators first.
 - Waiting on others: Whirlpool's moderators (gates the community posts, `docs/community.md`, and the F-Droid merge
-  request, `docs/fdroid/`); Play's closed test (12+ testers for 14 days, then production; `docs/play-console.md`).
-- Housekeeping: targetSdk 37 before August 2027; Google developer verification (2027); re-check reproducibility when
-  the build changes (`docs/fdroid/README.md`).
-- Small: the poster's name is a tap target under 48 dp; draggable scroll thumb; find scrolls to the post, not the
-  match; linked images; an app widget.
+  request, `docs/fdroid/`).
+- Housekeeping: targetSdk 37 before August 2027; Google developer verification (2027). Reproducibility is checked
+  automatically after each release and on build-changing PRs (`docs/fdroid/README.md`).
+- Small: the poster's name is a tap target under 48 dp; find scrolls to the post, not the match; linked images; an
+  app widget.
 - Unknowns:
   - `get=recent` when not empty: assumed to have the `THREADS` shape; the Recent screen must cope with it failing as
     `Drift`.
