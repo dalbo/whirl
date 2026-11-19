@@ -20,6 +20,7 @@ rootProject.name = "whirl"
 include(":app")
 include(":core:model")
 include(":core:scraper")
+include(":core:whirlcode")
 include(":core:network")
 include(":core:database")
 include(":core:data")
