@@ -79,7 +79,9 @@ class WatchedViewModel @Inject constructor(deps: ListDeps, private val visits: A
 
     val state = stateOf(
         _unreadOnly.flatMapLatest { unread ->
+            // Each tab is its own list, so switching starts at the top (ThreadListBody's listKey).
             val sections = deps.watched.watched(unread).toListState { list -> groupByForum(list.map { it.toItem() }) }
+                .map { it.copy(listKey = if (unread) "unread" else "all") }
             if (!unread) {
                 sections
             } else {

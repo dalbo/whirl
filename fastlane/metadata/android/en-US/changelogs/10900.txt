@@ -1,0 +1,6 @@
+Whirl 1.9.0
+- Settings, favourites, mutes and your API key (end-to-end encrypted) are backed up for a new phone
+- Mute a watched thread: it stays in Watched but never notifies
+- A banner if Whirlpool rejects your key, with "Enter a new key"; you are never signed out
+- Password managers can save and fill the key
+- Settings in pages, and a note when Data Saver delays the check

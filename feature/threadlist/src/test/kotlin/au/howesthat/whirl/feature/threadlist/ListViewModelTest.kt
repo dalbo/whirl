@@ -12,6 +12,7 @@ import au.howesthat.whirl.core.data.AccountGeneration
 import au.howesthat.whirl.core.data.OpenThread
 import au.howesthat.whirl.core.data.AppVisits
 import au.howesthat.whirl.core.data.ForumRepository
+import au.howesthat.whirl.core.data.LibraryRepository
 import au.howesthat.whirl.core.data.OpenedFrom
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.model.WatchAction
@@ -49,6 +50,14 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import au.howesthat.whirl.core.model.WhirlpoolError
+import au.howesthat.whirl.core.network.RetryPolicy
+import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -82,7 +91,7 @@ class ListViewModelTest {
         ForumRepository(api, db.forumDao(), db.fetchLogDao(), clock),
         lists,
         watched,
-        SavedStateHandle(),
+        LibraryRepository(ApplicationProvider.getApplicationContext(), db.forumDao()), SavedStateHandle(), api,
     )
 
     /** A list whose fetches wait until the test completes them. */
@@ -116,8 +125,8 @@ class ListViewModelTest {
 
     @Before
     fun setUp() {
-        // DataStore reads the file once; do it here in wall-clock time, not on a test dispatcher.
-        runBlocking { withTimeout(10_000) { deps.settings.settings.first() } }
+        // DataStore reads each file once (settings, account); do it here in wall-clock time, not on a test dispatcher.
+        runBlocking { withTimeout(10_000) { deps.settings.settings.first(); deps.settings.account.first(); deps.library.mutedThreads.first() } }
         Dispatchers.setMain(dispatcher)
     }
 
@@ -127,6 +136,42 @@ class ListViewModelTest {
         Dispatchers.resetMain()
         appScope.cancel()
         db.close()
+    }
+
+    /** Answers every API call with [body] and [code]; a bad key is 403 with Whirlpool's error envelope. */
+    private class Canned(var code: Int, var body: String) : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response = Response.Builder()
+            .request(chain.request()).protocol(Protocol.HTTP_1_1).code(code).message("")
+            .body(body.toResponseBody("application/json".toMediaType())).build()
+    }
+
+    private class Fetching(deps: ListDeps) : ListViewModel(deps, OpenedFrom.LIST) {
+        var fetches = 0
+        override suspend fun fetch(force: Boolean) {
+            fetches++
+            deps.api.forums()
+        }
+    }
+
+    @Test
+    fun `a list showing a rejected key fetches again once a new key is accepted`() = TestScope(dispatcher).runTest {
+        val canned = Canned(403, """{"ALERT":"","AUTH":{"NAME":"","ID":0},"DOCS":"","ERROR":"Not authenticated. Bad API key?"}""")
+        val keyed = WhirlpoolApi(OkHttpClient.Builder().addInterceptor(canned).build(), { "1234-5678-9012-34" }, retry = RetryPolicy.NONE)
+        val vm = held { Fetching(ListDeps(deps.settings, deps.forums, deps.watched, deps.watchQueue, deps.library, SavedStateHandle(), keyed)) }
+        vm.refresh()
+        advanceUntilIdle()
+        waitFor { vm.error.value is WhirlpoolError.BadKey }
+        assertEquals(1, vm.fetches)
+
+        canned.code = 200
+        canned.body = """{"ALERT":"","AUTH":{"NAME":"d@llin","ID":216903},"DOCS":"","ERROR":"","FORUM":[]}"""
+        keyed.keyReplaced() // AccountRepository.signIn, once the new key is stored
+        waitFor { vm.fetches == 2 }
+    }
+
+    /** The API reads on its own IO dispatcher, so the test waits in wall-clock time between steps. */
+    private fun TestScope.waitFor(condition: () -> Boolean) = runBlocking {
+        withTimeout(5_000) { while (!condition()) { withContext(Dispatchers.Default) { kotlinx.coroutines.delay(10) }; testScheduler.advanceUntilIdle() } }
     }
 
     @Test
@@ -176,6 +221,21 @@ class ListViewModelTest {
         watched.perform(WatchAction.WATCH, listOf(row.id))
         vm.watchedIds.first { row.id in it }
         assertEquals(listOf(WatchAction.UNWATCH), vm.watchActions(row))
+    }
+
+    @Test
+    fun `a watched row offers Don't notify, then Notify again`() = TestScope(dispatcher).runTest {
+        val vm = held { Blocking(deps) }
+        val row = ThreadItem(ThreadId("3pxj858k"), ThreadId("3pxj858k"), "NBN", forum = ForumRef(92, "Choosing an ISP"))
+        deps.library.setMuted(listOf(row.id), muted = false) // one library store per JVM
+        assertNull(vm.muted(row), "not watched: nothing to mute")
+        val watchedRow = row.copy(unreadCount = 3, watched = WatchedPosition(1, 1, 3))
+        assertEquals(false, vm.muted(watchedRow))
+        vm.setMuted(watchedRow, true)
+        vm.mutedIds.first { row.id in it }
+        assertEquals(true, vm.muted(watchedRow))
+        vm.setMuted(watchedRow, false)
+        vm.mutedIds.first { row.id !in it }
     }
 
     @Test

@@ -34,13 +34,13 @@ class MigrationTest {
         helper.runMigrationsAndValidate(name, 2, true).close()
 
         val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), WhirlDatabase::class.java, name)
-            .addMigrations(MIGRATION_4_5)
+            .addMigrations(*MIGRATIONS)
             .allowMainThreadQueries()
             .build()
         try {
             val forums = db.forumDao().observeAll().first()
             assertEquals(listOf(92), forums.map { it.id })
-            assertEquals(true, forums.single().isFavourite)
+            assertEquals(listOf(92), db.forumDao().legacyFavouriteIds())
             assertEquals(4, db.threadDao().get("3pxj858k")?.unreadCount)
             assertEquals(listOf("3pxj858k"), db.threadDao().observeSource(ThreadSource.WATCHED, "all").first().map { it.id })
             assertEquals(123L, db.fetchLogDao().fetchedAt("forums"))
@@ -59,7 +59,7 @@ class MigrationTest {
         helper.runMigrationsAndValidate(name, 3, true).close()
 
         val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), WhirlDatabase::class.java, name)
-            .addMigrations(MIGRATION_4_5)
+            .addMigrations(*MIGRATIONS)
             .allowMainThreadQueries()
             .build()
         try {
@@ -79,7 +79,7 @@ class MigrationTest {
         helper.runMigrationsAndValidate(name, 4, true).close()
 
         val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), WhirlDatabase::class.java, name)
-            .addMigrations(MIGRATION_4_5)
+            .addMigrations(*MIGRATIONS)
             .allowMainThreadQueries()
             .build()
         try {
@@ -111,7 +111,7 @@ class MigrationTest {
         helper.runMigrationsAndValidate(name, 5, true, MIGRATION_4_5).close()
 
         val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), WhirlDatabase::class.java, name)
-            .addMigrations(MIGRATION_4_5)
+            .addMigrations(*MIGRATIONS)
             .allowMainThreadQueries()
             .build()
         try {
@@ -140,7 +140,7 @@ class MigrationTest {
         helper.runMigrationsAndValidate(name, 6, true, MIGRATION_4_5).close()
 
         val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), WhirlDatabase::class.java, name)
-            .addMigrations(MIGRATION_4_5)
+            .addMigrations(*MIGRATIONS)
             .allowMainThreadQueries()
             .build()
         try {
@@ -158,6 +158,59 @@ class MigrationTest {
             assertEquals(WatchAction.MARK_READ, row.action)
             assertEquals(PendingState.SENDING, row.state)
             assertEquals(listOf("3pxj858k", "9yvx1663"), row.ids)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun `v6 to v7 adds the archive cache and the rep's company, keeping cached posts`() = runTest {
+        helper.createDatabase(name, 6).use { db ->
+            db.execSQL(
+                "INSERT INTO thread_pages (thread_id, page, page_count, title, forum_id, forum_title, group_id, moderator_note_html, parts, " +
+                    "fetched_at, accessed_at) VALUES ('3l10nlj5', 1, 31, 'Leaptel', 31, 'Other ISPs', NULL, NULL, '', 1, 1)",
+            )
+            db.execSQL(
+                "INSERT INTO posts (thread_id, page, reply_id, reply_num, user_id, user_name, user_group, quip, post_count, posted_text, " +
+                    "posted_at, edited_text, is_op, hidden_reason, is_deleted, short_url, body_html) " +
+                    "VALUES ('3l10nlj5', 1, 73670545, 13, 27743, 'Matt E.', 'ISP Representative', NULL, 9458, 'x', NULL, NULL, 0, NULL, 0, NULL, '<p>hi</p>')",
+            )
+        }
+        helper.runMigrationsAndValidate(name, 7, true, MIGRATION_4_5).close()
+
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), WhirlDatabase::class.java, name)
+            .addMigrations(*MIGRATIONS)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val post = db.threadPageDao().posts("3l10nlj5", 1).single()
+            assertEquals("ISP Representative", post.userGroup)
+            assertEquals(null, post.repOf, "filled in when the page is next fetched")
+            assertEquals(0, db.archiveDao().pageCount())
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun `v7 to v8 keeps v1_8's favourites until they are moved, then drops them`() = runTest {
+        helper.createDatabase(name, 7).use { db ->
+            db.execSQL("INSERT INTO favourite_forums (forum_id, added_at) VALUES (92, 1)")
+            db.execSQL("INSERT INTO fetch_log (`key`, fetched_at) VALUES ('forums', 123)")
+        }
+        // Not validating dropped tables: the table stays on purpose until LibraryRepository has moved its rows.
+        helper.runMigrationsAndValidate(name, 8, false, *MIGRATIONS).close()
+
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), WhirlDatabase::class.java, name)
+            .addMigrations(*MIGRATIONS)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            assertEquals(listOf(92), db.forumDao().legacyFavouriteIds())
+            assertEquals(123L, db.fetchLogDao().fetchedAt("forums"))
+            db.forumDao().dropLegacyFavourites()
+            assertEquals(null, db.forumDao().legacyFavouriteIds())
+            db.forumDao().dropLegacyFavourites() // again: nothing to drop
         } finally {
             db.close()
         }

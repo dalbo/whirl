@@ -24,5 +24,6 @@
     <string name="notify_more">+%1$d more</string>
     <string name="notify_mark_read">Mark read</string>
     <string name="notify_unwatch">Unwatch</string>
+    <string name="notify_mute">Don\'t notify</string>
     <string name="notify_action_failed">Whirl could not reach Whirlpool. Try again from the Watched screen.</string>
 </resources>

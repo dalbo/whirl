@@ -2,6 +2,63 @@
 
 Run on a real phone before tagging a release (PLAN.md §8). Debug builds install beside the release app as `au.howesthat.whirl.debug`. Note the build, the phone and its Android version, and the network (Wi-Fi or mobile data) with the result.
 
+## v1.10 (export and import; docs/plans/settings-backup.md Part 2)
+- [ ] Upgrade straight from v1.8 (skipping v1.9): two favourite forums starred in v1.8 are still starred, and
+  `adb shell run-as au.howesthat.whirl.debug sqlite3 databases/whirl.db .tables` (or the database inspector) no longer
+  lists `favourite_forums`.
+- [ ] Settings › Backup › Export settings: the picker suggests `whirl-settings-<date>.json`; "Settings exported"; the
+  file opens in a text viewer, holds every setting, favourites and mutes, and no key, user id or name.
+- [ ] Change the theme, unstar a forum, then Import settings with that file: the dialog lists "General › Theme: … → …"
+  and "Favourite forums: 1 added"; Cancel changes nothing; Apply changes both and says "Settings imported".
+- [ ] Import a file shared through a chat app or Drive (typed as anything): it is read; an unrelated JSON or text file
+  says "This isn't a Whirl settings file."
+- [ ] Import a file whose notification interval differs: `adb shell dumpsys alarm | grep whirl` shows the new interval.
+- [ ] TalkBack reads the Export and Import rows as buttons, and every line of the import dialog.
+
+## v1.9 (settings backup; docs/plans/settings-backup.md)
+Upgrade over v1.8 first (install the v1.8 release, set a theme, star two forums, then install the new build): the key,
+theme and favourites carry over.
+2026-11-11, on the debug app (v1.8.0 built from the tag, set up on the test account, Dark, two favourites, then this
+build over it): passed; the key and account moved to the account file and the favourites to the library file, no
+setup, and the notification prompt showed (a fresh install had no permission). Then, on the debug app:
+- [ ] `adb shell bmgr enabled` is true; `adb shell bmgr backupnow au.howesthat.whirl.debug` succeeds.
+- [ ] `adb shell dumpsys backup` (or the transport's file list) shows the three `datastore/*.preferences_pb` files and no `whirl.db`.
+- [ ] Uninstall, reinstall (`adb install`; Auto Backup restores on install): no setup screen; theme, palette and favourite forums back; the watched list fetches again.
+- [x] After the restore, the check alarm is set (`adb shell dumpsys alarm | grep whirl`) and the first check alerts unread watched threads as after a fresh setup.
+  2026-11-11 (Pixel 9 Pro XL, Android 17, test account): armed (`dumpsys alarm`), fired about 20:03 and alerted the one unmuted unread thread; the first check after the 2026-11-09 restore was not watched.
+- [x] Settings › Backup says what is backed up; with the screen lock removed (only on a spare phone or emulator), it says nothing is backed up.
+  2026-11-11: the screen-lock case only (no spare phone). It now names muted threads too; they are in the library store.
+- [ ] An API 27 emulator: settings and favourites restore, setup asks for the key with the restored settings shown.
+- [x] Notification permission after a restore (watched-thread alerts on): revoke it first if Android restored it
+  (`adb shell pm revoke au.howesthat.whirl.debug android.permission.POST_NOTIFICATIONS`, and note whether it came back
+  by itself). On start, "Allow notifications?" shows once: Allow grants it; Not now (or tapping outside) and a restart
+  do not show it again; Settings › Notifications still offers "Notifications are blocked".
+  2026-11-11, Pixel 9 Pro XL, Android 17, Wi-Fi: the permission was not granted after the earlier restore (Android did
+  not restore it); the prompt, Allow, Not now and the restart all as above. The "blocked" line not rechecked.
+- [x] Key rejected: `tools/phone/break-key.sh`, open Whirl, refresh Watched. The red banner "Whirlpool did not accept
+  your API key" sits under the status bar (icons readable) and stays over every screen; nothing signs out. "Enter a
+  new key" opens the key step over the app: Cancel and back return to the same screen; the real key passes, the
+  banner goes, an open list showing the key error fetches again by itself, and settings, favourites and mutes are as
+  before (a key for another account clears the cached lists, as signing in always has). Then the same in landscape.
+  2026-11-11, same phone: all of it, landscape too; Watched and Forums fetched again by themselves.
+- [ ] Key field: the password manager offers to save the key after Log in (2026-11-11: Bitwarden offered), and offers to fill it in the key step
+  (setup on a fresh install, or "Enter a new key").
+- [x] Mute: a watched thread's row menu and thread menu offer Don't notify; the row shows a crossed-out bell; the next
+  check leaves it out of the notification (summary and per thread); a per-thread notification's Don't notify removes
+  it at once; Notify again brings it back on its next reply; unwatching it and refreshing Watched › All forgets the mute.
+  2026-11-11: the check left out two muted unread threads (summary and per thread); the notification's Don't notify cleared both notifications and muted the thread; row menu Notify again and Don't notify with the bell. The thread menu's Don't notify too. Not run: Notify again on the next reply, unwatch forgets the mute.
+- [x] Data Saver on (Whirl not unrestricted), or Whirl's own Background data off: Settings › Notifications shows "Checks wait for Wi-Fi"; tapping it
+  opens Whirl's data usage setting; allowing unrestricted data and coming back hides the note.
+
+## v1.8 (archive reader)
+  2026-11-11: the debug app had background data off already; the note showed, opened Whirl's data usage page, and went once background data was allowed (put back after).
+- [ ] Settings › Threads › Read threads as one scroll: a watched thread opens at its first unread post (also when that post was hidden); a long thread opens at its newest posts; ⋮ › Read in pages / Read as one scroll keeps the post at the top.
+- [ ] Load earlier posts keeps your place; the bar shows "Archive page N of M" with its dates; a gap divider where a post was hidden.
+- [ ] Posts by OP / moderators / reps / a poster (from pages too): results from the loaded posts, Search earlier pages with progress and Stop, Show all posts returns to the post. Reps show their company.
+- [ ] Reopen a thread read before: posts show at once; a few new posts appear below without moving you.
+- [ ] Drag the scroll bar on an 800-post page and a 20-post page: smooth, the bubble shows the post number, a fast drag does not freeze; the Back gesture still works away from the thumb.
+- [ ] TalkBack through Load earlier and the filter header; rotate and kill the process (`adb shell am kill`) mid-thread: it reopens at the same post; offline, a cached thread opens with "Offline: showing saved posts".
+
 ## v1.0 (polish)
 **TalkBack** (Settings → Accessibility → TalkBack; or hold both volume keys if the shortcut is on)
 - [ ] Watched, a forum and a thread: every button is read with a name (menu, back, search, refresh, more options, previous/next part).
@@ -33,8 +90,8 @@ Run on a real phone before tagging a release (PLAN.md §8). Debug builds install
 - [ ] With unread watched threads, a check posts one notification (title, "N new replies in M threads" or the thread's title, inbox lines, Mark read / Unwatch). Tapping opens Watched.
 - [ ] The same replies do not alert again; a new reply does. Nothing unread cancels it.
 - [ ] Mark read / Unwatch buttons remove the notification and update Watched.
-- [ ] Dozing: app in the background, screen off, `adb shell dumpsys deviceidle force-idle`; the check is deferred and runs in the next maintenance window (`dumpsys deviceidle step`), WorkManager's periodic run survives a reboot.
-- [ ] Changing the interval keeps one scheduled job (`dumpsys jobscheduler | grep WatchedCheckWorker`).
+- [ ] Dozing (v1.7.1): app in the background, screen off, `adb shell dumpsys deviceidle force-idle deep`; the alarm still starts a check about one interval after the last (`dumpsys batterystats --history | grep WatchedCheckWorker` shows an expedited `*job*e/` run while `device_idle=full`), and only one check runs. `dumpsys deviceidle unforce` afterwards. After a reboot the fallback's first run sets the alarm again.
+- [ ] Changing the interval keeps one scheduled job and one alarm (`dumpsys jobscheduler | grep WatchedCheckWorker`, `dumpsys alarm | grep CHECK_WATCHED`).
 
 **Other**
 - [ ] Forum overflow → New thread in browser opens the new-thread form (logged in to Whirlpool in the browser).

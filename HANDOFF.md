@@ -9,7 +9,7 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 |---|---|
 | `PLAN.md` | Target features (from Whirldroid 2.14.12), verified Whirlpool behaviour, architecture, decisions (§5) |
 | `docs/plans/` | The plans since v1.3 (`v1.3.md` also covers v1.4; v1.5 had none) |
-| `docs/history.md` | How each phase and release was built and what it decided, up to v1.7 |
+| `docs/history.md` | How each phase and release was built and what it decided, up to v1.9.0 |
 | `fixtures/api/`, `fixtures/html/` | Real API responses and **raw** pages (no key inside); `fixtures/README.md` |
 | `tools/capture/` | Headed Playwright captures, the only way past Cloudflare from this machine |
 | `docs/device-checklist.md` | The phone pass before each release |
@@ -29,12 +29,14 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
    int, `THREADS.UNREAD` a boolean; always pass `watchedmode`.
 6. **This machine cannot reach Whirlpool** (Cloudflare blocks curl, desktop OkHttp and headless browsers). Captures go
    through `tools/capture/` (headed Playwright); live checks run on Dallin's phone. Unit tests never touch the network.
-7. **The API key** is in `~/.config/whirldroid/apikey` (mode 600): read it in scripts, never print, log or commit it.
+7. **The API key** is in `~/.config/whirldroid/apikey` (mode 600), and the test account's (`whirl-app`, the one the
+   phone's debug app uses) in `~/.config/whirldroid/testapikey`: read them in scripts, never print, log or commit them.
    Same for `~/.config/whirldroid/release.jks` and `release-signing.env`.
 8. **Releases come only from the tag-driven workflow** (`release.yml`; PLAN.md §6). Never publish a local build. A
    release PR bumps `app/version.properties`, adds `## vX.Y.Z` to CHANGELOG.md and
    `fastlane/metadata/android/en-AU/changelogs/<versionCode>.txt` (≤500 characters), copied to `en-US`. Ask Dallin
-   before tagging. `v0.*` tags are GitHub pre-releases, `v1.*` "Latest".
+   before tagging. `v0.*` tags are GitHub pre-releases, `v1.*` "Latest". A tag reaches Play's alpha track;
+   `promote.yml` (run on main, by hand) moves it to production (`docs/play-console.md` §8). Ask Dallin before promoting.
 9. **`main` is protected:** branch, PR, green CI on an up-to-date branch, squash merge. Merge only when Dallin says so
    in the session. Tags are pushed from a commit on `main`.
 10. **No Whirlpool web session in the app** (no login, cookies, posting or site AJAX) until Whirlpool's moderators
@@ -46,7 +48,8 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
     behaviour, never copy from it.
 
 ## Commands
-- Full check, as CI runs it: `./gradlew :app:lintDebug test assembleDebug` (2–12 minutes; a `:core:ui` change reruns
+- Full check, as CI runs it: `./gradlew :app:lintDebug test assembleDebug` (CI runs the three as parallel jobs, and a
+  PR that changes only Markdown, `docs/` or `site/` skips them; the required check `build` sums them up) (2–12 minutes; a `:core:ui` change reruns
   every module's tests). The daemon is pinned to JDK 17 (`gradle/gradle-daemon-jvm.properties`; `~/.jdks`).
 - Versions: `gradle/libs.versions.toml` (check Maven before adding a library). Conventions: `build-logic/convention`
   (`whirl.jvm.library`, `whirl.android.library` with one Robolectric SDK in `build-logic/robolectric/`,
@@ -58,12 +61,12 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 | Module | What it holds |
 |---|---|
 | `:core:model` | `ThreadId`, `WhirlpoolError`, list/thread/post models, `PostBody`, `TextQuery`, `WatchAction`, `WhirlpoolSite` |
-| `:core:scraper` | Pure JVM parsers for the raw pages (`ThreadListParser`, `ThreadPageParser`, `PostBodyParser`, `UserProfileParser`, `WhirlpoolTime`). `SearchResultsParser` and `ForumIndexParser` are kept for v1.8 |
+| `:core:scraper` | Pure JVM parsers for the raw pages (`ThreadListParser`, `ThreadPageParser`, `PostBodyParser`, `UserProfileParser`, `WhirlpoolTime`). `ArchivePageParser` (v1.8: `/archive/` pages, parts, exact page mapping). `SearchResultsParser` and `ForumIndexParser` are kept for later |
 | `:core:network` | `WhirlpoolApi`, `WhirlpoolWeb`, `WhirlpoolUrls`; main-safe (bodies read on IO), Cloudflare detection, retries |
-| `:core:database` | Room **v6**, schemas in `core/database/schemas/` |
+| `:core:database` | Room **v8**, schemas in `core/database/schemas/`; hand-written migrations in `MIGRATIONS` |
 | `:core:data` | Repositories, `SettingsRepository` (DataStore), `Refresher`, `WatchedRepository` + `WatchQueue`, dispatchers |
 | `:core:ui` | Theme, styles, `PostBodyView`, find bar, `ListScreenState`, `ListPaneRoute` |
-| `:core:notifications` | Watched-thread check (WorkManager), `WatchedNotifier`, notification buttons |
+| `:core:notifications` | Watched-thread check (`CheckAlarm` during Doze, WorkManager fallback), `WatchedNotifier`, notification buttons |
 | `:feature:*` | `setup`, `settings`, `threadlist` (all thread lists, search), `forums`, `thread`, `news`, `user`; each owns its routes |
 | `:app` | Hilt, `MainActivity` (setup until `setupDone`), Navigation 3 (`TopLevelBackStack`, `WhirlApp`), snackbars |
 
@@ -76,7 +79,9 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 - **Room:** a new version needs a migration and a `MigrationTest` case; build once so the schema JSON exists before
   the test can see it.
 - **Settings:** one table (`SETTING_FIELDS`, `SettingsRepository.kt`); only values that differ from the default are
-  stored. A new setting is a field in `Settings` and a row in the table (a test checks they match).
+  stored. A new setting is a field in `Settings` and a row in the table (a test checks they match). The API key, the
+  account and `setup_done` live in a separate `account` DataStore (v1.9), so the settings file holds nothing secret
+  and can be backed up (`docs/plans/settings-backup.md`); never put anything secret in the settings store.
 - **Watched threads and account switches** (v1.7, docs/plans/v1.7.md §11.2):
   - `WatchedRepository` has the lists; `WatchQueue` makes, stores, sends and undoes actions; `WatchedStore` holds
     what both share. Lock order: `sending`, then `mutex`, then the database transaction; every section under
@@ -101,11 +106,23 @@ debugging reconnects by its mDNS name once paired. Debug builds install as `au.h
 dropping adb: `cmd connectivity set-chain3-enabled true` and
 `set-package-networking-enabled false au.howesthat.whirl.debug` (turn both back). The phone locks often: ask Dallin to
 unlock it rather than changing its settings. It stays one pane in landscape (448 dp tall); two panes are checked in
-unit tests. Per-release checks: `docs/device-checklist.md`.
+unit tests. Per-release checks: `docs/device-checklist.md`. `tools/phone/` taps by label, picks from long-press menus
+and lists the debug app's stored key names (never values); its tap scripts refuse when Whirl is not in front (calls
+and chat bubbles pop up).
 
 ## Open ideas
-- **v1.8: the archive reader** (decided; docs/plans/v1.7.md §8): whole-thread reading from `/archive/<id>`, find in
-  the whole thread, posts by a user filtered in the app. First step: raw fixtures of a multi-page archive.
+- **v1.8: the archive reader** (released 2026-11-09; `docs/plans/v1.8.md`, history in `docs/history.md`): still to
+  check on the phone are §7's TalkBack, process-death and offline items. Follow-ups: a moderator view of whole-thread
+  search (the note in `docs/play-console.md` mentions it), "tap a filtered post to see it in context".
+- **v1.9: settings backup** (released 2026-11-11; plan `docs/plans/settings-backup.md`, history in
+  `docs/history.md`): settings, favourites, mutes and the key backed up; the key-rejected banner; mute; the Data Saver
+  note. **Part 2 built** (2026-11-19, unreleased): export and import as JSON in Settings › Backup, and Room v8, which
+  stops declaring `favourite_forums`; `LibraryRepository` drops the table after moving its rows. Still to do: the phone
+  pass (export, share, import on a second install; a v1.8 → v1.10 update keeps favourites). Not checked: the API 27
+  emulator, password-manager fill.
+- **Post writer** (idea, `docs/plans/post-writer.md`): write a reply with collected quotes, a formatting bar and a live
+  preview, then copy it into Whirlpool's reply page. Probably after v1.8.
+- **Guest mode** (idea, `docs/plans/guest.md`): browse public pages with no API key. Ask the moderators first.
 - Waiting on others: Whirlpool's moderators (gates the community posts, `docs/community.md`, and the F-Droid merge
   request, `docs/fdroid/`); Play's closed test (12+ testers for 14 days, then production; `docs/play-console.md`).
 - Housekeeping: targetSdk 37 before August 2027; Google developer verification (2027). Reproducibility is checked

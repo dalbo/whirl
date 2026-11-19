@@ -137,7 +137,7 @@ class ThreadPageParserTest {
         val first = page.posts.first()
         assertEquals(UserRef(30703, "Tiedan"), first.author)
         assertEquals(903, first.postCount)
-        assertEquals("2008-Jun-24, 1:15 pm AEST", first.postedText)
+        assertEquals("2008-Jun-24, 1:15 pm", first.postedText, "from datePublished, written as thread pages write it")
         assertEquals(LocalDateTime.of(2008, 6, 24, 13, 15), first.postedAt)
         assertEquals("https://whrl.pl/RbzjOW", first.shortUrl)
         assertTrue(page.posts.none { it.isDeleted })

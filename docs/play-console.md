@@ -119,7 +119,9 @@ Google Play's Data safety section", read 2026-10-21).
 > Hi, I'm d@llin (#216903). I've written Whirl, a free, open-source (MIT) Android reader for Whirlpool that replaces
 > Whirldroid. It uses the API with each user's own key for watched threads, news and actions, and reads public forum and
 > thread pages for display, at about the rate a person browses (no background scraping; notifications use one
-> `get=watched` call per interval). It never logs in to the site: posting, private forums and PMs open in the user's
+> `get=watched` call per interval). Since v1.8 it can read a thread from its /archive/ pages (800 posts each) and
+> filter or search them in the app; earlier pages are fetched only when the reader asks, one a second, at most 60
+> per thread a day, and cached. It never logs in to the site: posting, private forums and PMs open in the user's
 > browser. It's free with no ads, analytics or revenue.
 >
 > Before I publish it on Google Play I wanted to check: (1) are you comfortable with an app reading public pages this
@@ -127,8 +129,8 @@ Google Play's Data safety section", read 2026-10-21).
 > thread in Android to find testers? I'd also like it listed on the 3rd Party Clients page once it's out.
 
 ## 7. Automating later releases (keyless)
-Each tag's AAB is uploaded by `release.yml` to the `alpha` track (`PLAY_TRACK`; switch it to `production` after Play
-grants production access), with the R8 mapping file and `fastlane/metadata/android/en-AU/changelogs/<versionCode>.txt`
+Each tag's AAB is uploaded by `release.yml` to the `alpha` track (`PLAY_TRACK`; `promote.yml` moves it to
+production, §8), with the R8 mapping file and `fastlane/metadata/android/en-AU/changelogs/<versionCode>.txt`
 as release notes. A tag without that file fails before anything reaches Play. The workflow signs in to Google Cloud with
 GitHub's OIDC token (**Workload Identity Federation**): there is no service-account key anywhere. (Dallin's Cloud
 organisation blocks key creation, `iam.managed.disableServiceAccountKeyCreation`, 2026-10-22; keyless is better anyway.)
@@ -164,3 +166,26 @@ Without the two repository variables below, the Play steps are skipped.
 6. **Re-running a failed release**: "Re-run failed jobs" on the tag's run. "Publish GitHub Release" skips a release that
    already exists, so the run goes on to Play. (Tags before v1.1.1 lack that skip: delete the GitHub release first, as
    for v1.1.0, whose rebuild had identical checksums.) Keyless upload first worked on v1.1.0.
+
+## 8. Promoting to production (`promote.yml`)
+Each tag still goes to `alpha` first. When the testers are happy, **Actions → Promote to production → Run workflow**
+on main, or `gh workflow run promote.yml -f version=v1.9.0` (add `-f rollout=20` for a staged rollout,
+`-f check_only=true` to have Play validate the change without committing it). It checks that the version code is on
+alpha, then puts that same bundle on production with the tag's `changelogs/<versionCode>.txt` as release notes. A
+staged rollout is raised or completed by running it again with a larger `rollout`. Nothing is rebuilt.
+
+One-time setup (before the first run):
+1. Play Console → **Users and permissions** → the `whirl-github-release` service account → App permissions → Whirl:
+   add **Release to production, exclude devices, and use Play App Signing**.
+2. The token's attribute condition (§7, step 3) allows only `v…` tags. Let this one workflow, on main, through too
+   (Cloud Shell, project `whirl-release`):
+
+       COND="assertion.repository=='dalbo/whirl' && (assertion.ref.startsWith('refs/tags/v') || assertion.workflow_ref=='dalbo/whirl/.github/workflows/promote.yml@refs/heads/main')"
+       gcloud iam workload-identity-pools providers update-oidc whirl \
+         --location=global --workload-identity-pool=github \
+         --project=whirl-release --attribute-condition="$COND"
+
+   (Paste the long `COND=` line on its own: a wrapped command line runs as two commands.) Done 2026-11-12.
+
+   `main` is protected, so only a reviewed `promote.yml` gets a token this way; other workflows on main still get none.
+3. Try it with `check_only=true` first. "Sign in to Google Cloud" failing is step 2; 403 from the Play API, step 1.

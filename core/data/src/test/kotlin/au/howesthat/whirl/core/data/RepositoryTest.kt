@@ -69,7 +69,8 @@ class RepositoryTest {
     // DataStore needs a scope that actually runs; a TestScope that nobody advances would hang every read.
     private val dataStoreScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val store by lazy { PreferenceDataStoreFactory.create(scope = dataStoreScope) { tmp.newFile("s.preferences_pb").also { it.delete() } } }
-    private val settings by lazy { SettingsRepository(store) }
+    private val accountStore by lazy { PreferenceDataStoreFactory.create(scope = dataStoreScope) { tmp.newFile("a.preferences_pb").also { it.delete() } } }
+    private val settings by lazy { SettingsRepository(store, accountStore) }
     private val api by lazy {
         WhirlpoolApi(WhirlpoolHttp.client("Whirl/test"), settings::apiKey, server.url("/api/"), RetryPolicy.NONE)
     }
@@ -109,6 +110,30 @@ class RepositoryTest {
         account.signOut()
         assertNull(settings.apiKey())
         assertFalse(settings.isSetupDone.first())
+    }
+
+    @Test
+    fun `a rejected key is never dropped, and a new key for the same account keeps setup and settings`() = runTest {
+        val generation = AccountGeneration()
+        val account = AccountRepository(api, settings, db, watchQueue(generation, Clock.systemUTC(), backgroundScope))
+        val watched = WatchedRepository(api, WatchedStore(db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), generation, clock))
+        enqueue("api_user.json")
+        account.signIn("1234-5678")
+        settings.setSetupDone()
+        settings.update { it.copy(theme = ThemeMode.DARK) }
+
+        enqueue("api_badkey.json", 403)
+        assertFailsWith<WhirlpoolError.BadKey> { watched.refresh(unreadOnly = true, force = true) }
+        assertTrue(api.keyRejected.value)
+        assertEquals("1234-5678", settings.apiKey(), "a BadKey reply may be a passing fault: the key stays")
+        assertTrue(settings.isSetupDone.first())
+
+        enqueue("api_user.json")
+        account.signIn("8765-4321")
+        assertFalse(api.keyRejected.value)
+        assertEquals("8765-4321", settings.apiKey())
+        assertTrue(settings.isSetupDone.first())
+        assertEquals(ThemeMode.DARK, settings.settings.first().theme)
     }
 
     @Test
@@ -214,10 +239,9 @@ class RepositoryTest {
         val forums = ForumRepository(api, db.forumDao(), db.fetchLogDao(), clock)
         enqueue("api_forum.json")
         forums.refresh()
-        forums.setFavourite(92, true)
         val list = forums.forums.first().value
         assertEquals(54, list.size)
-        assertTrue(list.single { it.forum.id == 92 }.isFavourite)
+        assertTrue(list.single { it.forum.id == 1 }.isPrivate)
 
         val latest = LatestThreadsRepository(api, db.threadDao(), db.fetchLogDao(), clock)
         enqueue("api_threads_count100.json")
@@ -286,7 +310,7 @@ class RepositoryTest {
             nightStart = LocalTime.of(21, 30), nightEnd = LocalTime.of(6, 15), postFontSize = PostFontSize.LARGE,
             textScale = TextScale.LARGER, screenAnimations = false, twoPane = true, twoPaneLandscapeOnly = true,
             browserApp = true, watchedNotify = true, notifyIntervalMinutes = 15, notifyStyle = NotifyStyle.PER_THREAD,
-            notifyKeepUntilRead = true, openThreadsInBrowser = true, loadPublicAtBottom = true, loadPrivateAtBottom = true,
+            notifyKeepUntilRead = true, openThreadsInBrowser = true, loadPublicAtBottom = true, loadPrivateAtBottom = true, readThreadsAsScroll = true,
             recentHistoryDays = 30, loadRecentAtTop = true, ignoreOwnRepliesRecent = true, loadWatchedAtTop = true,
             ignoreOwnRepliesWatched = true, watchedAutoMarkAsRead = true, watchedBackToList = true, watchUndo = false,
             undoSeconds = 10,
@@ -364,7 +388,7 @@ class RepositoryTest {
         val oldScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         val file = File(tmp.root, "old.preferences_pb")
         val old = PreferenceDataStoreFactory.create(scope = oldScope) { file }
-        SettingsRepository(old).update { it.copy(theme = ThemeMode.DARK) }
+        SettingsRepository(old, accountStore).update { it.copy(theme = ThemeMode.DARK) }
         old.edit { p ->
             p[stringPreferencesKey("homepage")] = Settings().homepage.name
             p[intPreferencesKey("undo_seconds")] = Settings().undoSeconds
@@ -373,7 +397,7 @@ class RepositoryTest {
         oldScope.coroutineContext.job.cancelAndJoin() // one DataStore per file at a time
 
         val migrated = PreferenceDataStoreFactory.create(scope = dataStoreScope, migrations = listOf(DropStoredDefaults)) { file }
-        val settings = SettingsRepository(migrated)
+        val settings = SettingsRepository(migrated, accountStore)
         assertEquals(Settings(theme = ThemeMode.DARK), settings.settings.first())
         assertEquals(setOf("theme", "stored_defaults_dropped"), migrated.data.first().asMap().keys.map { it.name }.toSet())
     }

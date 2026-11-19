@@ -6,6 +6,9 @@
     <string name="setup_key_open_profile">Open account settings</string>
     <string name="setup_key_label">API key</string>
     <string name="setup_key_check">Log in</string>
+    <string name="setup_new_key_title">A new API key</string>
+    <string name="setup_new_key_body">Your settings, favourites and muted threads stay as they are.</string>
+    <string name="setup_new_key_cancel">Cancel</string>
     <string name="setup_key_rejected_title">Key not accepted</string>
     <string name="setup_key_rejected_body">Whirlpool said: \"%1$s\"\n\nCheck that you copied the whole key, including the dashes.</string>
     <string name="setup_notify_title">Notifications</string>

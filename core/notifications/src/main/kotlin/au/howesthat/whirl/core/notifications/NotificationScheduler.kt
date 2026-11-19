@@ -18,14 +18,16 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Keeps the periodic check in step with the settings: scheduled while signed in with watched-thread alerts on, at
- * the chosen interval (WorkManager's minimum is 15 minutes), cancelled otherwise. WorkManager re-arms it after a reboot.
+ * Keeps the check in step with the settings: scheduled while signed in with watched-thread alerts on, at the chosen
+ * interval (at least 15 minutes), cancelled otherwise. Two clocks start it: [CheckAlarm], which fires during Doze, and
+ * periodic work as the fallback, which WorkManager re-arms after a reboot (and whose run sets the alarm again).
  */
 @Singleton
 class NotificationScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settings: SettingsRepository,
     private val notifier: WatchedNotifier,
+    private val alarm: CheckAlarm,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     /** Called once from `Application.onCreate`. */
@@ -40,16 +42,19 @@ class NotificationScheduler @Inject constructor(
     }
 
     /** [intervalMinutes] null cancels the check and the notification. */
-    internal fun apply(intervalMinutes: Int?) {
+    internal suspend fun apply(intervalMinutes: Int?) {
         val work = WorkManager.getInstance(context)
         if (intervalMinutes == null) {
+            alarm.cancel()
             work.cancelUniqueWork(WORK_NAME)
+            work.cancelUniqueWork(CheckAlarm.WORK_NAME)
             notifier.cancel()
             return
         }
+        alarm.ensure(intervalMinutes)
         // The flex window puts each run in the last minutes of its period, not anywhere in it, so checks are about
         // one interval apart when the phone is awake. Doze and standby buckets still defer them.
-        val request = PeriodicWorkRequestBuilder<WatchedCheckWorker>(maxOf(intervalMinutes, 15).toLong(), TimeUnit.MINUTES, FLEX_MINUTES, TimeUnit.MINUTES)
+        val request = PeriodicWorkRequestBuilder<WatchedCheckWorker>(intervalMillis(intervalMinutes), TimeUnit.MILLISECONDS, FLEX_MINUTES, TimeUnit.MINUTES)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .build()
         // UPDATE keeps the running schedule and changes only the interval.

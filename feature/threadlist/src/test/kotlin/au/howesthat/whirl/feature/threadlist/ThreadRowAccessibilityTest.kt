@@ -37,7 +37,7 @@ class ThreadRowAccessibilityTest {
         lastPostedText = "Friday at 10:19 am",
     )
 
-    private fun row(fontScale: Float = 1f) = compose.setContent {
+    private fun row(fontScale: Float = 1f, muted: Boolean? = null) = compose.setContent {
         val density = LocalDensity.current
         CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
             WhirlTheme(darkTheme = false) {
@@ -49,6 +49,7 @@ class ThreadRowAccessibilityTest {
                     onOpenInBrowser = {},
                     onOpenForum = {},
                     watchActions = listOf(WatchAction.MARK_READ, WatchAction.UNWATCH),
+                    muted = muted,
                 )
             }
         }
@@ -61,6 +62,14 @@ class ThreadRowAccessibilityTest {
         val merged = compose.onNodeWithText(item.title).fetchSemanticsNode()
         val labels = merged.config.getOrNull(SemanticsActions.CustomActions).orEmpty().map { it.label }
         assertEquals(listOf("Mark as read", "Unwatch", "Jump to last post", "Open in browser", "Go to Choosing an ISP"), labels)
+    }
+
+    @Test
+    fun `a muted row says so and offers Notify again`() {
+        row(muted = true)
+        compose.onNodeWithContentDescription("Notifications off", useUnmergedTree = true).assertIsDisplayed()
+        val labels = compose.onNodeWithText(item.title).fetchSemanticsNode().config.getOrNull(SemanticsActions.CustomActions).orEmpty().map { it.label }
+        assertEquals(listOf("Mark as read", "Unwatch", "Notify again"), labels.take(3))
     }
 
     @Test

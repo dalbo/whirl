@@ -35,6 +35,7 @@ class MainViewModel @Inject constructor(
     api: WhirlpoolApi,
     private val watchQueue: WatchQueue,
     private val forums: ForumRepository,
+    private val notificationPrompt: NotificationPrompt,
 ) : ViewModel() {
     /** Null until settings are read, which keeps the splash screen up. */
     val state: StateFlow<MainState?> = combine(settings.settings, settings.isSetupDone, ::MainState)
@@ -45,6 +46,18 @@ class MainViewModel @Inject constructor(
 
     /** Whirlpool's site notice from the last API call. */
     val alert = api.alert
+
+    /** Whirlpool turned down the stored key: a banner offers a new one; the key is never dropped on its own. */
+    val keyRejected = api.keyRejected
+
+    private val _askNotifications = MutableStateFlow(!notificationPrompt.asked)
+    /** False once the one-time notification permission prompt has been shown on this install. */
+    val askNotifications: StateFlow<Boolean> = _askNotifications.asStateFlow()
+
+    fun notificationsAsked() {
+        notificationPrompt.markAsked()
+        _askNotifications.value = false
+    }
 
     private val _link = MutableStateFlow<Any?>(null)
     /** A route from a link the app was opened with, waiting for the NavHost (which may still be behind setup). */

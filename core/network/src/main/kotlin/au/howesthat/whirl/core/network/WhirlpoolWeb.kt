@@ -67,8 +67,14 @@ class WhirlpoolUrls(
             .apply { if (repsOnly) addQueryParameter("ur", "1") }
             .build()
 
-    /** The whole thread on one page (800 posts per request). Not used yet: kept for v1.8's archive reader. */
+    /** The thread's archive entry page: its first page, or the first page of its part (800 posts per request). */
     fun archive(id: ThreadId): HttpUrl = forums.newBuilder().addPathSegments("archive/${id.value}").build()
+
+    /** An archive page by the path the page list gives (`/archive/2747207`, `/archive/97r5wzn3-58`). */
+    fun archivePage(path: String): HttpUrl {
+        require(path.startsWith("/archive/")) { "Not an archive path: $path" }
+        return forums.newBuilder().encodedPath(path).build()
+    }
 
     fun popular(): HttpUrl = forums.newBuilder().addPathSegment("forum").addPathSegment("")
         .addQueryParameter("action", "popular_views").build()

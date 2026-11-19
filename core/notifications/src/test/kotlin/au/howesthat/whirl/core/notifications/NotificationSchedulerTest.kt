@@ -9,6 +9,9 @@ import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
 import au.howesthat.whirl.core.data.Account
 import au.howesthat.whirl.core.data.AccountGeneration
+import au.howesthat.whirl.core.data.LibraryRepository
+import au.howesthat.whirl.core.data.Settings
+import au.howesthat.whirl.core.data.SettingsFile
 import au.howesthat.whirl.core.data.SettingsRepository
 import au.howesthat.whirl.core.data.WatchSendScheduler
 import au.howesthat.whirl.core.data.WatchedRepository
@@ -34,6 +37,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import au.howesthat.whirl.core.data.WatchedStore
 import au.howesthat.whirl.core.data.WatchQueue
@@ -49,8 +53,10 @@ class NotificationSchedulerTest {
     private val api = WhirlpoolApi(WhirlpoolHttp.client("t"), { null })
     private val store = WatchedStore(db.threadDao(), db.fetchLogDao(), db.pendingWatchDao(), RoomTransactor(db), AccountGeneration(), clock)
     private val watched = WatchedRepository(api, store)
-    private val notifier = WatchedNotifier(context, settings, watched, WatchQueue(api, store, watched, WatchSendScheduler.None, Dispatchers.Default, appScope), db.notifiedDao())
-    private val scheduler = NotificationScheduler(context, settings, notifier, appScope)
+    private val library = LibraryRepository(context, db.forumDao())
+    private val notifier = WatchedNotifier(context, settings, watched, WatchQueue(api, store, watched, WatchSendScheduler.None, Dispatchers.Default, appScope), db.notifiedDao(), library)
+    private val alarm = CheckAlarm(context, db.checkLogDao(), clock)
+    private val scheduler = NotificationScheduler(context, settings, notifier, alarm, appScope)
 
     @Before
     fun setUp() = WorkManagerTestInitHelper.initializeTestWorkManager(context)
@@ -64,8 +70,9 @@ class NotificationSchedulerTest {
     private fun work(): List<WorkInfo> = WorkManager.getInstance(context).getWorkInfosForUniqueWork(NotificationScheduler.WORK_NAME).get()
 
     @Test
-    fun `scheduled at the interval, never under 15 minutes, and cancelled`() {
+    fun `scheduled at the interval, never under 15 minutes, and cancelled`() = runTest {
         scheduler.apply(60)
+        assertEquals(clock.instant().plusSeconds(60 * 60), alarm.next(), "the alarm too")
         val info = work().single()
         assertEquals(WorkInfo.State.ENQUEUED, info.state)
         assertEquals(TimeUnit.MINUTES.toMillis(60), info.periodicityInfo!!.repeatIntervalMillis)
@@ -82,6 +89,7 @@ class NotificationSchedulerTest {
 
         scheduler.apply(null)
         assertTrue(work().all { it.state == WorkInfo.State.CANCELLED })
+        assertNull(alarm.next())
     }
 
     @Test
@@ -95,5 +103,21 @@ class NotificationSchedulerTest {
         until { work().any { it.state == WorkInfo.State.ENQUEUED && it.periodicityInfo?.repeatIntervalMillis == TimeUnit.MINUTES.toMillis(30) } }
         settings.update { it.copy(watchedNotify = false) }
         until { work().all { it.state == WorkInfo.State.CANCELLED } }
+    }
+
+    @Test
+    fun `an imported interval re-arms the check like the switch does`() = runTest {
+        settings.signIn("k", Account(216903, "d@llin"))
+        settings.setSetupDone()
+        settings.update { it.copy(watchedNotify = true, notifyIntervalMinutes = 60) }
+        scheduler.start()
+        suspend fun until(check: () -> Boolean) = withContext(Dispatchers.Default) { withTimeout(10_000) { while (!check()) delay(20) } }
+        fun every(minutes: Long) = work().any { it.state == WorkInfo.State.ENQUEUED && it.periodicityInfo?.repeatIntervalMillis == TimeUnit.MINUTES.toMillis(minutes) }
+        until { every(60) }
+
+        val read = SettingsFile.read(SettingsFile.write(Settings(watchedNotify = true, notifyIntervalMinutes = 240), emptySet(), emptySet(), "1.10.0"))
+        val import = (read as SettingsFile.Read.Imported).import
+        settings.update { import.applyTo(it) } // as Settings › Backup's Apply does
+        until { every(240) }
     }
 }

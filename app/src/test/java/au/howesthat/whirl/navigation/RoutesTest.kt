@@ -1,5 +1,7 @@
 package au.howesthat.whirl.navigation
 
+import au.howesthat.whirl.feature.settings.SettingsPage
+import au.howesthat.whirl.feature.settings.SettingsPageRoute
 import au.howesthat.whirl.core.data.Homepage
 import org.junit.Test
 import au.howesthat.whirl.feature.thread.ThreadRoute
@@ -30,6 +32,6 @@ class RoutesTest {
     fun `the thread lists, and only they, are shown as the list beside a thread`() {
         val lists = listOf(WatchedRoute, RecentRoute, LatestRoute, PopularRoute, ForumRoute(7, "x"), SearchRoute("q"), UserRoute(1))
         lists.forEach { assertTrue(isListPane(it), "$it") }
-        listOf(NewsRoute, ForumsRoute, SettingsRoute, AboutRoute, CheckHistoryRoute, ThreadRoute("3pxj858k")).forEach { assertFalse(isListPane(it), "$it") }
+        listOf(NewsRoute, ForumsRoute, SettingsRoute, SettingsPageRoute(SettingsPage.BACKUP), AboutRoute, CheckHistoryRoute, ThreadRoute("3pxj858k")).forEach { assertFalse(isListPane(it), "$it") }
     }
 }

@@ -2,6 +2,31 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.9.0
+Your settings come with you to a new phone, and mute for watched threads.
+- Android's backup now keeps Whirl's settings, favourite forums and muted threads, and your API key. The key goes up only end-to-end encrypted with your screen lock, so on a new phone Whirl starts signed in, in your theme, with your favourites. Cached threads and posts are never backed up: a new phone fetches them again. Settings › Backup says what this phone backs up.
+- Mute a watched thread: "Don't notify" in its menu, or on its notification. It stays in Watched, marked with a crossed-out bell, but never notifies. "Notify again" turns it back on.
+- If Whirlpool stops accepting your API key, a banner says so, with "Enter a new key". Whirl never signs you out by itself, and your settings, favourites and mutes stay.
+- After moving to a new phone, Whirl asks once for permission to show notifications, since Android does not carry it over.
+- Password managers offer to save the API key, and to fill it in on another phone.
+- Settings is split into pages: General, Notifications, Threads, Recent threads, Watched threads and Backup.
+- Settings › Notifications says "Checks wait for Wi-Fi" when Data Saver, or Whirl's own background data setting, holds back the watched-thread check on mobile data.
+
+## v1.8.0
+Read a whole thread as one scroll, and filter it in the app.
+- Settings › Threads › "Read threads as one scroll" opens threads from Whirlpool's archive as one list of up to 800 posts, instead of pages of 20. "Load earlier posts" and "Load later posts" bring in the 800 before or after. Any thread can switch from its ⋮ menu ("Read as one scroll" / "Read in pages") and keeps your place.
+- Posts by me, by the OP, by moderators and by reps, and a post's "Posts by … in this thread", now filter in the app instead of opening the browser. They start with the posts loaded; "Search earlier pages" looks further back through the thread, about a page a second, with Stop.
+- Find in the scroll view offers "Search earlier pages" too, to search the whole thread.
+- The scroll bar can be dragged: while it shows, press it and drag to move through a long thread, with the post number beside it. Also in pages.
+- Threads you have read before open at once from the saved copy while Whirl checks for new posts, and a few new posts are added without downloading the whole archive page again.
+- Reps' posts show their company ("ISP Representative · Leaptel").
+
+## v1.7.1
+Watched-thread notifications on time, and lists that start at the top.
+- Watched-thread notifications arrive close to the interval you chose, even while the phone sits idle. Android's Doze used to hold the check back for an hour or more, so a notification often turned up only when you picked the phone up or opened Whirl. The check is now started by an alarm Android lets through Doze, with the old schedule kept as a backup.
+- Watched › All opens at the top again, instead of partway down where the Unread tab was.
+- A new search, a search's next or previous page, another group of a forum, and another number of days in Recent all start at the top of the list.
+
 ## v1.7.0
 Fixes and speed-ups, before the archive reader in v1.8.
 - Watched threads with new posts open with the first unread post at the top of the screen, just under the "New posts" line, as asked for by a tester (it used to be a little further down). When the last post you read ended a page, the thread opens on the next page.

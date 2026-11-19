@@ -36,6 +36,8 @@ data class Settings(
     val openThreadsInBrowser: Boolean = false,
     val loadPublicAtBottom: Boolean = false,
     val loadPrivateAtBottom: Boolean = false,
+    /** Threads open as one continuous scroll from the archive (v1.8) instead of 20-post pages. */
+    val readThreadsAsScroll: Boolean = false,
     // Recent
     val recentHistoryDays: Int = 7,
     val loadRecentAtTop: Boolean = false,

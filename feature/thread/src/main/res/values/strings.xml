@@ -23,6 +23,8 @@
     <string name="watch">Watch</string>
     <string name="mark_read">Mark as read</string>
     <string name="unwatch">Unwatch</string>
+    <string name="mute">Don\'t notify</string>
+    <string name="unmute">Notify again</string>
     <string name="watched_threads">Watched threads</string>
     <string name="reply_to_thread">Reply in browser</string>
     <string name="filter_mine">Posts by me</string>
@@ -30,7 +32,7 @@
     <string name="filter_mods">Posts by moderators</string>
     <string name="filter_reps">Posts by reps</string>
     <!-- Above the post filters in the thread menu: Whirlpool shows filtered views only to signed-in users. -->
-    <string name="filters_in_browser">In your browser</string>
+    <string name="filters_title">Show only</string>
     <string name="new_posts">New posts</string>
     <string name="find_on_page">Find on page</string>
     <string name="find_previous">Previous match</string>
@@ -40,5 +42,33 @@
     <plurals name="find_posts">
         <item quantity="one">%1$d post</item>
         <item quantity="other">%1$d posts</item>
+    </plurals>
+    <string name="read_as_scroll">Read as one scroll</string>
+    <string name="read_in_pages">Read in pages</string>
+    <string name="first_post">First post</string>
+    <string name="newest_post">Newest post</string>
+    <string name="scroll_load_earlier">Load earlier posts</string>
+    <string name="scroll_load_later">Load later posts</string>
+    <string name="scroll_archive_page">Archive page %1$d of %2$d</string>
+    <string name="scroll_archive_page_dated">Archive page %1$d of %2$d, %3$s</string>
+    <string name="scroll_posts_range">Posts %1$s–%2$s</string>
+    <string name="scroll_loading">Loading posts</string>
+    <string name="scroll_loaded">Posts loaded</string>
+    <string name="scroll_offline">Offline: showing saved posts</string>
+    <string name="scroll_limit">Whirl has loaded as many earlier pages of this thread as it will today.</string>
+    <string name="scroll_search_earlier">Search earlier pages</string>
+    <string name="scroll_filter_range">posts %1$s–%2$s</string>
+    <string name="scroll_search_for">Posts with “%1$s”</string>
+    <string name="scroll_searching">Searching back to archive page %1$d of %2$d</string>
+    <string name="scroll_stop">Stop</string>
+    <string name="scroll_show_all">Show all posts</string>
+    <string name="scroll_rate_limited">Whirlpool asked Whirl to slow down. Try again later.</string>
+    <plurals name="scroll_filter_found">
+        <item quantity="one">%1$d post in %2$s</item>
+        <item quantity="other">%1$d posts in %2$s</item>
+    </plurals>
+    <plurals name="scroll_posts_missing">
+        <item quantity="one">%1$d post not shown (hidden by a moderator)</item>
+        <item quantity="other">%1$d posts not shown (hidden by moderators)</item>
     </plurals>
 </resources>

@@ -9,5 +9,9 @@
         <receiver
             android:name=".NotificationActionReceiver"
             android:exported="false" />
+        <!-- CheckAlarm's allow-while-idle alarm, which starts the watched-thread check during Doze. -->
+        <receiver
+            android:name=".CheckAlarmReceiver"
+            android:exported="false" />
     </application>
 </manifest>

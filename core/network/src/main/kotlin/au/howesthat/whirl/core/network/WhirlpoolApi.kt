@@ -46,11 +46,36 @@ class WhirlpoolApi(
     /** The latest non-error `ALERT` text from the API (empty when none). Shown verbatim. */
     val alert: StateFlow<String> = _alert.asStateFlow()
 
+    private val _keyRejected = MutableStateFlow(false)
+
+    /**
+     * Whirlpool turned down the stored key on the last call that used it; the next call with the stored key that
+     * succeeds clears it, and so does [keyReplaced]. Only published, never acted on here: `BadKey` comes from any reply
+     * with `AUTH.ID` 0, a passing server fault included, so the app shows a banner instead of signing out
+     * (docs/plans/settings-backup.md, step 4). A key passed in explicitly (setup checking a new one) neither sets nor
+     * clears it: a check that passes comes before the key is stored, and screens retrying then would still send the old one.
+     */
+    val keyRejected: StateFlow<Boolean> = _keyRejected.asStateFlow()
+
+    /** A new key is stored: clears [keyRejected], which is the screens' cue to fetch again with it. */
+    fun keyReplaced() {
+        _keyRejected.value = false
+    }
+
+    /** A reply for a key already replaced (a call that started before [keyReplaced]) says nothing about the new one. */
+    private suspend fun rejected(usedKey: String) {
+        if (apiKey() == usedKey) _keyRejected.value = true
+    }
+
     /** Validates a key: returns its user or throws [WhirlpoolError.BadKey]. Used by the setup wizard. */
     suspend fun user(key: String? = null): ApiUser {
-        val env = call(setOf("user"), key = key)
+        val used = key ?: apiKey() ?: throw WhirlpoolError.BadKey("No API key set")
+        val env = call(setOf("user"), key = used, stored = key == null)
         val auth = env.auth ?: throw WhirlpoolError.Drift("API response has no AUTH")
-        if (auth.id == 0L) throw WhirlpoolError.BadKey(env.error.ifEmpty { "Not authenticated. Bad API key?" })
+        if (auth.id == 0L) {
+            if (key == null) rejected(used)
+            throw WhirlpoolError.BadKey(env.error.ifEmpty { "Not authenticated. Bad API key?" })
+        }
         return ApiUser(auth.id, auth.name)
     }
 
@@ -123,7 +148,8 @@ class WhirlpoolApi(
         lastPage = maxOf(it.lastPage, 1),
     )
 
-    private suspend fun call(gets: Set<String>, params: Map<String, String> = emptyMap(), key: String? = null): ApiEnvelope {
+    /** [stored]: [key], or the stored key when null, is the stored one, so its outcome sets or clears [keyRejected]. */
+    private suspend fun call(gets: Set<String>, params: Map<String, String> = emptyMap(), key: String? = null, stored: Boolean = key == null): ApiEnvelope {
         val apiKey = key ?: apiKey() ?: throw WhirlpoolError.BadKey("No API key set")
         val url = baseUrl.newBuilder()
             .addQueryParameter("key", apiKey)
@@ -134,12 +160,15 @@ class WhirlpoolApi(
         val response = client.fetch(Request.Builder().url(url).build(), retry, io)
         val env = withContext(io) { decode(response) }
         when {
-            response.code == 403 || (env.auth?.id == 0L && env.error.isNotEmpty()) ->
+            response.code == 403 || (env.auth?.id == 0L && env.error.isNotEmpty()) -> {
+                if (stored) rejected(apiKey)
                 throw WhirlpoolError.BadKey(env.error.ifEmpty { "Not authenticated. Bad API key?" })
+            }
             env.error.isNotEmpty() -> throw WhirlpoolError.Api(env.error, response.code)
             response.code !in 200..299 -> throw WhirlpoolError.Api("HTTP ${response.code}", response.code)
         }
         _alert.value = env.alert
+        if (stored && env.auth?.id != 0L) _keyRejected.value = false
         return env
     }
 

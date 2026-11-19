@@ -174,6 +174,8 @@ internal fun PostHeader(p: Post, onUser: () -> Unit, highlight: FindHighlight?) 
         // The user group sits here rather than beside the name, which large text would squeeze to nothing.
         val meta = listOfNotNull(
             p.userGroup,
+            // A rep's company ("Leaptel").
+            p.repOf,
             stringResource(R.string.post_op).takeIf { p.isOp },
             p.postedText,
             p.editedText?.let { stringResource(R.string.post_edited, it) },

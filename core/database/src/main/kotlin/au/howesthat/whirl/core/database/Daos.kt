@@ -5,55 +5,61 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RoomDatabase
 import androidx.room.Transaction
 import androidx.room.Upsert
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 
-data class ForumWithFavourite(
-    val id: Int,
-    val title: String,
-    val section: String,
-    val sort: Int,
-    @ColumnInfo(name = "is_private") val isPrivate: Boolean,
-    @ColumnInfo(name = "is_favourite") val isFavourite: Boolean,
-)
-
+/** An abstract class rather than an interface for [legacyFavouriteIds], which reads a table Room no longer declares. */
 @Dao
-interface ForumDao {
-    @Query(
-        """SELECT f.id, f.title, f.section, f.sort, f.is_private, (fav.forum_id IS NOT NULL) AS is_favourite
-           FROM forums f LEFT JOIN favourite_forums fav ON fav.forum_id = f.id ORDER BY f.sort""",
-    )
-    fun observeAll(): Flow<List<ForumWithFavourite>>
+abstract class ForumDao(private val db: RoomDatabase) {
+    @Query("SELECT * FROM forums ORDER BY sort")
+    abstract fun observeAll(): Flow<List<ForumEntity>>
 
     @Query("SELECT id FROM forums WHERE is_private = 1")
-    suspend fun privateIds(): List<Int>
+    abstract suspend fun privateIds(): List<Int>
 
     @Query("DELETE FROM forums")
-    suspend fun deleteAll()
+    abstract suspend fun deleteAll()
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(forums: List<ForumEntity>)
+    abstract suspend fun insertAll(forums: List<ForumEntity>)
 
     /** Replaces the forum list, keeping what has been learned about private forums. */
     @Transaction
-    suspend fun replaceAll(forums: List<ForumEntity>) {
+    open suspend fun replaceAll(forums: List<ForumEntity>) {
         val private = privateIds().toSet()
         deleteAll()
         insertAll(forums.map { if (it.id in private) it.copy(isPrivate = true) else it })
     }
 
     @Query("UPDATE forums SET is_private = :isPrivate WHERE id = :id")
-    suspend fun setPrivate(id: Int, isPrivate: Boolean)
+    abstract suspend fun setPrivate(id: Int, isPrivate: Boolean)
 
     @Query("UPDATE forums SET is_private = 0")
-    suspend fun clearPrivate()
+    abstract suspend fun clearPrivate()
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun addFavourite(favourite: FavouriteForumEntity)
+    /**
+     * v1.8's favourites, read once to move them to the library store (`LibraryRepository`); null when the table is
+     * gone (dropped by [dropLegacyFavourites], or never made: installs since v8). Room stopped declaring the table in
+     * v8, but its migration keeps it, so a phone that skipped v1.9 still has its favourites to move.
+     */
+    open suspend fun legacyFavouriteIds(): List<Int>? = db.withTransaction {
+        val sql = db.openHelper.writableDatabase
+        val exists = sql.query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '$LEGACY_FAVOURITES'").use { it.moveToFirst() }
+        if (!exists) return@withTransaction null
+        sql.query("SELECT forum_id FROM $LEGACY_FAVOURITES").use { c -> buildList { while (c.moveToNext()) add(c.getInt(0)) } }
+    }
 
-    @Query("DELETE FROM favourite_forums WHERE forum_id = :forumId")
-    suspend fun removeFavourite(forumId: Int)
+    /** Drops v1.8's favourites table, once its rows are safely in the library store. */
+    open suspend fun dropLegacyFavourites() = db.withTransaction {
+        db.openHelper.writableDatabase.execSQL("DROP TABLE IF EXISTS $LEGACY_FAVOURITES")
+    }
+
+    private companion object {
+        const val LEGACY_FAVOURITES = "favourite_forums"
+    }
 }
 
 /** The columns `get=threads` and `get=recent` provide. */
@@ -285,6 +291,10 @@ interface CheckLogDao {
     @Query("SELECT * FROM check_log ORDER BY started_at DESC, id DESC")
     fun observe(): Flow<List<CheckLogEntity>>
 
+    /** When the most recent check started (epoch milliseconds), or null before the first. */
+    @Query("SELECT MAX(started_at) FROM check_log")
+    suspend fun latestStartedAt(): Long?
+
     @Insert
     suspend fun insert(entry: CheckLogEntity)
 
@@ -335,4 +345,150 @@ interface PendingWatchDao {
 
     @Query("DELETE FROM pending_watch")
     suspend fun clear()
+}
+
+@Dao
+interface ArchiveDao {
+    @Query("SELECT * FROM archive_threads WHERE thread_id = :threadId")
+    suspend fun thread(threadId: String): ArchiveThreadEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putThread(thread: ArchiveThreadEntity)
+
+    @Query("UPDATE archive_threads SET searched_day = :day, searched_today = :count WHERE thread_id = :threadId")
+    suspend fun setSearched(threadId: String, day: Long, count: Int)
+
+    @Query("SELECT * FROM archive_pages WHERE thread_id = :threadId AND path = :path")
+    suspend fun page(threadId: String, path: String): ArchivePageEntity?
+
+    /** The thread's cached pages, newest posts last. */
+    @Query("SELECT * FROM archive_pages WHERE thread_id = :threadId ORDER BY first")
+    suspend fun pages(threadId: String): List<ArchivePageEntity>
+
+    @Query("SELECT * FROM archive_posts WHERE thread_id = :threadId AND path = :path ORDER BY reply_num")
+    suspend fun posts(threadId: String, path: String): List<ArchivePostEntity>
+
+    @Query("SELECT * FROM archive_posts WHERE thread_id = :threadId AND reply_id IN (:replyIds) ORDER BY reply_num")
+    suspend fun postsByIds(threadId: String, replyIds: List<Long>): List<ArchivePostEntity>
+
+    @Query("SELECT reply_id FROM archive_posts WHERE thread_id = :threadId AND path = :path")
+    suspend fun keptIds(threadId: String, path: String): List<Long>
+
+    @Query("SELECT * FROM archive_index WHERE thread_id = :threadId AND path = :path ORDER BY reply_num")
+    suspend fun index(threadId: String, path: String): List<ArchiveIndexEntity>
+
+    /** Paths of the pages whose posts are in the index (fetched at least once, bodies or not). */
+    @Query("SELECT DISTINCT path FROM archive_index WHERE thread_id = :threadId")
+    suspend fun indexedPaths(threadId: String): List<String>
+
+    @Query("SELECT * FROM archive_index WHERE thread_id = :threadId AND user_id = :userId ORDER BY reply_num")
+    suspend fun byUser(threadId: String, userId: Long): List<ArchiveIndexEntity>
+
+    @Query("SELECT * FROM archive_index WHERE thread_id = :threadId AND is_op = 1 ORDER BY reply_num")
+    suspend fun byOp(threadId: String): List<ArchiveIndexEntity>
+
+    @Query("SELECT * FROM archive_index WHERE thread_id = :threadId AND user_group IN (:groups) ORDER BY reply_num")
+    suspend fun byGroup(threadId: String, groups: List<String>): List<ArchiveIndexEntity>
+
+    @Query("SELECT * FROM archive_index WHERE thread_id = :threadId AND (rep_of IS NOT NULL OR user_group = :repGroup) ORDER BY reply_num")
+    suspend fun byReps(threadId: String, repGroup: String): List<ArchiveIndexEntity>
+
+    @Query("UPDATE archive_pages SET accessed_at = :at WHERE thread_id = :threadId AND path = :path")
+    suspend fun touch(threadId: String, path: String, at: Long)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPage(page: ArchivePageEntity)
+
+    @androidx.room.Update
+    suspend fun updatePage(page: ArchivePageEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPosts(posts: List<ArchivePostEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertIndex(rows: List<ArchiveIndexEntity>)
+
+    @Query("DELETE FROM archive_posts WHERE thread_id = :threadId AND path = :path")
+    suspend fun deletePosts(threadId: String, path: String)
+
+    @Query("DELETE FROM archive_index WHERE thread_id = :threadId AND path = :path")
+    suspend fun deleteIndex(threadId: String, path: String)
+
+    /**
+     * Deletes all but the [keep] most recently opened pages, never those of [openThreadId]; their posts go with them.
+     * The index stays.
+     */
+    @Query(
+        """DELETE FROM archive_pages WHERE thread_id != :openThreadId AND rowid NOT IN
+           (SELECT rowid FROM archive_pages ORDER BY accessed_at DESC, fetched_at DESC LIMIT :keep)""",
+    )
+    suspend fun evict(keep: Int, openThreadId: String)
+
+    /** Forgets threads not fetched since [before]: their list, index and any pages left. */
+    @Transaction
+    suspend fun forgetBefore(before: Long) {
+        deleteIndexOfStale(before)
+        deletePagesOfStale(before)
+        deleteStaleThreads(before)
+    }
+
+    @Query("DELETE FROM archive_index WHERE thread_id IN (SELECT thread_id FROM archive_threads WHERE fetched_at < :before)")
+    suspend fun deleteIndexOfStale(before: Long)
+
+    @Query("DELETE FROM archive_pages WHERE thread_id IN (SELECT thread_id FROM archive_threads WHERE fetched_at < :before)")
+    suspend fun deletePagesOfStale(before: Long)
+
+    @Query("DELETE FROM archive_threads WHERE fetched_at < :before")
+    suspend fun deleteStaleThreads(before: Long)
+
+    @Query("SELECT COUNT(*) FROM archive_pages")
+    suspend fun pageCount(): Int
+
+    /**
+     * A scanned page: its index rows replaced, the bodies of [kept] posts added to what it already has, and the page
+     * row kept (complete stays complete) or added as incomplete. Then trims the page cache to [keep] pages.
+     */
+    @Transaction
+    suspend fun storeScanned(
+        thread: ArchiveThreadEntity,
+        page: ArchivePageEntity,
+        kept: List<ArchivePostEntity>,
+        index: List<ArchiveIndexEntity>,
+        keep: Int,
+    ) {
+        putThread(thread)
+        val existing = page(page.threadId, page.path)
+        if (existing == null) insertPage(page.copy(complete = false)) else touch(page.threadId, page.path, page.accessedAt)
+        insertPosts(kept)
+        deleteIndex(page.threadId, page.path)
+        insertIndex(index)
+        evict(keep, openThreadId = page.threadId)
+    }
+
+    /** New posts at the end of a cached page: [page] with its new last post, and the posts and index rows to add. */
+    @Transaction
+    suspend fun append(page: ArchivePageEntity, posts: List<ArchivePostEntity>, index: List<ArchiveIndexEntity>) {
+        // An update, not REPLACE: replacing the row would cascade-delete the posts already on the page.
+        updatePage(page)
+        insertPosts(posts)
+        insertIndex(index)
+    }
+
+    /** Replaces one page, its posts and its index rows, then trims the page cache to [keep] pages. */
+    @Transaction
+    suspend fun store(
+        thread: ArchiveThreadEntity,
+        page: ArchivePageEntity,
+        posts: List<ArchivePostEntity>,
+        index: List<ArchiveIndexEntity>,
+        keep: Int,
+    ) {
+        putThread(thread)
+        deletePosts(page.threadId, page.path)
+        deleteIndex(page.threadId, page.path)
+        insertPage(page)
+        insertPosts(posts)
+        insertIndex(index)
+        evict(keep, openThreadId = page.threadId)
+    }
 }

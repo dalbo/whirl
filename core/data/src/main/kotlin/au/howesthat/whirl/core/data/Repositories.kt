@@ -1,7 +1,6 @@
 package au.howesthat.whirl.core.data
 
 import au.howesthat.whirl.core.database.ApiThreadColumns
-import au.howesthat.whirl.core.database.FavouriteForumEntity
 import au.howesthat.whirl.core.database.FetchLogDao
 import au.howesthat.whirl.core.database.FetchLogEntity
 import au.howesthat.whirl.core.database.ForumDao
@@ -29,7 +28,8 @@ import kotlin.time.Duration
 import javax.inject.Inject
 import javax.inject.Singleton
 
-data class ForumListItem(val forum: Forum, val isFavourite: Boolean, val isPrivate: Boolean)
+/** A forum in the list. [isFavourite] comes from [LibraryRepository]; [ForumRepository] leaves it false. */
+data class ForumListItem(val forum: Forum, val isPrivate: Boolean, val isFavourite: Boolean = false)
 
 /**
  * A list from the API cached in Room, with when it was fetched (the fetch log, under each list's key): what every
@@ -64,7 +64,7 @@ class ForumRepository @Inject constructor(
     private val list = CachedApiList(log, clock, MaxAge.FORUMS)
 
     val forums: Flow<Cached<List<ForumListItem>>> = list.observe(dao.observeAll(), KEY) {
-        ForumListItem(Forum(it.id, it.title, it.section), it.isFavourite, it.isPrivate || it.id in KNOWN_PRIVATE)
+        ForumListItem(Forum(it.id, it.title, it.section), isPrivate = it.isPrivate || it.id in KNOWN_PRIVATE)
     }
 
     /** Forums whose pages need a web login: the known ones plus any learned from a "Not signed in" page. */
@@ -73,9 +73,6 @@ class ForumRepository @Inject constructor(
     suspend fun refresh(force: Boolean = false) = list.refresh(KEY, force) {
         dao.replaceAll(api.forums().mapIndexed { i, f -> ForumEntity(f.id, f.title, f.section, i) })
     }
-
-    suspend fun setFavourite(forumId: Int, favourite: Boolean) =
-        if (favourite) dao.addFavourite(FavouriteForumEntity(forumId, clock.millis())) else dao.removeFavourite(forumId)
 
     /** Called when a forum page turns out to need a web login. */
     suspend fun markPrivate(forumId: Int) = dao.setPrivate(forumId, true)

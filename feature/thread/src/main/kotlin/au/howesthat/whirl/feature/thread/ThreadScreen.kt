@@ -46,6 +46,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
+import au.howesthat.whirl.core.data.POSTS_PER_PAGE
+import au.howesthat.whirl.core.data.ThreadPageRepository
+import au.howesthat.whirl.core.data.pageOfPost
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -69,6 +74,8 @@ import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.PagePickerDialog
 import au.howesthat.whirl.core.ui.PostBodyView
 import au.howesthat.whirl.core.ui.ScrollThumb
+import au.howesthat.whirl.core.ui.rememberScrollThumb
+import au.howesthat.whirl.core.ui.scrollThumbDrag
 import androidx.compose.runtime.mutableIntStateOf
 import au.howesthat.whirl.core.ui.FindHighlight
 import au.howesthat.whirl.core.ui.OnFindShortcut
@@ -95,21 +102,74 @@ class ThreadNav(
     val openWatched: () -> Unit = {},
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * A thread, in pages or as one scroll ([ThreadRoute.scroll], else [scrollByDefault], the setting). The menu switches
+ * between the two, keeping the post at the top of the screen.
+ */
 @Composable
 fun ThreadScreen(
     route: ThreadRoute,
     navIcon: NavIcon,
     nav: ThreadNav,
-    viewModel: ThreadViewModel = hiltViewModel<ThreadViewModel, ThreadViewModel.Factory> { it.create(route) },
+    scrollByDefault: Boolean = false,
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-    val browser = rememberOpenInBrowser()
+    var scroll by rememberSaveable(route) { mutableStateOf(route.scroll ?: scrollByDefault) }
+    // After a switch: how many so far (a fresh view model each time) and the post to open at (null: the newest).
+    var switches by rememberSaveable(route) { mutableIntStateOf(0) }
+    var switchedAt by rememberSaveable(route) { mutableStateOf<Int?>(null) }
+    var switchedFilter by rememberSaveable(route) { mutableStateOf<String?>(null) }
+    val opened = if (switches == 0) route else route.switchedTo(switchedAt).copy(filter = switchedFilter)
     val snackbar = remember { SnackbarHostState() }
-    val failedText = stringResource(R.string.link_failed)
+    val key = "${if (scroll) "scroll" else "pages"}:$switches"
 
-    LaunchedEffect(viewModel) {
-        viewModel.navigation.collect { event ->
+    // The top bars below are drawn inside the content and pad for the status bar themselves.
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
+        contentWindowInsets = ScaffoldDefaults.contentWindowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+    ) { outer ->
+        if (scroll) {
+            val viewModel = hiltViewModel<ScrollThreadViewModel, ScrollThreadViewModel.Factory>(key = key) { it.create(opened) }
+            ThreadEvents(viewModel.navigation, nav, snackbar)
+            ScrollThread(viewModel, navIcon, nav.openWatched, onReadInPages = { top ->
+                switchedAt = top
+                switchedFilter = null
+                switches++
+                scroll = false
+            }, Modifier.padding(outer))
+        } else {
+            val viewModel = hiltViewModel<ThreadViewModel, ThreadViewModel.Factory>(key = key) { it.create(opened) }
+            ThreadEvents(viewModel.navigation, nav, snackbar, onReadFiltered = { filter ->
+                switchedAt = viewModel.topPost()
+                switchedFilter = filter.code
+                switches++
+                scroll = true
+            })
+            PagedThread(viewModel, navIcon, nav, onReadAsScroll = { top ->
+                switchedAt = top
+                switchedFilter = null
+                switches++
+                scroll = true
+            }, Modifier.padding(outer))
+        }
+    }
+}
+
+/** The route after switching modes: opening at post [post], or at the newest post when null. */
+internal fun ThreadRoute.switchedTo(post: Int?): ThreadRoute =
+    if (post == null) copy(page = ThreadPageRepository.LAST_PAGE, scrollToPost = null, scrollToReply = null)
+    else copy(page = pageOfPost(post), scrollToPost = post, scrollToReply = null)
+
+@Composable
+private fun ThreadEvents(
+    events: kotlinx.coroutines.flow.Flow<ThreadEvent>,
+    nav: ThreadNav,
+    snackbar: SnackbarHostState,
+    onReadFiltered: (ReaderFilter) -> Unit = {},
+) {
+    val browser = rememberOpenInBrowser()
+    val failedText = stringResource(R.string.link_failed)
+    LaunchedEffect(events) {
+        events.collect { event ->
             when (event) {
                 is ThreadEvent.OpenThread -> nav.openThread(event.route)
                 is ThreadEvent.OpenForum -> nav.openForum(event.forum)
@@ -118,18 +178,27 @@ fun ThreadScreen(
                 // Launched: showSnackbar suspends until the snackbar goes, which would hold back the next event.
                 is ThreadEvent.Failed -> launch { snackbar.showSnackbar(failedText) }
                 ThreadEvent.Back -> nav.back()
+                is ThreadEvent.ReadFiltered -> onReadFiltered(event.filter)
             }
         }
     }
+}
 
-    // The top bars below are drawn inside the content and pad for the status bar themselves.
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbar) },
-        contentWindowInsets = ScaffoldDefaults.contentWindowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
-    ) { outer ->
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PagedThread(
+    viewModel: ThreadViewModel,
+    navIcon: NavIcon,
+    nav: ThreadNav,
+    onReadAsScroll: (topPost: Int?) -> Unit,
+    modifier: Modifier,
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val browser = rememberOpenInBrowser()
+    Box(modifier) {
         val start = state.startPage
         if (start == null) {
-            Column(Modifier.padding(outer)) {
+            Column {
                 TopAppBar(colors = whirlTopBarColors(), title = { Text(state.title.orEmpty()) }, navigationIcon = { NavIconButton(navIcon) }, windowInsets = TopBarInsets)
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     val failed = state.error
@@ -141,7 +210,7 @@ fun ThreadScreen(
                 }
             }
         } else {
-            ThreadPager(start, state, navIcon, nav.openWatched, viewModel, Modifier.padding(outer))
+            ThreadPager(start, state, navIcon, nav.openWatched, onReadAsScroll, viewModel, Modifier)
         }
     }
 }
@@ -164,6 +233,7 @@ private fun ThreadPager(
     state: ThreadUiState,
     navIcon: NavIcon,
     onWatched: () -> Unit,
+    onReadAsScroll: (topPost: Int?) -> Unit,
     viewModel: ThreadViewModel,
     modifier: Modifier,
 ) {
@@ -174,6 +244,7 @@ private fun ThreadPager(
     val myUserId by viewModel.myUserId.collectAsStateWithLifecycle()
     val firstUnread by viewModel.firstUnread.collectAsStateWithLifecycle()
     val isWatched by viewModel.isWatched.collectAsStateWithLifecycle()
+    val isMuted by viewModel.isMuted.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val browser = rememberOpenInBrowser()
     var picking by remember { mutableStateOf(false) }
@@ -233,8 +304,10 @@ private fun ThreadPager(
                 ThreadMenu(
                     isWatched = isWatched,
                     onWatchAction = viewModel::perform,
+                    isMuted = isMuted,
+                    onSetMuted = viewModel::setMuted,
                     myUserId = myUserId,
-                    onUsersPosts = viewModel::showUsersPosts,
+                    onUsersPosts = { viewModel.showMyPosts() },
                     onOpPosts = viewModel::showOpPosts,
                     onModeratorPosts = viewModel::showModeratorPosts,
                     onRepPosts = viewModel::showRepPosts,
@@ -245,6 +318,7 @@ private fun ThreadPager(
                     onOpenInBrowser = { browser(viewModel.threadUrl(pager.currentPage + 1)) },
                     onWatched = onWatched,
                     onFind = { viewModel.setFindQuery("") },
+                    onSwitchMode = { onReadAsScroll(viewModel.topPost() ?: ((pager.currentPage) * POSTS_PER_PAGE + 1)) },
                 )
             },
         )
@@ -306,8 +380,18 @@ private fun PageContent(page: Int, viewModel: ThreadViewModel, context: PageCont
     LaunchedEffect(list) {
         list.interactionSource.interactions.collect { if (it is DragInteraction.Start) viewModel.userScrolled() }
     }
+    // The post at the top of the page, for switching to the scroll reader.
+    LaunchedEffect(list, loaded) {
+        val posts = loaded?.posts ?: return@LaunchedEffect
+        snapshotFlow { list.firstVisibleItemIndex }.collect { i ->
+            posts.getOrNull((i - headerCount).coerceIn(0, posts.lastIndex))?.let { viewModel.setTopPost(page, it.post.number) }
+        }
+    }
 
-    PullToRefreshBox(isRefreshing = refreshing, onRefresh = { viewModel.refresh() }, modifier = Modifier.fillMaxSize()) {
+    val thumb = rememberScrollThumb(list) { index ->
+        loaded?.posts?.getOrNull((index - headerCount).coerceAtLeast(0))?.let { "#${it.post.number}" }
+    }
+    PullToRefreshBox(isRefreshing = refreshing, onRefresh = { viewModel.refresh() }, modifier = Modifier.fillMaxSize().scrollThumbDrag(thumb)) {
         when {
             loaded == null && error != null -> ErrorState(
                 error,
@@ -319,7 +403,7 @@ private fun PageContent(page: Int, viewModel: ThreadViewModel, context: PageCont
             else -> {
                 PostList(loaded, page, list, error, textStyle, context, viewModel)
                 // At the edge of the pane, not of the readable-width column of posts.
-                ScrollThumb(list, Modifier.align(Alignment.CenterEnd))
+                ScrollThumb(thumb, Modifier.align(Alignment.CenterEnd))
             }
         }
     }
@@ -400,7 +484,7 @@ private fun PostList(
                         onLink = viewModel::openLink,
                         onQuote = { viewModel.openQuote(it, ui) },
                         onUser = { viewModel.openUser(post.post.author.id) },
-                        onUsersPosts = { viewModel.showUsersPosts(post.post.author.id) },
+                        onUsersPosts = { viewModel.showUsersPosts(post.post.author.id, post.post.author.name) },
                         onReply = { browser(viewModel.replyToPostUrl(post.post)) },
                         onEdit = { browser(viewModel.editPostUrl(post.post)) },
                         onReport = { browser(viewModel.reportPostUrl(post.post)) },

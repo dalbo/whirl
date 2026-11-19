@@ -35,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import au.howesthat.whirl.core.data.NewsRepository
 import au.howesthat.whirl.core.model.NewsItem
+import au.howesthat.whirl.core.network.WhirlpoolApi
 import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.ui.rememberNow
 import au.howesthat.whirl.core.ui.ErrorState
@@ -84,8 +85,8 @@ fun filterNews(days: List<NewsDay>, query: TextQuery): List<NewsDay> =
 data class NewsState(val days: List<NewsDay>?, val updatedAt: Instant?)
 
 @HiltViewModel
-class NewsViewModel @Inject constructor(private val repo: NewsRepository, savedState: SavedStateHandle) : ViewModel() {
-    private val screen = ListScreenState(viewModelScope, savedState)
+class NewsViewModel @Inject constructor(private val repo: NewsRepository, savedState: SavedStateHandle, api: WhirlpoolApi) : ViewModel() {
+    private val screen = ListScreenState(viewModelScope, savedState).apply { retryWhenKeyAccepted(api.keyRejected) { repo.refresh(force = true) } }
     val query: StateFlow<String?> = screen.query
     val refreshing: StateFlow<Boolean> = screen.refreshing
     val error: StateFlow<Throwable?> = screen.error

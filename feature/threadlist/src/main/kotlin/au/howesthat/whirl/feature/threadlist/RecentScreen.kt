@@ -55,7 +55,7 @@ class RecentViewModel @Inject constructor(deps: ListDeps, private val repo: Rece
                 repo.threads(days).toListState { list ->
                     // 2.14.12: "ignore my own replies" hides threads whose last post is mine.
                     groupByForum(list.filterNot { ignoreOwn && it.lastPoster.id == me }.map { it.toItem() })
-                }
+                }.map { it.copy(listKey = days) } // another number of days is another list, shown from the top
             }
             .filtered(),
     )

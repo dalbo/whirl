@@ -13,7 +13,8 @@ permissions:
 env:
   # Google Play's minimum targetSdk for new apps and updates (raised each August).
   PLAY_MIN_TARGET_SDK: 36
-  # Play track for each tag's AAB: "alpha" is the built-in closed-testing track (docs/play-console.md).
+  # Play track for each tag's AAB: "alpha" is the built-in closed-testing track (docs/play-console.md). promote.yml
+  # then moves a tested release to production.
   PLAY_TRACK: alpha
 
 jobs:

@@ -94,6 +94,7 @@ class CheckHistory @Inject constructor(
     private val dao: CheckLogDao,
     private val settings: SettingsRepository,
     private val clock: Clock,
+    private val alarm: CheckAlarm,
 ) {
     val records: Flow<List<CheckRecord>> = dao.observe().map { rows -> rows.map { it.toRecord() } }
 
@@ -103,6 +104,9 @@ class CheckHistory @Inject constructor(
             .map { infos -> infos.firstOrNull { !it.state.isFinished } }
 
     fun now(): Instant = clock.instant()
+
+    /** When the alarm next starts a check, or null when none is set. */
+    fun nextAlarm(): Instant? = alarm.next()
 
     /** Records one check that started at [startedAt]. */
     suspend fun record(startedAt: Instant, attempt: Int, outcome: CheckOutcome) {
