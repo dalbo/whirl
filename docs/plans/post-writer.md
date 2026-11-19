@@ -153,6 +153,14 @@ are in `whirl.db` and deliberately not backed up.
   thread view models). A snackbar says "Copied: paste into the reply box", with **Delete draft**. The draft stays until
   deleted, so a failed post loses nothing.
 
+*As built (PR D):* `:feature:writer`. `WriterViewModel` loads the draft (the field is read-only until then), attaches
+itself as the thread's writer, saves 500 ms after typing stops, on Copy and reply, and in `onCleared` through the
+application scope; the preview converts 250 ms after typing stops, on the default dispatcher. `Formatting` holds the
+bar's operations as pure functions on text and selection (`FormattingTest`). The bar uses text labels with TalkBack
+descriptions (only the core icon set is in the build); "More codes" lists the rest. Undo and redo are the text field's
+own. Copy and reply copies, saves, opens the reply page, and offers Delete draft in the snackbar. Not yet: the
+monospace toggle (§5). Nothing opens the writer until PR E1.
+
 ## 6. Entry points: PRs E1 and E2
 - **E1** (`:feature:thread`): post menu **Quote** (pages and scroll reader) adds `Quote.of(post)` to that thread's
   draft, with a snackbar "Quoted · 3 quotes in your reply" and **Open**. Thread menu **Write a reply** opens the
