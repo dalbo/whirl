@@ -1,5 +1,7 @@
 package au.howesthat.whirl.core.whirlcode
 
+import au.howesthat.whirl.core.model.PostBody
+
 /**
  * WhirlCode, Whirlpool's post markup (`fixtures/html/wiki_whirlcode.html`), turned into the HTML the site renders for
  * it, so the post writer's preview goes through the same parser and renderer as every post
@@ -12,6 +14,9 @@ package au.howesthat.whirl.core.whirlcode
  */
 object WhirlCode {
     fun toHtml(source: String): String = BlockWriter(source.replace("\r\n", "\n").replace('\r', '\n')).write()
+
+    /** A parsed post as WhirlCode: the reverse of [toHtml] through `PostBodyParser`, as near as WhirlCode can write it. */
+    fun fromBody(body: PostBody): String = FromBody.write(body)
 }
 
 /** What a structural code opens: `:` an indent, `>` a reply quote, `*` and `#` a list level. */

@@ -72,6 +72,10 @@ internal object Inline {
         /** Positions where a code's closer was looked for and not found, so a run of unclosed codes stays linear. */
         private val failed = HashSet<Long>()
 
+        /** Where each closer last occurs: an opener after it can never close, so it is text at once. */
+        private val lastCloser = HashMap<String, Int>()
+        private fun canClose(close: String, from: Int) = lastCloser.getOrPut(close) { s.lastIndexOf(close) } >= from
+
         fun run(): String = parse(0, null)!!.first
 
         /**
@@ -138,7 +142,7 @@ internal object Inline {
                             continue
                         }
                     } else {
-                        val inner = parse(i + 2, close, depth + 1)
+                        val inner = if (canClose(close, i + 2)) parse(i + 2, close, depth + 1) else null
                         if (inner != null) {
                             emit(i, wrap(next, inner.first))
                             i = inner.second
