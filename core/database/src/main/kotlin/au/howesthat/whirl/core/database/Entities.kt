@@ -283,3 +283,15 @@ data class ArchiveIndexEntity(
     @ColumnInfo(name = "rep_of") val repOf: String?,
     @ColumnInfo(name = "is_op") val isOp: Boolean,
 )
+
+/**
+ * A reply being written in the post writer, one per thread (`docs/plans/post-writer.md` §4). The user's own writing:
+ * not cleared with the account's data, and (like the rest of this database) not backed up.
+ */
+@Entity(tableName = "drafts")
+data class DraftEntity(
+    @PrimaryKey @ColumnInfo(name = "thread_id") val threadId: String,
+    @ColumnInfo(name = "thread_title") val threadTitle: String,
+    val text: String,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long,
+)

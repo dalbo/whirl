@@ -2,7 +2,8 @@
 <!--
     Android 12+. Here <include> takes no requireFlags (it would be ignored, and the API key would go up unencrypted), so
     cloud backup as a whole needs end-to-end encryption: a phone with no screen lock backs up nothing, and Settings
-    says so. Only what is listed is backed up. Left out: whirl.db (a cache, fetched again) and shared prefs (the check
+    says so. Only what is listed is backed up. Left out: whirl.db (a cache, fetched again, and the post
+    writer's drafts, which are short-lived and deliberately not backed up) and shared prefs (the check
     alarm, per boot). docs/plans/settings-backup.md; BackupRulesTest checks these files.
 -->
 <data-extraction-rules>

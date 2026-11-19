@@ -215,4 +215,23 @@ class MigrationTest {
             db.close()
         }
     }
+
+    @Test
+    fun `v8 to v9 adds the drafts and keeps the rest`() = runTest {
+        helper.createDatabase(name, 8).use { db ->
+            db.execSQL("INSERT INTO fetch_log (`key`, fetched_at) VALUES ('forums', 123)")
+        }
+        helper.runMigrationsAndValidate(name, 9, false, *MIGRATIONS).close()
+
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), WhirlDatabase::class.java, name)
+            .addMigrations(*MIGRATIONS)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            assertEquals(123L, db.fetchLogDao().fetchedAt("forums"))
+            assertEquals(emptyList(), db.draftDao().observeAll().first())
+        } finally {
+            db.close()
+        }
+    }
 }

@@ -34,8 +34,9 @@ import javax.inject.Singleton
         ArchivePageEntity::class,
         ArchivePostEntity::class,
         ArchiveIndexEntity::class,
+        DraftEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
     autoMigrations = [
         // v2: thread page cache (thread_pages, posts).
@@ -51,6 +52,8 @@ import javax.inject.Singleton
         // posts.rep_of.
         AutoMigration(from = 6, to = 7),
         // v8 (MIGRATION_7_8): favourite_forums is no longer declared.
+        // v9 (v1.11): the post writer's drafts.
+        AutoMigration(from = 8, to = 9),
     ],
 )
 abstract class WhirlDatabase : RoomDatabase() {
@@ -62,9 +65,13 @@ abstract class WhirlDatabase : RoomDatabase() {
     abstract fun threadPageDao(): ThreadPageDao
     abstract fun checkLogDao(): CheckLogDao
     abstract fun pendingWatchDao(): PendingWatchDao
+    abstract fun draftDao(): DraftDao
     abstract fun archiveDao(): ArchiveDao
 
-    /** Clears everything tied to the signed-in account (on log out or key change), in one transaction. */
+    /**
+     * Clears everything tied to the signed-in account (on log out or key change), in one transaction. Not drafts: they
+     * are the user's writing, not the account's data.
+     */
     suspend fun clearAccountData() = withTransaction {
         threadDao().clearSource(ThreadSource.WATCHED, "unread")
         threadDao().clearSource(ThreadSource.WATCHED, "all")
@@ -151,6 +158,7 @@ object DatabaseModule {
     @Provides fun archiveDao(db: WhirlDatabase) = db.archiveDao()
     @Provides fun checkLogDao(db: WhirlDatabase) = db.checkLogDao()
     @Provides fun pendingWatchDao(db: WhirlDatabase) = db.pendingWatchDao()
+    @Provides fun draftDao(db: WhirlDatabase) = db.draftDao()
 }
 
 @Module

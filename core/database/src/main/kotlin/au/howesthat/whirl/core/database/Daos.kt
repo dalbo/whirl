@@ -492,3 +492,22 @@ interface ArchiveDao {
         evict(keep, openThreadId = page.threadId)
     }
 }
+
+@Dao
+interface DraftDao {
+    @Query("SELECT * FROM drafts WHERE thread_id = :threadId")
+    fun observe(threadId: String): Flow<DraftEntity?>
+
+    @Query("SELECT * FROM drafts WHERE thread_id = :threadId")
+    suspend fun get(threadId: String): DraftEntity?
+
+    /** Newest first, for Drafts. */
+    @Query("SELECT * FROM drafts ORDER BY updated_at DESC")
+    fun observeAll(): Flow<List<DraftEntity>>
+
+    @Upsert
+    suspend fun upsert(draft: DraftEntity)
+
+    @Query("DELETE FROM drafts WHERE thread_id = :threadId")
+    suspend fun delete(threadId: String)
+}
