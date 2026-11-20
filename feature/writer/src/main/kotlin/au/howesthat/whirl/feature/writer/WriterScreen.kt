@@ -2,6 +2,8 @@ package au.howesthat.whirl.feature.writer
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.os.Build
+import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.pager.HorizontalPager
@@ -58,6 +60,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
@@ -83,21 +86,38 @@ fun WriterScreen(route: WriterRoute, navIcon: NavIcon, onClosed: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val copied = stringResource(R.string.writer_copied)
+    val backFromReply = stringResource(R.string.writer_back_from_reply)
     val deleteLabel = stringResource(R.string.writer_delete_draft)
     val clipLabel = stringResource(R.string.writer_clip_label)
+
+    // Set by Copy and reply; on the way back from the reply page, the offer to delete the draft shows. Saveable, so it
+    // survives the app being killed while the user is on the site.
+    var awaitingReturn by rememberSaveable { mutableStateOf(false) }
 
     fun copyAndReply() {
         viewModel.saveNow()
         val clipboard = context.getSystemService(ClipboardManager::class.java)
         clipboard.setPrimaryClip(ClipData.newPlainText(clipLabel, viewModel.text.text.toString()))
+        // Android 13+ shows its own preview of what was copied; older versions show nothing, so say so there.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) Toast.makeText(context, copied, Toast.LENGTH_SHORT).show()
+        awaitingReturn = true
         browser(viewModel.replyUrl())
-        scope.launch {
-            val result = snackbar.showSnackbar(copied, actionLabel = deleteLabel, withDismissAction = true, duration = SnackbarDuration.Long)
-            if (result == SnackbarResult.ActionPerformed) {
-                viewModel.deleteDraft()
-                onClosed()
+    }
+
+    // Each time the writer comes back to the front: if that is from the reply page, offer to delete the draft. A snackbar
+    // shown when the browser opened was gone before anyone could see it (Dallin, 2026-11-20).
+    LifecycleResumeEffect(Unit) {
+        if (awaitingReturn) {
+            awaitingReturn = false
+            scope.launch {
+                val result = snackbar.showSnackbar(backFromReply, actionLabel = deleteLabel, withDismissAction = true, duration = SnackbarDuration.Long)
+                if (result == SnackbarResult.ActionPerformed) {
+                    viewModel.deleteDraft()
+                    onClosed()
+                }
             }
         }
+        onPauseOrDispose {}
     }
 
     Scaffold(
