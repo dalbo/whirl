@@ -1,6 +1,6 @@
 # Plan: the post writer (v1.11)
 
-Status: **planned and reviewed** (2026-11-19), not started. Idea from Dallin, 2026-11-08; decisions below from
+Status: **planned and reviewed** (2026-11-19); **PRs A and B built** (2026-11-19). Idea from Dallin, 2026-11-08; decisions below from
 2026-11-19. v1.10 is settings export and import (`settings-backup.md` Part 2), so this is the next feature release.
 
 Whirlpool's reply box takes raw WhirlCode or a little HTML, with a preview but no formatting buttons. On a phone, a
@@ -84,6 +84,13 @@ unescaped HTML), not for matching the site.
   - **safety on the HTML string**, not on `PostBody` (the parser ignores attributes such as `onclick`, so a `PostBody`
     comparison cannot catch them): no `<script>`, no attribute but `href` and `class`, no `javascript:` link.
 
+*As built (PR A):* `Inline.kt` (bracket codes by recursive descent, at most 32 deep; allowed tags; entities; dashes),
+`Links.kt` (the link rules: from a survey of every link in the fixtures, external links keep their text, forum links
+show their path, `whrl.pl` drops its scheme, bare `www.` gets `http://`; the "host only" texts were custom labels, not
+shortening) and `WhirlCode.kt` (the line pass). Blank lines end a paragraph but close no quote, list or table, as the
+test post shows; a single newline is `<br>`. Guesses waiting for §1.4: trailing punctuation outside links, an
+unclosed code left as typed, over-limit structural codes as text, one `<pre>` per `$ ` line.
+
 ## 3. Post to WhirlCode, for quoting: PR B
 `WhirlCode.fromBody(body: PostBody): String`, the reverse, so a quote carries the post's formatting and links.
 - A link whose text is its URL, or the site's shortened form of it (§1.2), becomes the bare URL; wiki, Google and
@@ -99,6 +106,15 @@ unescaped HTML), not for matching the site.
   attribution and the quoted paragraphs after it, and `wcrep` spans within a paragraph. Lists, tables and code keep
   their structure. A post that is only quotes gives just the attribution line.
 - No Quote on hidden or deleted posts.
+
+*As built (PR B):* `FromBody.kt` and `Quote.kt`. Links go back to the form the site autolinks (email, `[?…?]`,
+`[[…]]`, forum paths, `whrl.pl`, `www.`, a bare URL whose text is the URL) when nothing follows that the autolink would
+swallow, else `<a href>`. Text the converter would act on (`[*`, `*]`, a spaced hyphen, `://`, `@`, `www.`, a line
+starting with a structure code) is written as entities. Inherited styles (a `>` quote's colour, a header cell's bold) are
+not written again. Of the 2,591 posts in the fixtures, 2,586 round-trip exactly; the five that do not are in
+`FromBodyTest.KNOWN` with why (a URL holding `<` and `>`; 2009 markup with whitespace-only lines). Not writable and so
+not round-tripped: images, underline, a line break in a list item, code or a rule inside a quote, an attribution
+inside a quote, two quotes or lists of the same kind next to each other (a blank line does not separate them).
 
 ## 4. Drafts: Room v9, PR C
 - `drafts(thread_id TEXT PRIMARY KEY, thread_title TEXT, text TEXT, updated_at INTEGER)`, with a migration test.
