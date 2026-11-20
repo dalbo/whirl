@@ -42,4 +42,6 @@
     <string name="drafts_empty">No drafts. Quote a post or choose Write a reply in a thread\'s menu to start one.</string>
     <string name="drafts_deleted">Draft deleted</string>
     <string name="drafts_undo">Undo</string>
+    <string name="writer_outdent">List item out a level</string>
+    <string name="writer_indent_list">List item in a level</string>
 </resources>

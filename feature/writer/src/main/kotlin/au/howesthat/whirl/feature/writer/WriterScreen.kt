@@ -12,7 +12,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.verticalScroll
@@ -48,9 +49,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -128,7 +128,9 @@ fun WriterScreen(route: WriterRoute, navIcon: NavIcon, onClosed: () -> Unit) {
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         // Side by side when the writer itself is wide enough, not the window: beside a list it may be narrow.
-        BoxWithConstraints(Modifier.padding(padding).fillMaxSize().imePadding()) {
+        // consumeWindowInsets: the scaffold's padding already holds the navigation bar, which imePadding would add again
+        // (a gap above the keyboard, as seen after a dialog closed).
+        BoxWithConstraints(Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize().imePadding()) {
             if (maxWidth >= SIDE_BY_SIDE) {
                 Row(Modifier.fillMaxSize()) {
                     Editor(viewModel, loaded, Modifier.weight(1f))
@@ -180,22 +182,24 @@ private fun Editor(viewModel: WriterViewModel, loaded: Boolean, modifier: Modifi
             lineLimits = TextFieldLineLimits.MultiLine(),
         )
         HorizontalDivider()
-        // The formatting bar, above the keyboard: each button wraps the selection, or inserts a pair at the cursor.
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp)) {
+        // The formatting bar, above the keyboard: each button wraps the selection, or inserts a pair at the cursor; the
+        // line buttons act on every line the selection touches. Icons in 48 dp targets, no padding between them.
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
             fun wrap(open: String, close: String) = viewModel.format { Formatting.wrap(it, open, close) }
-            fun prefix(code: Char) = viewModel.format { Formatting.toggleLinePrefix(it, code) }
-            BarButton("B", R.string.writer_bold) { wrap("[*", "*]") }
-            BarButton("I", R.string.writer_italic) { wrap("[/", "/]") }
-            BarButton("“”", R.string.writer_forum_quote) { wrap("[\"", "\"]") }
-            BarButton(">", R.string.writer_reply_quote) { prefix('>') }
-            BarButton("▓", R.string.writer_spoiler) { wrap("[_", "_]") }
-            BarButton("🔗", R.string.writer_link) { link = true }
-            BarButton("•", R.string.writer_bullets) { prefix('*') }
-            BarButton("1.", R.string.writer_numbers) { prefix('#') }
-            BarButton("{ }", R.string.writer_code) { viewModel.format { Formatting.block(it, "$$\n\n$$", cursorAt = 3) } }
-            BarButton("⋯", R.string.writer_more_codes) { more = true }
-            BarButton("↶", R.string.writer_undo, enabled = viewModel.text.undoState.canUndo) { viewModel.text.undoState.undo() }
-            BarButton("↷", R.string.writer_redo, enabled = viewModel.text.undoState.canRedo) { viewModel.text.undoState.redo() }
+            BarButton(R.drawable.writer_bold, R.string.writer_bold) { wrap("[*", "*]") }
+            BarButton(R.drawable.writer_italic, R.string.writer_italic) { wrap("[/", "/]") }
+            BarButton(R.drawable.writer_link, R.string.writer_link) { link = true }
+            BarButton(R.drawable.writer_forum_quote, R.string.writer_forum_quote) { wrap("[\"", "\"]") }
+            BarButton(R.drawable.writer_reply_quote, R.string.writer_reply_quote) { viewModel.format { Formatting.toggleLinePrefix(it, '>') } }
+            BarButton(R.drawable.writer_bullets, R.string.writer_bullets) { viewModel.format { Formatting.toggleList(it, '*') } }
+            BarButton(R.drawable.writer_numbers, R.string.writer_numbers) { viewModel.format { Formatting.toggleList(it, '#') } }
+            BarButton(R.drawable.writer_outdent, R.string.writer_outdent) { viewModel.format { Formatting.nestList(it, deeper = false) } }
+            BarButton(R.drawable.writer_indent, R.string.writer_indent_list) { viewModel.format { Formatting.nestList(it, deeper = true) } }
+            BarButton(R.drawable.writer_spoiler, R.string.writer_spoiler) { wrap("[_", "_]") }
+            BarButton(R.drawable.writer_code, R.string.writer_code) { viewModel.format { Formatting.block(it, "$$\n\n$$", cursorAt = 3) } }
+            BarButton(R.drawable.writer_more, R.string.writer_more_codes) { more = true }
+            BarButton(R.drawable.writer_undo, R.string.writer_undo, enabled = viewModel.text.undoState.canUndo) { viewModel.text.undoState.undo() }
+            BarButton(R.drawable.writer_redo, R.string.writer_redo, enabled = viewModel.text.undoState.canRedo) { viewModel.text.undoState.redo() }
         }
     }
     if (link) LinkDialog(onDismiss = { link = false }) { url, label -> viewModel.format { Formatting.link(it, url, label) } }
@@ -203,10 +207,9 @@ private fun Editor(viewModel: WriterViewModel, loaded: Boolean, modifier: Modifi
 }
 
 @Composable
-private fun BarButton(label: String, description: Int, enabled: Boolean = true, onClick: () -> Unit) {
-    val spoken = stringResource(description)
-    TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).semantics { contentDescription = spoken }) {
-        Text(label)
+private fun BarButton(icon: Int, description: Int, enabled: Boolean = true, onClick: () -> Unit) {
+    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(48.dp)) {
+        Icon(painterResource(icon), contentDescription = stringResource(description))
     }
 }
 
