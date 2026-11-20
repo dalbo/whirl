@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Icon
@@ -64,6 +65,7 @@ import au.howesthat.whirl.core.ui.rememberNow
 import au.howesthat.whirl.core.ui.ActionsMenu
 import au.howesthat.whirl.core.ui.EmptyState
 import au.howesthat.whirl.core.ui.LocalAppStyle
+import au.howesthat.whirl.core.ui.LocalDraftThreads
 import au.howesthat.whirl.core.ui.MenuAction
 import au.howesthat.whirl.core.ui.RowPosition
 import au.howesthat.whirl.core.ui.SectionHeading
@@ -228,6 +230,7 @@ fun ThreadRowItem(
     selected: Boolean = false,
 ) {
     var menu by remember { mutableStateOf(false) }
+    val hasDraft = item.id in LocalDraftThreads.current
     val openable = item.openId != null
     val inactive = item.kind != RowKind.THREAD
     val actions = watchActions.map { action -> MenuAction(watchActionLabel(action)) { onWatchAction(action) } } +
@@ -278,9 +281,10 @@ fun ThreadRowItem(
                 )
             },
             supportingContent = { Text(details(item, now), maxLines = 2, overflow = TextOverflow.Ellipsis) },
-            trailingContent = if (item.unreadCount > 0 || muted == true) {
+            trailingContent = if (item.unreadCount > 0 || muted == true || hasDraft) {
                 {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (hasDraft) DraftMark()
                         if (muted == true) MutedMark()
                         if (item.unreadCount > 0) UnreadCount(item.unreadCount, accent)
                     }
@@ -317,6 +321,11 @@ private fun UnreadCount(count: Int, accent: Boolean) {
 }
 
 /** A bell with a line through it: this watched thread does not notify. */
+@Composable
+private fun DraftMark() {
+    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.row_draft), modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+}
+
 @Composable
 private fun MutedMark() {
     val color = MaterialTheme.colorScheme.onSurfaceVariant

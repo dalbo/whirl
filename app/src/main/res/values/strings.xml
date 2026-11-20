@@ -43,4 +43,5 @@
     <string name="notify_prompt_body">Watched-thread alerts are on, but Android has not let Whirl show notifications on this phone yet. You can change this later in Settings › Notifications.</string>
     <string name="notify_prompt_allow">Allow</string>
     <string name="notify_prompt_later">Not now</string>
+    <string name="nav_drafts">Drafts</string>
 </resources>

@@ -177,6 +177,11 @@ Quote is left off hidden and deleted posts. `ThreadNav.openWriter` pushes the `W
 `:feature:thread` does not depend on `:feature:writer`. "Reply to this post" (`replyTo`) is not wired yet: Write a reply
 and the chip open the thread's draft, which replies to the thread.
 
+*As built (PR E2):* `DraftsRoute`/`DraftsScreen` (`:feature:writer`), a drawer destination after Watched and a list
+pane, so a draft opens beside it in two panes: title, first line, age; tap opens the writer; swipe (or TalkBack's
+Delete action) deletes, with Undo. The rows' mark is `LocalDraftThreads` (`:core:ui`), provided once from
+`MainViewModel`, so no list's view model changed; `ThreadRowItem` shows a pencil beside the muted and unread marks.
+
 ## 7. Order (one PR each; `main` stays releasable)
 Step 0 (§1.4, Dallin posts the edge cases; can run alongside A) → A converter → B reverse and quotes → C drafts → D
 writer → E1 → E2. Nothing shows in the app until E1, so A–D merge as they are ready. Then a release

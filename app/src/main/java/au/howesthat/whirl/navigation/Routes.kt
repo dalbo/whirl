@@ -5,6 +5,7 @@ import au.howesthat.whirl.core.data.Homepage
 import au.howesthat.whirl.core.ui.ListPaneRoute
 import au.howesthat.whirl.feature.settings.SettingsPageRoute
 import au.howesthat.whirl.feature.thread.ThreadRoute
+import au.howesthat.whirl.feature.writer.DraftsRoute
 import au.howesthat.whirl.feature.writer.WriterRoute
 import au.howesthat.whirl.feature.threadlist.ForumRoute
 import au.howesthat.whirl.feature.threadlist.SearchRoute
@@ -53,5 +54,6 @@ val RouteSerializers = SerializersModule {
         subclass(SearchRoute::class)
         subclass(UserRoute::class)
         subclass(WriterRoute::class)
+        subclass(DraftsRoute::class)
     }
 }
