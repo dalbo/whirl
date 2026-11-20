@@ -4,6 +4,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -41,6 +43,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +52,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -138,13 +142,19 @@ fun WriterScreen(route: WriterRoute, navIcon: NavIcon, onClosed: () -> Unit) {
                     Preview(viewModel, Modifier.weight(1f))
                 }
             } else {
-                var tab by rememberSaveable { mutableStateOf(0) }
+                // Write and Preview side by side in a pager: tap a tab or swipe between them (Dallin, 2026-11-20).
+                val pages = rememberPagerState { 2 }
+                val keyboard = LocalSoftwareKeyboardController.current
+                // The keyboard would cover the preview: it goes when Preview settles, and comes back on a tap in Write.
+                LaunchedEffect(pages.settledPage) { if (pages.settledPage == 1) keyboard?.hide() }
                 Column(Modifier.fillMaxSize()) {
-                    PrimaryTabRow(selectedTabIndex = tab) {
-                        Tab(tab == 0, { tab = 0 }, text = { Text(stringResource(R.string.writer_tab_write)) })
-                        Tab(tab == 1, { tab = 1 }, text = { Text(stringResource(R.string.writer_tab_preview)) })
+                    PrimaryTabRow(selectedTabIndex = pages.currentPage) {
+                        Tab(pages.currentPage == 0, { scope.launch { pages.animateScrollToPage(0) } }, text = { Text(stringResource(R.string.writer_tab_write)) })
+                        Tab(pages.currentPage == 1, { scope.launch { pages.animateScrollToPage(1) } }, text = { Text(stringResource(R.string.writer_tab_preview)) })
                     }
-                    if (tab == 0) Editor(viewModel, loaded, Modifier.weight(1f)) else Preview(viewModel, Modifier.weight(1f))
+                    HorizontalPager(pages, Modifier.weight(1f).fillMaxWidth()) { page ->
+                        if (page == 0) Editor(viewModel, loaded, Modifier.fillMaxSize()) else Preview(viewModel, Modifier.fillMaxSize())
+                    }
                 }
             }
         }
