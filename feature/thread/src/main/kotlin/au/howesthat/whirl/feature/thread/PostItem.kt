@@ -105,7 +105,11 @@ internal fun PostItem(
 ) {
     val p = post.post
     var menu by remember { mutableStateOf(false) }
+    val draft = LocalReplyDraft.current
     val actions = listOfNotNull(
+        // Into the thread's reply draft (post writer); not for a post with nothing of its own to quote.
+        MenuAction(stringResource(R.string.post_quote), onClick = { draft?.quote?.invoke(post) })
+            .takeIf { draft != null && p.hiddenReason == null && !p.isDeleted },
         MenuAction(stringResource(R.string.post_reply), onClick = onReply),
         MenuAction(stringResource(R.string.post_edit), onClick = onEdit).takeIf { isMine },
         MenuAction(stringResource(R.string.post_user_info, p.author.name), onClick = onUser),

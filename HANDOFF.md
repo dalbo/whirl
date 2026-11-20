@@ -122,8 +122,8 @@ and chat bubbles pop up).
   pass (export, share, import on a second install; a v1.8 → v1.10 update keeps favourites). Not checked: the API 27
   emulator, password-manager fill.
 - **Post writer** (v1.10 with export and import; plan `docs/plans/post-writer.md`): write a reply with collected
-  quotes, a formatting bar and a live preview, then copy it into Whirlpool's reply page. PRs A–D built (converter both
-  ways, drafts, the writer screen); next E1 (Quote, "Write a reply") and E2 (Drafts list), then step 0 (an edge-case
+  quotes, a formatting bar and a live preview, then copy it into Whirlpool's reply page. PRs A–E1 built (converter both
+  ways, drafts, the writer screen, Quote and "Write a reply"); next E2 (Drafts list), then step 0 (an edge-case
   post for Dallin to post) and the phone pass.
 - **Notifications with the posts** (idea, 2026-11-12): today a check makes one API call (`get=watched`) and never
   loads a thread page. Fetching the page with the first unread post would let a notification expand to the next

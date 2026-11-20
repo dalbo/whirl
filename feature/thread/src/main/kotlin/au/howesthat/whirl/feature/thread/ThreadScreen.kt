@@ -100,6 +100,8 @@ class ThreadNav(
     val back: () -> Unit,
     /** The Watched threads list, straight from however deep the thread was reached. */
     val openWatched: () -> Unit = {},
+    /** The post writer for a thread (its id and title). */
+    val openWriter: (threadId: String, title: String) -> Unit = { _, _ -> },
 )
 
 /**
@@ -121,35 +123,41 @@ fun ThreadScreen(
     val opened = if (switches == 0) route else route.switchedTo(switchedAt).copy(filter = switchedFilter)
     val snackbar = remember { SnackbarHostState() }
     val key = "${if (scroll) "scroll" else "pages"}:$switches"
+    // The reply draft outlives a switch between pages and scroll: keyed by the thread alone.
+    val draft = hiltViewModel<ThreadDraftViewModel, ThreadDraftViewModel.Factory>(key = "draft:${route.threadId}") { it.create(route.threadId) }
+    val write = { nav.openWriter(route.threadId, draft.title) }
+    QuotedSnackbars(draft, snackbar, onOpen = write)
 
     // The top bars below are drawn inside the content and pad for the status bar themselves.
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
     ) { outer ->
-        if (scroll) {
-            val viewModel = hiltViewModel<ScrollThreadViewModel, ScrollThreadViewModel.Factory>(key = key) { it.create(opened) }
-            ThreadEvents(viewModel.navigation, nav, snackbar)
-            ScrollThread(viewModel, navIcon, nav.openWatched, onReadInPages = { top ->
-                switchedAt = top
-                switchedFilter = null
-                switches++
-                scroll = false
-            }, Modifier.padding(outer))
-        } else {
-            val viewModel = hiltViewModel<ThreadViewModel, ThreadViewModel.Factory>(key = key) { it.create(opened) }
-            ThreadEvents(viewModel.navigation, nav, snackbar, onReadFiltered = { filter ->
-                switchedAt = viewModel.topPost()
-                switchedFilter = filter.code
-                switches++
-                scroll = true
-            })
-            PagedThread(viewModel, navIcon, nav, onReadAsScroll = { top ->
-                switchedAt = top
-                switchedFilter = null
-                switches++
-                scroll = true
-            }, Modifier.padding(outer))
+        ProvideReplyDraft(draft, onWrite = write) {
+            if (scroll) {
+                val viewModel = hiltViewModel<ScrollThreadViewModel, ScrollThreadViewModel.Factory>(key = key) { it.create(opened) }
+                ThreadEvents(viewModel.navigation, nav, snackbar)
+                ScrollThread(viewModel, navIcon, nav.openWatched, onReadInPages = { top ->
+                    switchedAt = top
+                    switchedFilter = null
+                    switches++
+                    scroll = false
+                }, Modifier.padding(outer))
+            } else {
+                val viewModel = hiltViewModel<ThreadViewModel, ThreadViewModel.Factory>(key = key) { it.create(opened) }
+                ThreadEvents(viewModel.navigation, nav, snackbar, onReadFiltered = { filter ->
+                    switchedAt = viewModel.topPost()
+                    switchedFilter = filter.code
+                    switches++
+                    scroll = true
+                })
+                PagedThread(viewModel, navIcon, nav, onReadAsScroll = { top ->
+                    switchedAt = top
+                    switchedFilter = null
+                    switches++
+                    scroll = true
+                }, Modifier.padding(outer))
+            }
         }
     }
 }
@@ -194,6 +202,7 @@ private fun PagedThread(
     modifier: Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    ReplyDraftTitle(state.title)
     val browser = rememberOpenInBrowser()
     Box(modifier) {
         val start = state.startPage
@@ -300,6 +309,7 @@ private fun ThreadPager(
             },
             navigationIcon = { NavIconButton(navIcon) },
             actions = {
+                DraftChip()
                 IconButton(onClick = { viewModel.refresh() }) { Icon(Icons.Default.Refresh, stringResource(R.string.refresh)) }
                 ThreadMenu(
                     isWatched = isWatched,

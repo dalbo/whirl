@@ -88,6 +88,10 @@ internal fun ThreadMenu(
         FilterItem(stringResource(R.string.filter_mods), onModeratorPosts)
         FilterItem(stringResource(R.string.filter_reps), onRepPosts)
         HorizontalDivider()
+        // The post writer; "Reply in browser" stays for those who write on the site.
+        LocalReplyDraft.current?.let { draft ->
+            DropdownMenuItem(text = { Text(stringResource(R.string.write_reply)) }, onClick = { open = false; draft.write() })
+        }
         DropdownMenuItem(text = { Text(stringResource(R.string.reply_to_thread)) }, onClick = { open = false; onReply() })
         DropdownMenuItem(text = { Text(stringResource(au.howesthat.whirl.core.ui.R.string.open_in_browser)) }, onClick = { open = false; onOpenInBrowser() })
     }

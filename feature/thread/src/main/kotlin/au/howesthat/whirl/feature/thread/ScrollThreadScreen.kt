@@ -133,6 +133,7 @@ internal fun ScrollThread(
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    ReplyDraftTitle(state.title)
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val myUserId by viewModel.myUserId.collectAsStateWithLifecycle()
     val firstUnread by viewModel.firstUnread.collectAsStateWithLifecycle()
@@ -216,6 +217,7 @@ internal fun ScrollThread(
             },
             navigationIcon = { NavIconButton(navIcon) },
             actions = {
+                DraftChip()
                 IconButton(onClick = viewModel::refresh) { Icon(Icons.Default.Refresh, stringResource(R.string.refresh)) }
                 ThreadMenu(
                     isWatched = isWatched,

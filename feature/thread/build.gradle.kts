@@ -10,6 +10,8 @@ android {
 dependencies {
     // PostBodyParser turns cached body HTML into blocks.
     implementation(project(":core:scraper"))
+    // Quote: a post as WhirlCode for the post writer.
+    implementation(project(":core:whirlcode"))
     implementation(libs.androidx.navigation3.runtime)
 
     testImplementation(project(":core:database"))

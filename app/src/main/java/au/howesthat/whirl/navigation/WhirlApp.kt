@@ -149,6 +149,7 @@ fun WhirlApp(
             openUser = { backStack.push(UserRoute(it)) },
             back = { backStack.pop() },
             openWatched = { backStack.goHome(WatchedRoute) },
+            openWriter = { id, title -> backStack.push(WriterRoute(id, title)) },
         )
     }
 
