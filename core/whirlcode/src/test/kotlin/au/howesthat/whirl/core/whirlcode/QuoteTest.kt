@@ -89,4 +89,21 @@ class QuoteTest {
             (rendered(code)[1] as Block.Paragraph).inlines,
         )
     }
+
+    @Test
+    fun `quoted text stays readable, with no entities where none are needed and no stray spaces`() {
+        // From the phone (2026-11-20): leo27's list came out as `[" &#45; the from wallpaper "]`, and `d@llin` as d&#064;llin.
+        val body = PostBody(
+            listOf(
+                Block.Paragraph(listOf(Inline.Text("d@llin needs testers"))),
+                Block.Paragraph(listOf(Inline.Text("Notes: "), Inline.LineBreak, Inline.Text(" - the wallpaper colour "), Inline.LineBreak, Inline.Text(" - a purple icon"))),
+            ),
+        )
+        assertEquals(
+            "@1 A writes...\n\n[\"d@llin needs testers\"]\n\n[\"Notes:\"]\n[\"- the wallpaper colour\"]\n[\"- a purple icon\"]",
+            Quote.of(1, "A", body),
+        )
+        // An address still is broken up, so it stays text rather than becoming a link.
+        assertEquals("@1 A writes...\n\n[\"mail me at a&#064;b.com\"]", Quote.of(1, "A", PostBody(listOf(Block.Paragraph(listOf(Inline.Text("mail me at a@b.com")))))))
+    }
 }

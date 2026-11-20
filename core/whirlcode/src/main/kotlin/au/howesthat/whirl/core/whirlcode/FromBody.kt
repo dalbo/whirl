@@ -146,6 +146,9 @@ internal object FromBody {
      */
     private fun text(raw: String): String {
         val s = raw.replace('\n', ' ')
+        // Only what the converter would turn into a link is broken up: `d@llin` and `see: this` stay as typed.
+        val links = Links.find(s).map { it.range }
+        fun inLink(i: Int) = links.any { i in it }
         val out = StringBuilder()
         for ((i, c) in s.withIndex()) {
             val next = s.getOrNull(i + 1)
@@ -158,12 +161,12 @@ internal object FromBody {
                     // An opener ([*, [[, [.*) or a closer (*]) would start or end a code.
                     c == '[' && (next == '[' || next == '.' || next in MARKERS) -> "&#91;"
                     c == ']' && (prev in MARKERS || prev == ']' || prev == '.') -> "&#93;"
-                    // A spaced hyphen would become a dash.
-                    c == '-' && (prev == null || prev.isWhitespace()) && (next == null || next.isWhitespace() || next == '-') -> "&#45;"
-                    // An address the converter would link: break it with an entity.
-                    c == '@' -> "&#064;"
-                    c == ':' && s.startsWith("//", i + 1) -> "&#58;"
-                    c == 'w' && s.startsWith("ww.", i + 1) && (prev == null || !prev.isLetterOrDigit()) -> "&#119;"
+                    // A hyphen with spaces both sides would become a dash (one at the start of the text has none before).
+                    c == '-' && prev != null && prev.isWhitespace() && (next == null || next.isWhitespace() || next == '-') -> "&#45;"
+                    // An address the converter would link: one entity inside it is enough.
+                    inLink(i) && c == '@' -> "&#064;"
+                    inLink(i) && c == ':' && s.startsWith("//", i + 1) -> "&#58;"
+                    inLink(i) && c == 'w' && s.startsWith("ww.", i + 1) && (prev == null || !prev.isLetterOrDigit()) -> "&#119;"
                     else -> c.toString()
                 },
             )

@@ -24,8 +24,8 @@ object Quote {
         return (listOf(attribution) + lines).joinToString("\n\n")
     }
 
-    /** `["line"]`; a line that is empty (or only an escaped structure code) stays as it is. */
-    private fun forumQuote(line: String) = if (line.isBlank()) line else "[\"$line\"]"
+    /** `["line"]`, trimmed (old posts carry spaces around their line breaks); an empty line stays empty. */
+    private fun forumQuote(line: String) = line.trim().let { if (it.isEmpty()) it else "[\"$it\"]" }
 
     /** The blocks the poster wrote: inner quotes and their attributions left out. */
     private fun ownWords(blocks: List<Block>): List<Block> {
@@ -38,12 +38,30 @@ object Quote {
                     val own = block.inlines.filterNot(::isQuoted).dropWhile { it == Inline.LineBreak }.dropLastWhile { it == Inline.LineBreak }
                     val onlyQuote = own.all { it == Inline.LineBreak || (it is Inline.Text && it.text.isBlank()) }
                     // A paragraph that is all quote belongs to the attribution before it.
-                    if (!onlyQuote) out += Block.Paragraph(own)
+                    if (!onlyQuote) out += Block.Paragraph(trimLines(own))
                 }
                 else -> out += block
             }
         }
         return out
+    }
+
+    /**
+     * Spaces at the start and end of each line dropped before the text is written as WhirlCode, so a quoted line reads
+     * `["- the colour"]`, not `[" &#45; the colour "]` (old posts carry spaces around their line breaks).
+     */
+    private fun trimLines(inlines: List<Inline>): List<Inline> {
+        val out = inlines.toMutableList()
+        for (i in out.indices) {
+            val text = out[i] as? Inline.Text ?: continue
+            val startsLine = i == 0 || out[i - 1] == Inline.LineBreak
+            val endsLine = i == out.lastIndex || out[i + 1] == Inline.LineBreak
+            var t = text.text
+            if (startsLine) t = t.trimStart()
+            if (endsLine) t = t.trimEnd()
+            out[i] = text.copy(text = t)
+        }
+        return out.filterNot { it is Inline.Text && it.text.isEmpty() }
     }
 
     private fun isQuoted(inline: Inline) = when (inline) {
