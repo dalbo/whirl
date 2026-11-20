@@ -67,8 +67,7 @@ class WriterViewModelTest {
      * apply notifications, which snapshotFlow needs to see an edit, so send them here.
      */
     private suspend fun until(check: suspend () -> Boolean) = withContext(Dispatchers.Default) {
-        // Generous: under the full parallel test run a debounced save plus a Room write took over 5 s once.
-        withTimeout(15_000) {
+        withTimeout(5_000) {
             while (!check()) {
                 Snapshot.sendApplyNotifications()
                 delay(20)

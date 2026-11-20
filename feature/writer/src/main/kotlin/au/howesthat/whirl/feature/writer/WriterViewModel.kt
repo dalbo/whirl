@@ -30,7 +30,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -92,8 +91,11 @@ class WriterViewModel @AssistedInject constructor(
                     added
                 }
             }
+            // Collecting before the field opens, and with no drop(1): the first value is the stored text, which save()
+            // skips as unchanged. Dropping it instead lost an edit made before the collector's first read (a quote
+            // arriving through attachWriter), which then waited for onCleared to be saved.
+            launch { snapshotFlow { text.text.toString() }.debounce(SAVE_DELAY_MS).collect(::save) }
             _loaded.value = true
-            snapshotFlow { text.text.toString() }.drop(1).debounce(SAVE_DELAY_MS).collect(::save)
         }
     }
 
