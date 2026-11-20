@@ -163,6 +163,10 @@ descriptions (only the core icon set is in the build); "More codes" lists the re
 own. Copy and reply copies, saves, opens the reply page, and offers Delete draft in the snackbar. Not yet: the
 monospace toggle (§5). Nothing opens the writer until PR E1.
 
+*From Dallin's first try (2026-11-20, #164 and after):* Material Symbols icons in the bar; list buttons switch kind
+and nest; the keyboard inset counted once; Write and Preview in a pager, swiped as well as tapped, with the keyboard
+hidden on Preview.
+
 ## 6. Entry points: PRs E1 and E2
 - **E1** (`:feature:thread`): post menu **Quote** (pages and scroll reader) adds `Quote.of(post)` to that thread's
   draft, with a snackbar "Quoted · 3 quotes in your reply" and **Open**. Thread menu **Write a reply** opens the
