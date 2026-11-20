@@ -130,6 +130,12 @@ inside a quote, two quotes or lists of the same kind next to each other (a blank
   cache, fetched again": update the comments to say drafts are in it too and are deliberately not backed up. Revisit
   if asked.
 
+*As built (PR C):* `DraftEntity`/`DraftDao`, an auto-migration 8 → 9, and `DraftRepository` (`:core:data`): `observe`,
+`observeAll` (newest first), `save` (blank deletes), `delete`, `appendQuote` (returns the quote count for the snackbar)
+and `attachWriter`, through which an open writer takes quotes for its thread; its callback must not call `save` (the
+lock is held), the writer's own save stores the quote. The backup rules' comments and `BackupRulesTest` now say drafts
+are in `whirl.db` and deliberately not backed up.
+
 ## 5. The writer screen: `:feature:writer`, PR D
 - `WriterRoute(threadId)` (in `RouteSerializers`) is a **detail-pane entry**, like `ThreadRoute` (`WhirlApp.kt`
   metadata): in two panes it replaces the thread beside the list, and back returns to the thread. Not a

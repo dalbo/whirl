@@ -13,7 +13,8 @@ import kotlin.test.assertTrue
 
 /**
  * What Android backs up (docs/plans/settings-backup.md). The API key must never go to the cloud unencrypted, and the
- * cache (whirl.db) and shared prefs never at all. Once a rules file has an include, only what it includes is backed up.
+ * database (whirl.db: the cache, and the post writer's drafts, which are deliberately not backed up) and shared prefs
+ * never at all. Once a rules file has an include, only what it includes is backed up.
  */
 class BackupRulesTest {
     private fun rules(path: String): Element =
