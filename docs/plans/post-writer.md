@@ -171,6 +171,12 @@ monospace toggle (§5). Nothing opens the writer until PR E1.
   drawer): thread title, first line and age, newest first; tap opens the writer, swipe deletes with Undo. A draft icon
   on thread-list rows (each list's row model gains the flag, from one `observeAll()` of draft thread ids).
 
+*As built (PR E1):* `ThreadDraftViewModel` (per thread, so it outlives a switch between pages and scroll) and a
+`LocalReplyDraft` the post menu, the thread menu and both readers' top bars read, so no reader takes new parameters.
+Quote is left off hidden and deleted posts. `ThreadNav.openWriter` pushes the `WriterRoute` from `:app`, so
+`:feature:thread` does not depend on `:feature:writer`. "Reply to this post" (`replyTo`) is not wired yet: Write a reply
+and the chip open the thread's draft, which replies to the thread.
+
 ## 7. Order (one PR each; `main` stays releasable)
 Step 0 (§1.4, Dallin posts the edge cases; can run alongside A) → A converter → B reverse and quotes → C drafts → D
 writer → E1 → E2. Nothing shows in the app until E1, so A–D merge as they are ready. Then a release
