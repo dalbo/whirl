@@ -71,4 +71,12 @@
         <item quantity="one">%1$d post not shown (hidden by a moderator)</item>
         <item quantity="other">%1$d posts not shown (hidden by moderators)</item>
     </plurals>
+    <string name="post_quote">Quote</string>
+    <string name="write_reply">Write a reply</string>
+    <string name="draft_chip">Draft</string>
+    <string name="draft_open">Open</string>
+    <plurals name="quoted">
+        <item quantity="one">Quoted · 1 quote in your reply</item>
+        <item quantity="other">Quoted · %d quotes in your reply</item>
+    </plurals>
 </resources>
