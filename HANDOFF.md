@@ -68,7 +68,7 @@ built and what it decided is in `docs/history.md`; read it when a "why" is not a
 | `:core:data` | Repositories, `SettingsRepository` (DataStore), `Refresher`, `WatchedRepository` + `WatchQueue`, dispatchers |
 | `:core:ui` | Theme, styles, `PostBodyView`, find bar, `ListScreenState`, `ListPaneRoute` |
 | `:core:notifications` | Watched-thread check (`CheckAlarm` during Doze, WorkManager fallback), `WatchedNotifier`, notification buttons |
-| `:feature:*` | `setup`, `settings`, `threadlist` (all thread lists, search), `forums`, `thread`, `news`, `user`; each owns its routes |
+| `:feature:*` | `setup`, `settings`, `threadlist` (all thread lists, search), `forums`, `thread`, `news`, `user`, `writer` (the post writer, v1.10); each owns its routes |
 | `:app` | Hilt, `MainActivity` (setup until `setupDone`), Navigation 3 (`TopLevelBackStack`, `WhirlApp`), snackbars |
 
 ## Notes for the code
@@ -117,13 +117,14 @@ and chat bubbles pop up).
   search (the note in `docs/play-console.md` mentions it), "tap a filtered post to see it in context".
 - **v1.9: settings backup** (released 2026-11-11; plan `docs/plans/settings-backup.md`, history in
   `docs/history.md`): settings, favourites, mutes and the key backed up; the key-rejected banner; mute; the Data Saver
-  note. **Part 2 built** (2026-11-19, unreleased): export and import as JSON in Settings › Backup, and Room v8, which
+  note. **Part 2 built** (2026-11-19, releases in v1.10 with the post writer): export and import as JSON in Settings › Backup, and Room v8, which
   stops declaring `favourite_forums`; `LibraryRepository` drops the table after moving its rows. Still to do: the phone
   pass (export, share, import on a second install; a v1.8 → v1.10 update keeps favourites). Not checked: the API 27
   emulator, password-manager fill.
-- **Post writer** (v1.11, planned and reviewed 2026-11-19, `docs/plans/post-writer.md`): write a reply with collected
-  quotes, a formatting bar and a live preview, then copy it into Whirlpool's reply page. Starts with step 0 (an
-  edge-case post for Dallin to post) and PR A (WhirlCode to HTML, `:core:whirlcode`).
+- **Post writer** (v1.10 with export and import; plan `docs/plans/post-writer.md`): write a reply with collected
+  quotes, a formatting bar and a live preview, then copy it into Whirlpool's reply page. PRs A–D built (converter both
+  ways, drafts, the writer screen); next E1 (Quote, "Write a reply") and E2 (Drafts list), then step 0 (an edge-case
+  post for Dallin to post) and the phone pass.
 - **Notifications with the posts** (idea, 2026-11-12): today a check makes one API call (`get=watched`) and never
   loads a thread page. Fetching the page with the first unread post would let a notification expand to the next
   unread post or the recent posters' names, let mute become a filter (only these users, only when OP or a moderator

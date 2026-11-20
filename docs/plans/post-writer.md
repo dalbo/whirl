@@ -1,7 +1,8 @@
-# Plan: the post writer (v1.11)
+# Plan: the post writer (v1.10)
 
 Status: **planned and reviewed** (2026-11-19); **PRs A and B built** (2026-11-19). Idea from Dallin, 2026-11-08; decisions below from
-2026-11-19. v1.10 is settings export and import (`settings-backup.md` Part 2), so this is the next feature release.
+2026-11-19. Ships in **v1.10** with settings export and import (`settings-backup.md` Part 2): first planned for v1.11,
+moved into v1.10 by Dallin on 2026-11-20, as nobody was waiting for export and import.
 
 Whirlpool's reply box takes raw WhirlCode or a little HTML, with a preview but no formatting buttons. On a phone, a
 reply that quotes several people, with some formatting and a link, means copying text between pages and typing markup by
@@ -120,7 +121,8 @@ inside a quote, two quotes or lists of the same kind next to each other (a blank
 - `drafts(thread_id TEXT PRIMARY KEY, thread_title TEXT, text TEXT, updated_at INTEGER)`, with a migration test.
   Not tied to the account: signing out keeps drafts (they are the user's writing), and `clearAccountData` does not
   touch them.
-- **Merged after v1.10 is tagged**, so v1.10 does not ship schema v9 for a feature it does not have.
+- First held until a v1.10 tag (so v1.10 would not ship schema v9 for a feature it lacked); moot once the writer moved
+  into v1.10.
 - **One owner**: `DraftRepository` (`:core:data`) serialises every write behind a mutex. The writer saves as typed
   (debounced about 500 ms) and on leaving, through `@ApplicationScope` with `NonCancellable` (a save from
   `viewModelScope` is cancelled in `onCleared`). A quote added while the writer is open (two panes) goes through the
@@ -153,6 +155,14 @@ are in `whirl.db` and deliberately not backed up.
   thread view models). A snackbar says "Copied: paste into the reply box", with **Delete draft**. The draft stays until
   deleted, so a failed post loses nothing.
 
+*As built (PR D):* `:feature:writer`. `WriterViewModel` loads the draft (the field is read-only until then), attaches
+itself as the thread's writer, saves 500 ms after typing stops, on Copy and reply, and in `onCleared` through the
+application scope; the preview converts 250 ms after typing stops, on the default dispatcher. `Formatting` holds the
+bar's operations as pure functions on text and selection (`FormattingTest`). The bar uses text labels with TalkBack
+descriptions (only the core icon set is in the build); "More codes" lists the rest. Undo and redo are the text field's
+own. Copy and reply copies, saves, opens the reply page, and offers Delete draft in the snackbar. Not yet: the
+monospace toggle (§5). Nothing opens the writer until PR E1.
+
 ## 6. Entry points: PRs E1 and E2
 - **E1** (`:feature:thread`): post menu **Quote** (pages and scroll reader) adds `Quote.of(post)` to that thread's
   draft, with a snackbar "Quoted · 3 quotes in your reply" and **Open**. Thread menu **Write a reply** opens the
@@ -162,9 +172,9 @@ are in `whirl.db` and deliberately not backed up.
   on thread-list rows (each list's row model gains the flag, from one `observeAll()` of draft thread ids).
 
 ## 7. Order (one PR each; `main` stays releasable)
-Step 0 (§1.4, Dallin posts the edge cases; can run alongside A) → A converter → B reverse and quotes → C drafts (after
-the v1.10 tag) → D writer → E1 → E2. Nothing shows in the app until E1, so A–D merge as they are ready. Then a release
-PR (v1.11.0). **Effort**: A and B are most of the release (the review's estimate); the screens reuse what exists.
+Step 0 (§1.4, Dallin posts the edge cases; can run alongside A) → A converter → B reverse and quotes → C drafts → D
+writer → E1 → E2. Nothing shows in the app until E1, so A–D merge as they are ready. Then a release
+PR (v1.10.0, with settings export and import). **Effort**: A and B are most of the release (the review's estimate); the screens reuse what exists.
 
 ## 8. Reviewed
 An architect review (2026-11-19, read-only, against the code and fixtures) found:

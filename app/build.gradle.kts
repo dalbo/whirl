@@ -84,6 +84,7 @@ dependencies {
     implementation(project(":feature:thread"))
     implementation(project(":feature:news"))
     implementation(project(":feature:user"))
+    implementation(project(":feature:writer"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.splashscreen)

@@ -74,6 +74,8 @@ import au.howesthat.whirl.feature.settings.SettingsPageScreen
 import au.howesthat.whirl.feature.settings.SettingsScreen
 import au.howesthat.whirl.feature.thread.ThreadNav
 import au.howesthat.whirl.feature.thread.ThreadRoute
+import au.howesthat.whirl.feature.writer.WriterRoute
+import au.howesthat.whirl.feature.writer.WriterScreen
 import au.howesthat.whirl.feature.thread.ThreadScreen
 import au.howesthat.whirl.feature.threadlist.ForumRoute
 import au.howesthat.whirl.feature.threadlist.ForumScreen
@@ -179,6 +181,10 @@ fun WhirlApp(
         ListDetailSceneStrategy.listPane(sceneKey = key, detailPlaceholder = { ChooseThread() }) +
             ListDetailSceneStrategy.preferredPaneSize(width = listWidth) + paneMotion
     }
+    // The writer takes a thread's place beside the list (post-writer plan §5).
+    val writerMeta: (WriterRoute) -> Map<String, Any> = { key ->
+        backStack.listBelow(key, ::isListPane)?.let { list -> ListDetailSceneStrategy.detailPane(sceneKey = list) + paneMotion }.orEmpty()
+    }
     val threadMeta: (ThreadRoute) -> Map<String, Any> = { key ->
         backStack.listBelow(key, ::isListPane)?.let { list -> ListDetailSceneStrategy.detailPane(sceneKey = list) + paneMotion }.orEmpty()
     }
@@ -207,6 +213,7 @@ fun WhirlApp(
         entry<PopularRoute>(metadata = listMeta) { ListPane(it) { PopularScreen(drawerIcon, listNav) } }
         entry<ForumRoute>(metadata = listMeta) { ListPane(it) { ForumScreen(it, backIcon, listNav) } }
         entry<ThreadRoute>(metadata = threadMeta) { ThreadScreen(it, backIcon, threadNav, scrollByDefault = scrollThreads) }
+        entry<WriterRoute>(metadata = writerMeta) { WriterScreen(it, backIcon, onClosed = { backStack.pop() }) }
         entry<UserRoute>(metadata = listMeta) { ListPane(it) { UserScreen(it, backIcon, listNav) } }
         entry<SearchRoute>(metadata = listMeta) { ListPane(it) { SearchScreen(it, backIcon, listNav) } }
         entry<ForumsRoute>(metadata = listMeta) { ListPane(it) { ForumsScreen(drawerIcon, onOpenForum = listNav.openForum, onSearch = { words -> listNav.openSearch(SearchRoute(query = words)) }) } }
