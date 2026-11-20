@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
@@ -28,6 +29,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavKey
+import au.howesthat.whirl.feature.writer.DraftsRoute
 import au.howesthat.whirl.R
 import au.howesthat.whirl.core.data.Account
 import kotlin.reflect.KClass
@@ -41,6 +43,8 @@ val TOP_LEVEL = listOf(
     DrawerEntry(RecentRoute, R.string.nav_recent, Icons.Default.Person),
     DrawerEntry(LatestRoute, R.string.nav_latest, Icons.Default.Notifications),
     DrawerEntry(WatchedRoute, R.string.nav_watched, Icons.Default.Star),
+    // The post writer's drafts (v1.10).
+    DrawerEntry(DraftsRoute, R.string.nav_drafts, Icons.Default.Edit),
     DrawerEntry(PopularRoute, R.string.nav_popular, Icons.Default.ThumbUp),
     DrawerEntry(ForumsRoute, R.string.nav_forums, Icons.AutoMirrored.Filled.List),
 )

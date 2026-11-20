@@ -38,4 +38,8 @@
     <string name="writer_indent">Indent, on the selected lines</string>
     <string name="writer_rule">Horizontal rule</string>
     <string name="writer_table">Table</string>
+    <string name="drafts_title">Drafts</string>
+    <string name="drafts_empty">No drafts. Quote a post or choose Write a reply in a thread\'s menu to start one.</string>
+    <string name="drafts_deleted">Draft deleted</string>
+    <string name="drafts_undo">Undo</string>
 </resources>

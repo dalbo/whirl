@@ -3,6 +3,7 @@ package au.howesthat.whirl.navigation
 import au.howesthat.whirl.feature.settings.SettingsPage
 import au.howesthat.whirl.feature.settings.SettingsPageRoute
 import au.howesthat.whirl.core.data.Homepage
+import au.howesthat.whirl.feature.writer.DraftsRoute
 import org.junit.Test
 import au.howesthat.whirl.feature.thread.ThreadRoute
 import au.howesthat.whirl.feature.threadlist.ForumRoute
@@ -17,7 +18,8 @@ class RoutesTest {
     fun `every start screen is a drawer destination`() {
         val drawerRoutes = TOP_LEVEL.map { it.route }
         Homepage.entries.forEach { assertTrue(it.route() in drawerRoutes, "$it has no drawer entry") }
-        assertEquals(Homepage.entries.size, drawerRoutes.toSet().size)
+        // Drafts (the post writer's) is a drawer destination but not a start screen.
+        assertEquals(Homepage.entries.map { it.route() }.toSet(), drawerRoutes.toSet() - DraftsRoute)
     }
 
     @Test

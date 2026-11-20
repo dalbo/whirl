@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import au.howesthat.whirl.core.data.DraftRepository
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 data class MainState(val settings: Settings, val setupDone: Boolean)
@@ -36,7 +38,12 @@ class MainViewModel @Inject constructor(
     private val watchQueue: WatchQueue,
     private val forums: ForumRepository,
     private val notificationPrompt: NotificationPrompt,
+    drafts: DraftRepository,
 ) : ViewModel() {
+    /** Threads with a reply draft, for the marks in thread lists (post writer). */
+    val draftThreads = drafts.observeAll().map { list -> list.mapTo(mutableSetOf()) { it.threadId } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
     /** Null until settings are read, which keeps the splash screen up. */
     val state: StateFlow<MainState?> = combine(settings.settings, settings.isSetupDone, ::MainState)
         .distinctUntilChanged()

@@ -38,6 +38,7 @@ import au.howesthat.whirl.core.data.WatchedPosition
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.notifications.WatchedNotifier
 import au.howesthat.whirl.core.ui.LocalBrowserApp
+import au.howesthat.whirl.core.ui.LocalDraftThreads
 import au.howesthat.whirl.core.ui.LocalFindRequests
 import au.howesthat.whirl.core.ui.isFindShortcut
 import au.howesthat.whirl.core.ui.Styles
@@ -106,7 +107,12 @@ class MainActivity : ComponentActivity() {
                             if (banner) KeyRejectedBanner(onNewKey = { newKey = true })
                             // The banner took the status bar's inset; the screens below must not pad for it again.
                             Box(Modifier.weight(1f).then(if (banner) Modifier.consumeWindowInsets(BannerTopInsets) else Modifier)) {
-                                CompositionLocalProvider(LocalBrowserApp provides loaded.settings.browserApp, LocalFindRequests provides findRequests) {
+                                val draftThreads by viewModel.draftThreads.collectAsStateWithLifecycle()
+                                CompositionLocalProvider(
+                                    LocalBrowserApp provides loaded.settings.browserApp,
+                                    LocalFindRequests provides findRequests,
+                                    LocalDraftThreads provides draftThreads,
+                                ) {
                                     WhirlApp(
                                         startRoute = startRoute,
                                         account = account,

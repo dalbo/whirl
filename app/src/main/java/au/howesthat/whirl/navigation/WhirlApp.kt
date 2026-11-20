@@ -74,6 +74,8 @@ import au.howesthat.whirl.feature.settings.SettingsPageScreen
 import au.howesthat.whirl.feature.settings.SettingsScreen
 import au.howesthat.whirl.feature.thread.ThreadNav
 import au.howesthat.whirl.feature.thread.ThreadRoute
+import au.howesthat.whirl.feature.writer.DraftsRoute
+import au.howesthat.whirl.feature.writer.DraftsScreen
 import au.howesthat.whirl.feature.writer.WriterRoute
 import au.howesthat.whirl.feature.writer.WriterScreen
 import au.howesthat.whirl.feature.thread.ThreadScreen
@@ -214,6 +216,7 @@ fun WhirlApp(
         entry<PopularRoute>(metadata = listMeta) { ListPane(it) { PopularScreen(drawerIcon, listNav) } }
         entry<ForumRoute>(metadata = listMeta) { ListPane(it) { ForumScreen(it, backIcon, listNav) } }
         entry<ThreadRoute>(metadata = threadMeta) { ThreadScreen(it, backIcon, threadNav, scrollByDefault = scrollThreads) }
+        entry<DraftsRoute>(metadata = listMeta) { ListPane(it) { DraftsScreen(drawerIcon, onOpen = { id, title -> backStack.openFromList(WriterRoute(id, title), ::isListPane) }) } }
         entry<WriterRoute>(metadata = writerMeta) { WriterScreen(it, backIcon, onClosed = { backStack.pop() }) }
         entry<UserRoute>(metadata = listMeta) { ListPane(it) { UserScreen(it, backIcon, listNav) } }
         entry<SearchRoute>(metadata = listMeta) { ListPane(it) { SearchScreen(it, backIcon, listNav) } }
