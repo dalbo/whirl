@@ -40,4 +40,27 @@ class FormattingTest {
         assertEquals(edit("text\n\n-----", 11), Formatting.block(edit("text", 4), "-----"))
         assertEquals(edit("a\n\n$$\n\n$$\n\nb", 6), Formatting.block(edit("ab", 1), "$$\n\n$$", cursorAt = 3))
     }
+
+    @Test
+    fun `the list buttons add a list, switch its kind keeping its depth, and take it off`() {
+        val bullets = Formatting.toggleList(edit("one\ntwo", 0, 7), '*')
+        assertEquals("* one\n* two", bullets.text)
+        // Dallin, 2026-11-20: switching kind replaces the markers rather than adding a list inside the list.
+        assertEquals("# one\n# two", Formatting.toggleList(bullets, '#').text)
+        assertEquals("## nested", Formatting.toggleList(edit("** nested", 4), '#').text)
+        assertEquals("one\ntwo", Formatting.toggleList(bullets, '*').text)
+        // Inside a quote, the quote stays.
+        assertEquals("># point", Formatting.toggleList(edit(">* point", 3), '#').text)
+    }
+
+    @Test
+    fun `list items nest three deep and come back out, other lines unchanged`() {
+        val deeper = Formatting.nestList(edit("* a\nplain\n# b", 0, 13), deeper = true)
+        assertEquals("** a\nplain\n## b", deeper.text)
+        assertEquals("*** a", Formatting.nestList(edit("** a", 3), deeper = true).text)
+        assertEquals("*** a", Formatting.nestList(edit("*** a", 3), deeper = true).text, "three is WhirlCode's limit")
+        assertEquals("* a", Formatting.nestList(edit("** a", 3), deeper = false).text)
+        assertEquals("* a", Formatting.nestList(edit("* a", 2), deeper = false).text, "the top level stays a list")
+        assertEquals("**** x", Formatting.nestList(edit("**** x", 2), deeper = true).text, "four codes is the limit")
+    }
 }
