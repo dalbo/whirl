@@ -2,7 +2,8 @@
 <resources>
     <string name="writer_title">Reply</string>
     <string name="writer_copy_and_reply">Copy and reply</string>
-    <string name="writer_copied">Copied: paste into the reply box</string>
+    <string name="writer_copied">Copied: paste it into the reply box</string>
+    <string name="writer_back_from_reply">Posted your reply? You can delete this draft.</string>
     <string name="writer_clip_label">Whirl reply</string>
     <string name="writer_more">More options</string>
     <string name="writer_delete_draft">Delete draft</string>
