@@ -49,8 +49,6 @@ class FromBodyTest {
     private companion object {
         /** Posts that cannot survive, each with why. Reviewed by hand; a new entry needs a reason. */
         val KNOWN = setOf(
-            // The link's URL holds a literal `<APIKey>`: `<a href>` cannot carry `<` or `>`.
-            "archive_97q1vrm9_p2.html 68922256",
             // 2009 markup: lines of only spaces and runs of spaces around `<br>`. In WhirlCode a blank line is a new
             // paragraph and a line's trailing spaces are not kept, so these read back with the whitespace changed.
             "thread_archive_numeric.html 15845146",

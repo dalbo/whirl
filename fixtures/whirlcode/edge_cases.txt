@@ -1,0 +1,42 @@
+Edge cases for Whirl's post writer (please ignore). Each numbered line says what it checks.
+
+1. Unclosed bold: [*never closed
+2. Bold closed on the next line: [*starts here
+ends here*]
+3. Misnested: [*bold [/both*] italic/]
+4. Empty codes: [**] and [//]
+5. The same code nested: [*outer [*inner*] outer*]
+6. Escapes: [.*a*.] and [.["q"].]
+7. Dashes: a - b, a -- b, a-b, a --b, a- b
+- 8. A hyphen at the start of a line
+9. Addresses then punctuation: https://example.com/path, then (https://example.com/a_(b)) and https://example.com.
+10. A bare www address: www.example.com/page
+11. At signs: d@llin and someone@example.com.
+12. Not allowed HTML: <script>x</script> <b onclick="x">b</b> <u>u</u> <a href="javascript:x">j</a> 3 < 4 > 2 & AT&T &amp; &#169;
+13. A single line break follows
+right here.
+
+14. Two lines starting with $:
+$ first code line
+$ second code line
+
+15. Too many structural codes:
+>>>> four quote marks
+:: two indents
+**** four bullets
+>> ** two quotes and two bullets
+
+16. A quote, a blank line, a quote:
+> first
+
+> second
+
+17. A table with a trailing pipe and a pipe entity:
+| a | b |
+| c &#124; d | e |
+
+18. A jump link with no text:
+@76888415
+
+-----
+Last line.

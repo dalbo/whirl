@@ -61,13 +61,22 @@ their path; `https://example.com` shows in full. The rule is derived from the fi
 - `@id name` renders `name` only: "writes..." must be written.
 - The reply box's length limit is unknown. No counter until someone hits it; then add one.
 
-### 1.4 Still to capture, before PR A's edge cases (step 0)
-The wiki and the test post show the site's output for well-formed text only. What it does with malformed text (an
-unclosed `[*`, codes across a line break, `- ` at the start of a line, five structural codes, `<script>`, `<a
-onclick>`, a single newline versus a blank line) is unknown, and tests for it would encode guesses. So: Whirl writes an
-edge-case post (`fixtures/whirlcode/edge_cases.txt`); Dallin posts it in the Whirl thread as before; `tools/capture`
-saves that page, and its rendered post becomes the oracle. Until then those cases are tested only for safety (no
-unescaped HTML), not for matching the site.
+### 1.4 The edge cases (step 0, captured 2026-11-25)
+Dallin posted `fixtures/whirlcode/edge_cases.txt` in the Whirl thread (reply 76935755,
+`fixtures/html/thread_9244p8v1_edgecases.html`). What it showed, against what the converter had guessed:
+- **Codes are matched, not nested**: an opener, at least one character, the nearest closer, across the lines of a
+  paragraph. An unclosed `[*` takes everything to the next `*]`; `[**]` reaches past its own `*]`; a second `[*` inside
+  is text; crossed codes give crossed tags (the browser sorts them out). The converter had nested them and left an
+  unclosed code as typed.
+- `[.` and `.]` lose their dots after the codes: `[.["q"].]` is a bracketed quote.
+- A bare `www.` address is not linked.
+- Disallowed HTML shows as typed, including a lone closing tag and a `javascript:` link (the converter had dropped them).
+- `$` lines one after another are one code block; `-----` with text on the next line is text, not a rule.
+- Codes over the limits are text from that code on: `>>>> a` is three quotes holding `> a`.
+- As guessed: dashes, trailing punctuation outside links, `d@llin` not linked, a single newline a `<br>`, a blank line
+  inside a quote, a table's trailing pipe and `&#124;`, `@id` with no text as text.
+The converter now does all of this (`Inline.kt`, `WhirlCode.kt`), and `WhirlCodeTest` checks the post end to end. Still a
+guess: whether an unclosed code runs past a blank line (the post never tried; the converter stops at the paragraph).
 
 ## 2. WhirlCode to HTML: `:core:whirlcode` (pure JVM), PR A
 `WhirlCode.toHtml(source): String` writes the site's markup, and the preview is then
