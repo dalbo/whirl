@@ -121,6 +121,22 @@ Open ideas, roughly by value:
 ## Next: v1.7 tidy-up, then v1.8 archive reader (agreed 2026-11-05)
 **`docs/plans/v1.7.md`** is the plan: no new features in v1.7 (fixes from the 2026-11-05 review, dead code including the in-app post filter, build/CI, a shorter HANDOFF); the archive reader with search within a thread and posts by a user is v1.8 (§8 there).
 
+## v1.10.0
+- **Post writer** (`docs/plans/post-writer.md`; #156, #157, #159–#166, #171): `:core:whirlcode` turns WhirlCode into the
+  site's HTML for the preview (through `PostBodyParser` and the post renderer) and a parsed post back into WhirlCode for
+  quotes. The site's behaviour came from the wiki, Dallin's every-code test post and his edge-case post (2026-11-25):
+  codes are matched, not nested (opener, at least one character, nearest closer, across a paragraph's lines), escapes
+  lose their dots afterwards, bare `www.` is not linked, disallowed HTML shows as typed. Both posts are end-to-end tests;
+  2,606 of 2,610 fixture posts round-trip. Drafts in Room v9 (`DraftRepository`, one owner; quotes go through an open
+  writer). `:feature:writer`: formatting bar (Material Symbols vector drawables), pager between Write and Preview, Copy
+  and reply, and the offer to delete on the way back. Quote, Write a reply, the Draft chip, Drafts in the drawer and a
+  pencil on rows (`LocalDraftThreads`). Planned with an architect review; Dallin's first try gave #164–#166.
+- **Export and import** (settings-backup Part 2, #155): `SettingsFile`, built on `SETTING_FIELDS`; the import dialog
+  lists each change. Room v8 stopped declaring `favourite_forums`; `LibraryRepository` drops it after moving its rows,
+  so an update straight from v1.8 keeps favourites (checked on the phone).
+- Moved from v1.11 into v1.10 by Dallin (2026-11-20). Phone pass: `docs/device-checklist.md` v1.10; not run: TalkBack,
+  200 % font, landscape, two panes.
+
 ## v1.9.0 (2026-11-11)
 - **Settings backup, Part 1** (`docs/plans/settings-backup.md`; #138–#140, #147): the API key, account and
   `setup_done` moved to their own `account` DataStore (a `DataMigration` with a `moved_from_settings` marker), and

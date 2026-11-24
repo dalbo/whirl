@@ -2,18 +2,35 @@
 
 Run on a real phone before tagging a release (PLAN.md §8). Debug builds install beside the release app as `au.howesthat.whirl.debug`. Note the build, the phone and its Android version, and the network (Wi-Fi or mobile data) with the result.
 
-## v1.10 (export and import; docs/plans/settings-backup.md Part 2)
-- [ ] Upgrade straight from v1.8 (skipping v1.9): two favourite forums starred in v1.8 are still starred, and
-  `adb shell run-as au.howesthat.whirl.debug sqlite3 databases/whirl.db .tables` (or the database inspector) no longer
-  lists `favourite_forums`.
-- [ ] Settings › Backup › Export settings: the picker suggests `whirl-settings-<date>.json`; "Settings exported"; the
-  file opens in a text viewer, holds every setting, favourites and mutes, and no key, user id or name.
-- [ ] Change the theme, unstar a forum, then Import settings with that file: the dialog lists "General › Theme: … → …"
-  and "Favourite forums: 1 added"; Cancel changes nothing; Apply changes both and says "Settings imported".
-- [ ] Import a file shared through a chat app or Drive (typed as anything): it is read; an unrelated JSON or text file
-  says "This isn't a Whirl settings file."
-- [ ] Import a file whose notification interval differs: `adb shell dumpsys alarm | grep whirl` shows the new interval.
-- [ ] TalkBack reads the Export and Import rows as buttons, and every line of the import dialog.
+## v1.10 (post writer, docs/plans/post-writer.md; export and import, docs/plans/settings-backup.md Part 2)
+Pixel 9 Pro XL, Android 17, Wi-Fi, debug builds of the PRs as they merged (2026-11-19 and 2026-11-20).
+- [x] Upgrade straight from v1.8 (skipping v1.9): two favourite forums starred in v1.8 are still starred, and the
+  database no longer has `favourite_forums`.
+  2026-11-20: v1.8.0 built from its tag, set up on the test account, Desktops and Networking starred, then the current
+  build installed over it: no setup screen, both favourites kept; `whirl.db` copied out with `run-as` is
+  `user_version` 9, with `drafts` and without `favourite_forums`.
+- [x] Settings › Backup › Export settings: the picker suggests `whirl-settings-<date>.json`; "Settings exported"; the
+  file holds every setting, favourites and mutes, and no key, user id or name.
+  2026-11-19: 29 settings, 2 favourites, 2 mutes; checked against the test key without printing it.
+- [x] Import settings: the dialog lists what changes; nothing changes before Apply; Apply changes it and says
+  "Settings imported". 2026-11-19: "General › Theme: Light → Dark". 2026-11-20, onto a fresh install: seven settings
+  and "Muted threads: 2 added", then the notification prompt after a restore.
+- [x] An unrelated JSON file says "This isn't a Whirl settings file." (2026-11-19.)
+- [x] Import a file whose notification interval differs: the check's alarm moves. 2026-11-20: "Every 15 minutes →
+  Every 30 minutes" moved the next check from +11 to +25 minutes; and back.
+- [x] Quote three posts (one quoting someone else, one a list), add bold and a link, Preview, Copy and reply.
+  2026-11-20: the inner quote left out, `d@llin` and `- item` lines written plainly, the preview as on the site; Copy
+  and reply copied (Android's clipboard preview) and opened the reply page in Firefox. Not pasted or posted.
+- [x] Process death in the writer (`am kill` in the background): the draft and the back stack come back. (2026-11-20.)
+- [x] Back from the reply page: "Posted your reply? You can delete this draft." with Delete draft, which deletes it and
+  closes the writer. (2026-11-20, after 8 and 15 seconds away.)
+- [x] Formatting bar: icons; bullets → numbers → in a level gives `* `, `# `, `## `; no gap above the keyboard after
+  Link → Cancel; swipe between Write and Preview, the keyboard hidden on Preview. (2026-11-20.)
+- [x] The preview matches the site, odd cases included: Dallin's edge-case post (2026-11-25, reply 76935755) is a test,
+  `WhirlCodeTest`.
+- [ ] TalkBack: the Export and Import rows, the import dialog, the formatting bar, Drafts' Delete action.
+- [ ] 200 % font and landscape in the writer.
+- [ ] Two panes (tablet or emulator): quote from the thread while the writer is open beside it; nothing is lost.
 
 ## v1.9 (settings backup; docs/plans/settings-backup.md)
 Upgrade over v1.8 first (install the v1.8 release, set a theme, star two forums, then install the new build): the key,
