@@ -15,6 +15,11 @@ Whirl is unofficial: it is not made by or endorsed by Whirlpool. You sign in wit
 • Watch, unwatch and mark threads read, with Undo
 • Notifications for new replies in watched threads, checked at the interval you choose, with Mark read and Unwatch buttons
 
+<b>Write</b>
+• Write replies in Whirl: quote posts, format with a toolbar and preview them as Whirlpool shows them, then copy them into Whirlpool's reply page
+• Drafts are saved as you type, one per thread
+• Export and import your settings, favourites and muted threads as a file
+
 <b>Respectful of Whirlpool and of you</b>
 • Posting, private forums and private messages open in your browser, where you log in to Whirlpool yourself; Whirl never asks for your password
 • No ads, no analytics, no tracking; Whirl talks only to Whirlpool

@@ -1,6 +1,6 @@
 # Plan: the post writer (v1.10)
 
-Status: **planned and reviewed** (2026-11-19); **PRs A and B built** (2026-11-19). Idea from Dallin, 2026-11-08; decisions below from
+Status: **built** (2026-11-19 to 2026-11-25), released in v1.10.0. Idea from Dallin, 2026-11-08; decisions below from
 2026-11-19. Ships in **v1.10** with settings export and import (`settings-backup.md` Part 2): first planned for v1.11,
 moved into v1.10 by Dallin on 2026-11-20, as nobody was waiting for export and import.
 

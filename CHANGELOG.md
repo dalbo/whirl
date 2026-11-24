@@ -2,6 +2,14 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.10.0
+Write your replies in Whirl, and keep your settings in a file.
+- A post writer. Long-press a post and choose Quote to add it to your reply as "Name writes..." with their words (anything they were quoting is left out); quote as many posts as you like. Or choose Write a reply from a thread's ⋮ menu. Whirl never posts for you: Copy and reply copies your reply and opens Whirlpool's reply page, ready to paste, and when you come back Whirl offers to delete the draft.
+- A formatting bar for bold, italic, links, forum and reply quotes, bulleted and numbered lists (nested too), spoilers and code, with the rest of Whirlcode under More, and undo and redo.
+- Preview shows your reply as it will look on Whirlpool, tested against Whirlpool's own rendering, odd cases included. Swipe between Write and Preview; on a wide screen they sit side by side.
+- Drafts save as you type, one per thread, and come back after the app is closed. Drafts in the menu lists them all, a Draft button shows in a thread that has one, and thread lists mark them with a pencil.
+- Settings › Backup › Export settings saves your settings, favourite forums and muted threads to a file, and Import settings reads one back, showing what would change before anything does. Favourites and mutes are added, never removed. Your API key is never in the file, so it is safe to share.
+
 ## v1.9.0
 Your settings come with you to a new phone, and mute for watched threads.
 - Android's backup now keeps Whirl's settings, favourite forums and muted threads, and your API key. The key goes up only end-to-end encrypted with your screen lock, so on a new phone Whirl starts signed in, in your theme, with your favourites. Cached threads and posts are never backed up: a new phone fetches them again. Settings › Backup says what this phone backs up.
