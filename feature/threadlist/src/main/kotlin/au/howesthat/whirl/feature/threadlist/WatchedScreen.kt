@@ -47,6 +47,7 @@ import au.howesthat.whirl.core.model.TextQuery
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.ui.LocalAppStyle
 import au.howesthat.whirl.core.ui.NavIcon
+import au.howesthat.whirl.core.ui.openDrawerPastStart
 import au.howesthat.whirl.core.ui.Tabs
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -203,7 +204,7 @@ fun WatchedScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: WatchedViewMo
         actions = { WatchedMenu(markAll.size, finding = !query.isNullOrBlank(), viewModel::markAllRead) },
         subBar = { WatchedTabs(unreadOnly, unread, viewModel::showUnreadOnly) },
         body = { modifier ->
-            HorizontalPager(pager, modifier.fillMaxSize(), key = { it }) { page ->
+            HorizontalPager(pager, modifier.fillMaxSize().openDrawerPastStart(navIcon), key = { it }) { page ->
                 val onUnread = page == 0
                 // Refreshing and errors belong to the tab being shown.
                 val current = onUnread == unreadOnly && page == pager.settledPage

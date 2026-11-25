@@ -53,6 +53,7 @@ import au.howesthat.whirl.core.network.WhirlpoolUrls
 import au.howesthat.whirl.core.ui.FindButton
 import au.howesthat.whirl.core.ui.ListPaneRoute
 import au.howesthat.whirl.core.ui.NavIcon
+import au.howesthat.whirl.core.ui.openDrawerPastStart
 import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.PagePickerDialog
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
@@ -274,7 +275,7 @@ fun ForumScreen(
                 findQuery = query,
             )
         } else {
-            HorizontalPager(pager, Modifier.padding(padding).fillMaxSize(), key = { it }) { index ->
+            HorizontalPager(pager, Modifier.padding(padding).fillMaxSize().openDrawerPastStart(navIcon), key = { it }) { index ->
                 // Starts with the group's key, so coming back from a thread keeps the restored scroll position.
                 val pageState by remember(index, viewModel) { viewModel.page(index + 1) }.collectAsStateWithLifecycle(ListState(null, null, listKey = group))
                 val current = index == pager.settledPage
