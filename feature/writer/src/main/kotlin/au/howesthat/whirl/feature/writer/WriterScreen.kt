@@ -32,6 +32,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -211,6 +214,8 @@ private fun Editor(viewModel: WriterViewModel, loaded: Boolean, modifier: Modifi
             modifier = Modifier.weight(1f).fillMaxWidth(),
             placeholder = { Text(stringResource(R.string.writer_placeholder)) },
             lineLimits = TextFieldLineLimits.MultiLine(),
+            // Compose's default asks the keyboard for no capitals; a reply wants sentences, with suggestions.
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, autoCorrectEnabled = true, keyboardType = KeyboardType.Text),
         )
         HorizontalDivider()
         // The formatting bar, above the keyboard: each button wraps the selection, or inserts a pair at the cursor; the
@@ -283,8 +288,15 @@ private fun LinkDialog(onDismiss: () -> Unit, onLink: (url: String, label: Strin
         title = { Text(stringResource(R.string.writer_link)) },
         text = {
             Column {
-                OutlinedTextField(url, { url = it }, label = { Text(stringResource(R.string.writer_link_url)) }, singleLine = true)
-                OutlinedTextField(label, { label = it }, label = { Text(stringResource(R.string.writer_link_text)) }, singleLine = true, modifier = Modifier.padding(top = 8.dp))
+                OutlinedTextField(
+                    url, { url = it }, label = { Text(stringResource(R.string.writer_link_url)) }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false),
+                )
+                OutlinedTextField(
+                    label, { label = it }, label = { Text(stringResource(R.string.writer_link_text)) }, singleLine = true,
+                    modifier = Modifier.padding(top = 8.dp),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                )
             }
         },
         confirmButton = {
