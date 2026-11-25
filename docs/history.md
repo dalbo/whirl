@@ -121,6 +121,16 @@ Open ideas, roughly by value:
 ## Next: v1.7 tidy-up, then v1.8 archive reader (agreed 2026-11-05)
 **`docs/plans/v1.7.md`** is the plan: no new features in v1.7 (fixes from the 2026-11-05 review, dead code including the in-app post filter, build/CI, a shorter HANDOFF); the archive reader with search within a thread and posts by a user is v1.8 (§8 there).
 
+## v1.10.3
+- **Copy and select post text** (#181): Copy text and Select text in a post's menu (not on hidden or empty posts).
+  Posts stay unselectable in place, since a long press opens the menu; Select text is a dialog with the post as plain
+  text in a `SelectionContainer`. `PostBody.plainText()` (`:core:model`) puts quotes, and paragraphs all in quote
+  style, behind `> `, keeps list markers, and puts a tab between table cells. Checked on the phone.
+- **Writer keyboard** (#181): the field set no `keyboardOptions`, and Compose's default is no capitals. Now sentence
+  capitals and autocorrect (`inputType=0x22c001` on the phone); the link dialog's address gets the URL keyboard.
+- **Test flake** (#182): ThreadViewModelTest runs Main on a real thread; `UnconfinedTestDispatcher` threw
+  `UnsupportedOperationException` now and then after #177.
+
 ## v1.10.2
 - **Watched pager** (#179): Unread and All are pages of a `HorizontalPager`; `WatchedViewModel` keeps both lists
   (`unreadState`, `allState`) so the next page shows its cache mid-swipe, and `ThreadListScaffold` takes a `body`.
