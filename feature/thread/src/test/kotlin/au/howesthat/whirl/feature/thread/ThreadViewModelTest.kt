@@ -27,13 +27,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withContext
@@ -67,7 +68,7 @@ import kotlin.test.assertTrue
 import au.howesthat.whirl.core.data.WatchedStore
 import au.howesthat.whirl.core.data.WatchQueue
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class ThreadViewModelTest {
 
@@ -96,8 +97,15 @@ class ThreadViewModelTest {
             ThreadViewModel(route, repo, settings, lists, queue, LibraryRepository(ApplicationProvider.getApplicationContext(), db.forumDao()), saved, Dispatchers.Default)
     }
 
+    /**
+     * A real Main thread. The tests already wait in real time (fetches run on Dispatchers.Default), and
+     * UnconfinedTestDispatcher threw UnsupportedOperationException now and then when work from another thread reached
+     * Main (the v1.10.1 release run, then #181's CI, in two different tests).
+     */
+    private val main = newSingleThreadContext("test-main")
+
     @Before
-    fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
+    fun setUp() = Dispatchers.setMain(main)
 
     // Cleared after each test, which cancels the view models' work: left running, it could reach Dispatchers.Main
     // while the next test sets it, failing that test.
@@ -108,12 +116,12 @@ class ThreadViewModelTest {
     fun tearDown() {
         viewModels.clear()
         // Cancelled is not finished: work on another thread (a fetch, a parse) still resumes on Main once. Wait for
-        // it here, while Main is still this test's; otherwise it can land as the next test swaps Main, and
-        // UnconfinedTestDispatcher throws UnsupportedOperationException in that test (seen once on CI).
+        // it here, while Main is still this test's, so it never lands on the next test's.
         runBlocking {
             withTimeout(5_000) { created.forEach { it.viewModelScope.coroutineContext.job.join() } }
         }
         Dispatchers.resetMain()
+        main.close()
         appScope.cancel()
         server.close()
         db.close()
