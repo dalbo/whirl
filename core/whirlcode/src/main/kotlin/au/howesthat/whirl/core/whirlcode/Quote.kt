@@ -8,7 +8,8 @@ import au.howesthat.whirl.core.model.PostBody
  * A quote of a post for the post writer, in the form Dallin chose (`docs/plans/post-writer.md` §0, §3): a jump link
  * `@<postid> <name> writes...`, then each line the poster wrote as a `["…"]` forum quote. Inner quotes are dropped (an
  * attribution and the quote-only paragraphs after it, `>` quote blocks, quoted spans in a paragraph), so only the
- * poster's own words are quoted. Lists, tables and code keep their structure. `["` cannot cross a line, so each line
+ * poster's own words are quoted. Lists, tables and indents keep their structure with their text quoted (`* ["a point"]`,
+ * `| ["a"] | ["b"]`); code stays as code, as a code block cannot hold codes. `["` cannot cross a line, so each line
  * is quoted on its own.
  */
 object Quote {
@@ -17,7 +18,8 @@ object Quote {
         val lines = own.blocks.map { block ->
             when (block) {
                 is Block.Paragraph -> WhirlCode.fromBody(PostBody(listOf(block))).lines().joinToString("\n") { forumQuote(it) }
-                else -> WhirlCode.fromBody(PostBody(listOf(block)))
+                is Block.Code, Block.Rule -> WhirlCode.fromBody(PostBody(listOf(block)))
+                else -> quoteStructure(WhirlCode.fromBody(PostBody(listOf(block))))
             }
         }.filter { it.isNotBlank() }
         val attribution = "@$postId ${author.replace('\n', ' ').trim()} writes..."
@@ -26,6 +28,24 @@ object Quote {
 
     /** `["line"]`, trimmed (old posts carry spaces around their line breaks); an empty line stays empty. */
     private fun forumQuote(line: String) = line.trim().let { if (it.isEmpty()) it else "[\"$it\"]" }
+
+    /**
+     * The text of each line of a list, table or indent quoted, its structural codes left in front: `:* item` →
+     * `:* ["item"]`, `| a | b` → `| ["a"] | ["b"]`. A code block inside an indent (`$$` lines) is left alone.
+     */
+    private fun quoteStructure(code: String): String {
+        var inCode = false
+        return code.lines().joinToString("\n") { line ->
+            if (line.trim() == "$$") inCode = !inCode
+            when {
+                inCode || line.trim() == "$$" || line.startsWith("$ ") || RULE.matches(line) -> line
+                line.startsWith("|") -> "| " + line.substring(1).split('|').joinToString(" | ") { cell ->
+                    cell.trim().let { if (ALIGNMENT.matches(it)) it else forumQuote(it) }
+                }
+                else -> STRUCTURE.matchEntire(line)?.let { it.groupValues[1] + forumQuote(it.groupValues[2]) } ?: forumQuote(line)
+            }
+        }
+    }
 
     /** The blocks the poster wrote: inner quotes and their attributions left out. */
     private fun ownWords(blocks: List<Block>): List<Block> {
@@ -63,6 +83,12 @@ object Quote {
         }
         return out.filterNot { it is Inline.Text && it.text.isEmpty() }
     }
+
+    /** A table's alignment cell (`---`, `:---:`, `---:`). */
+    private val ALIGNMENT = Regex(":?-{3,}:?")
+    /** An indent's or list's codes: `: `, `:: `, `* `, `:# `. */
+    private val STRUCTURE = Regex("([:>]*[*#]+ |[:>]+ )(.*)")
+    private val RULE = Regex("-{5,}")
 
     private fun isQuoted(inline: Inline) = when (inline) {
         is Inline.Text -> inline.style.quote != null
