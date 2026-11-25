@@ -72,6 +72,13 @@
         <item quantity="other">%1$d posts not shown (hidden by moderators)</item>
     </plurals>
     <string name="post_quote">Quote</string>
+    <string name="post_copy_text">Copy text</string>
+    <string name="post_select_text">Select text</string>
+    <string name="post_select_text_title">%1$s\'s post</string>
+    <string name="post_select_text_done">Done</string>
+    <string name="post_copy_all">Copy all</string>
+    <string name="post_text_clip">Post by %1$s</string>
+    <string name="post_text_copied">Post copied</string>
     <string name="write_reply">Write a reply</string>
     <string name="draft_chip">Draft</string>
     <string name="draft_open">Open</string>

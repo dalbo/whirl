@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -32,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import au.howesthat.whirl.core.model.Post
+import au.howesthat.whirl.core.model.plainText
 import au.howesthat.whirl.core.ui.ActionsMenu
 import au.howesthat.whirl.core.ui.FindHighlight
 import au.howesthat.whirl.core.ui.LocalAppStyle
@@ -105,12 +107,17 @@ internal fun PostItem(
 ) {
     val p = post.post
     var menu by remember { mutableStateOf(false) }
+    var selecting by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val hasText = p.hiddenReason == null && post.body.blocks.isNotEmpty()
     val draft = LocalReplyDraft.current
     val actions = listOfNotNull(
         // Into the thread's reply draft (post writer); not for a post with nothing of its own to quote.
         MenuAction(stringResource(R.string.post_quote), onClick = { draft?.quote?.invoke(post) })
             .takeIf { draft != null && p.hiddenReason == null && !p.isDeleted },
         MenuAction(stringResource(R.string.post_reply), onClick = onReply),
+        MenuAction(stringResource(R.string.post_copy_text), onClick = { copyPostText(context, p.author.name, post.body.plainText()) }).takeIf { hasText },
+        MenuAction(stringResource(R.string.post_select_text), onClick = { selecting = true }).takeIf { hasText },
         MenuAction(stringResource(R.string.post_edit), onClick = onEdit).takeIf { isMine },
         MenuAction(stringResource(R.string.post_user_info, p.author.name), onClick = onUser),
         MenuAction(stringResource(R.string.post_users_posts, p.author.name), onClick = onUsersPosts),
@@ -159,6 +166,7 @@ internal fun PostItem(
         }
         ActionsMenu(menu, onDismiss = { menu = false }, actions)
     }
+    if (selecting) SelectTextDialog(p.author.name, post.body.plainText(), onDismiss = { selecting = false })
 }
 
 @Composable

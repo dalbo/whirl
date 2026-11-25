@@ -38,3 +38,44 @@ fun PostBody.searchText(): String = buildString {
     }
     blocks(blocks)
 }
+
+/**
+ * A post as plain text to copy or select: blocks a blank line apart, quotes (and paragraphs all in quote style) behind `> `, list items behind `•` or their
+ * number (indented a level at a time), a table's cells a tab apart, code as it is, spoilers shown. Images and rules
+ * are left out.
+ */
+fun PostBody.plainText(): String {
+    fun inlines(list: List<Inline>): String = buildString {
+        for (inline in list) {
+            when (inline) {
+                is Inline.Text -> append(inline.text)
+                is Inline.Link -> append(inline.text)
+                Inline.LineBreak -> append('\n')
+                is Inline.Spoiler -> append(inlines(inline.inlines))
+            }
+        }
+    }.lines().joinToString("\n") { it.trimEnd() }.trimEnd()
+    fun list(block: Block.ListBlock, depth: Int): List<String> = block.items.flatMapIndexed { i, item ->
+        val marker = if (block.ordered) "${i + 1}." else "•"
+        val line = "  ".repeat(depth) + marker + " " + inlines(item.inlines).replace("\n", " ")
+        listOf(line) + item.sublists.flatMap { list(it, depth + 1) }
+    }
+    fun quote(text: String) = text.lines().joinToString("\n") { if (it.isEmpty()) ">" else "> $it" }
+    fun quoted(list: List<Inline>): Boolean {
+        val words = list.filter { (it is Inline.Text && it.text.isNotBlank()) || it is Inline.Link }
+        return words.isNotEmpty() && words.all { if (it is Inline.Text) it.style.quote != null else (it as Inline.Link).style.quote != null }
+    }
+    fun blocks(list: List<Block>): List<String> = list.mapNotNull { block ->
+        when (block) {
+            is Block.QuoteAttribution -> block.text
+            // A quote as the site writes most of them: quote-styled text in a paragraph (`["…"]`), after its attribution.
+            is Block.Paragraph -> inlines(block.inlines).let { if (quoted(block.inlines)) quote(it) else it }
+            is Block.ListBlock -> list(block, 0).joinToString("\n")
+            is Block.Code -> block.text
+            is Block.Quote -> quote(blocks(block.blocks).joinToString("\n\n"))
+            is Block.Table -> block.rows.joinToString("\n") { row -> row.joinToString("\t") { inlines(it.inlines).replace("\n", " ") } }
+            is Block.Image, Block.Rule -> null
+        }?.takeIf { it.isNotBlank() }
+    }
+    return blocks(blocks).joinToString("\n\n")
+}
