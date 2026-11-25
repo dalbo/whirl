@@ -1,0 +1,2 @@
+Whirl 1.10.1
+- Copy and reply and the Draft button are readable in styles with a coloured top bar (Whirldroid, Whirlpool)
