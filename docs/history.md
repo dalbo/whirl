@@ -121,6 +121,13 @@ Open ideas, roughly by value:
 ## Next: v1.7 tidy-up, then v1.8 archive reader (agreed 2026-11-05)
 **`docs/plans/v1.7.md`** is the plan: no new features in v1.7 (fixes from the 2026-11-05 review, dead code including the in-app post filter, build/CI, a shorter HANDOFF); the archive reader with search within a thread and posts by a user is v1.8 (§8 there).
 
+## v1.10.1
+- **Top bar text buttons** (#174): `TopBarTextButton` (`:core:ui`) draws in `LocalContentColor`, which in a top bar's
+  actions is `onTopBar`. Copy and reply and the Draft chip had used `TextButton`'s primary, the same as the bar in
+  Whirldroid light (`#3A437B`) and close to it in Whirlpool light. Checked on the phone in Whirldroid light.
+- Release plumbing: `release.yml` uploads with `tracks` (#173; this tag is its first run). Gradle wrapper 9.9.2 (#169),
+  Robolectric 4.18.1 (#167). The Compose BOM (#168) is deferred to the next feature release (HANDOFF).
+
 ## v1.10.0
 - **Post writer** (`docs/plans/post-writer.md`; #156, #157, #159–#166, #171): `:core:whirlcode` turns WhirlCode into the
   site's HTML for the preview (through `PostBodyParser` and the post renderer) and a parsed post back into WhirlCode for

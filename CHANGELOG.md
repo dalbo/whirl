@@ -2,6 +2,10 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.10.1
+Copy and reply is easy to see in every colour style.
+- In styles with a coloured top bar (Whirldroid and Whirlpool), the writer's Copy and reply and a thread's Draft button were drawn in nearly the same colour as the bar, and in Whirldroid's light colours they could not be seen at all. They now use the bar's own text colour, like the icons beside them.
+
 ## v1.10.0
 Write your replies in Whirl, and keep your settings in a file.
 - A post writer. Long-press a post and choose Quote to add it to your reply as "Name writes..." with their words (anything they were quoting is left out); quote as many posts as you like. Or choose Write a reply from a thread's ⋮ menu. Whirl never posts for you: Copy and reply copies your reply and opens Whirlpool's reply page, ready to paste, and when you come back Whirl offers to delete the draft.
