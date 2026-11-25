@@ -2,14 +2,18 @@ package au.howesthat.whirl.core.ui
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.TopAppBarColors
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.Typography
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.contentColorFor
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarColors
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -93,6 +97,24 @@ fun whirlTopBarColors(): TopAppBarColors {
         actionIconContentColor = on,
     )
 }
+
+/**
+ * A text action in a top bar (Copy and reply, Draft), in the bar's own content colour. A plain TextButton uses the
+ * primary colour, which a style with a coloured bar can match: in Whirldroid's light palette both are #3A437B, so the
+ * button vanished (Dallin, 2026-11-25). Inside a TopAppBar's actions, LocalContentColor is the bar's action colour.
+ */
+@Composable
+fun TopBarTextButton(text: String, onClick: () -> Unit, enabled: Boolean = true) {
+    val color = LocalContentColor.current
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        colors = ButtonDefaults.textButtonColors(contentColor = color, disabledContentColor = color.copy(alpha = DISABLED_ALPHA)),
+    ) { Text(text) }
+}
+
+/** Material's alpha for disabled content. */
+private const val DISABLED_ALPHA = 0.38f
 
 /** Secondary text in a top bar ("Updated 2 min ago", "Page 1 of 13"). */
 @Composable
