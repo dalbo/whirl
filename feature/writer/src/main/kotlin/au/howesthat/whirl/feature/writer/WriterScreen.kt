@@ -65,6 +65,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import au.howesthat.whirl.core.ui.NavIcon
 import au.howesthat.whirl.core.ui.NavIconButton
 import au.howesthat.whirl.core.ui.PostBodyView
+import au.howesthat.whirl.core.ui.TopBarTextButton
 import au.howesthat.whirl.core.ui.rememberOpenInBrowser
 import au.howesthat.whirl.core.ui.whirlTopBarColors
 import kotlinx.coroutines.launch
@@ -132,7 +133,7 @@ fun WriterScreen(route: WriterRoute, navIcon: NavIcon, onClosed: () -> Unit) {
                     }
                 },
                 actions = {
-                    TextButton(onClick = ::copyAndReply, enabled = loaded && !isEmpty) { Text(stringResource(R.string.writer_copy_and_reply)) }
+                    TopBarTextButton(stringResource(R.string.writer_copy_and_reply), ::copyAndReply, enabled = loaded && !isEmpty)
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, stringResource(R.string.writer_more)) }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
