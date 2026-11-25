@@ -1,6 +1,9 @@
 package au.howesthat.whirl.feature.threadlist
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,9 +47,11 @@ import au.howesthat.whirl.core.model.TextQuery
 import au.howesthat.whirl.core.model.ThreadId
 import au.howesthat.whirl.core.ui.LocalAppStyle
 import au.howesthat.whirl.core.ui.NavIcon
+import au.howesthat.whirl.core.ui.openDrawerPastStart
 import au.howesthat.whirl.core.ui.Tabs
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -77,24 +82,26 @@ class WatchedViewModel @Inject constructor(deps: ListDeps, private val visits: A
         kept.value = id
     }
 
-    val state = stateOf(
-        _unreadOnly.flatMapLatest { unread ->
-            // Each tab is its own list, so switching starts at the top (ThreadListBody's listKey).
-            val sections = deps.watched.watched(unread).toListState { list -> groupByForum(list.map { it.toItem() }) }
-                .map { it.copy(listKey = if (unread) "unread" else "all") }
-            if (!unread) {
-                sections
-            } else {
-                // Opening a thread marks it read, which takes it off Unread while it is open beside the list.
-                var previous: List<Section>? = null
-                combine(sections, kept) { state, id ->
-                    val shown = state.sections?.let { keepRow(it, previous, id) }
-                    previous = shown
-                    state.copy(sections = shown)
-                }
-            }
-        }.filtered(),
-    )
+    /** One tab's list. Each tab is its own list, so switching starts at the top (ThreadListBody's listKey). */
+    private fun list(unread: Boolean): Flow<ListState> {
+        val sections = deps.watched.watched(unread).toListState { list -> groupByForum(list.map { it.toItem() }) }
+            .map { it.copy(listKey = if (unread) "unread" else "all") }
+        if (!unread) return sections.filtered()
+        // Opening a thread marks it read, which takes it off Unread while it is open beside the list.
+        var previous: List<Section>? = null
+        return combine(sections, kept) { state, id ->
+            val shown = state.sections?.let { keepRow(it, previous, id) }
+            previous = shown
+            state.copy(sections = shown)
+        }.filtered()
+    }
+
+    /** Both tabs' lists, so a swipe shows the next one straight away (from the cache; the tab it lands on refreshes). */
+    val unreadState = stateOf(list(unread = true))
+    val allState = stateOf(list(unread = false))
+
+    /** The selected tab's list. */
+    val state = stateOf(_unreadOnly.flatMapLatest { if (it) unreadState else allState })
 
     /**
      * Finding in Unread: how many threads in All match too, offered when Unread has none. The count is null when All
@@ -165,6 +172,27 @@ fun WatchedScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: WatchedViewMo
         viewModel.onShown()
         onPauseOrDispose {}
     }
+    val unreadList by viewModel.unreadState.collectAsStateWithLifecycle()
+    val allList by viewModel.allState.collectAsStateWithLifecycle()
+    val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    // Unread and All as pages: a swipe changes the tab, and a tab (or "Show N in All") moves the pager.
+    val pager = rememberPagerState(initialPage = if (unreadOnly) 0 else 1) { 2 }
+    LaunchedEffect(pager.settledPage) {
+        val onUnread = pager.settledPage == 0
+        if (onUnread != viewModel.unreadOnly.value) viewModel.showUnreadOnly(onUnread)
+    }
+    LaunchedEffect(unreadOnly) {
+        val page = if (unreadOnly) 0 else 1
+        if (pager.currentPage != page) pager.animateScrollToPage(page)
+    }
+    val showInAll: (@Composable () -> Unit)? = allMatches?.let { all ->
+        {
+            OutlinedButton(onClick = { viewModel.showUnreadOnly(false) }) {
+                Text(all.count?.let { pluralStringResource(R.plurals.find_show_in_all, it, it) } ?: stringResource(R.string.find_look_in_all))
+            }
+        }
+    }
     ThreadListScaffold(
         title = stringResource(R.string.watched_title),
         navIcon = navIcon,
@@ -175,11 +203,24 @@ fun WatchedScreen(navIcon: NavIcon, nav: ThreadListNav, viewModel: WatchedViewMo
         subtitle = unread.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.watched_unread, it, it) },
         actions = { WatchedMenu(markAll.size, finding = !query.isNullOrBlank(), viewModel::markAllRead) },
         subBar = { WatchedTabs(unreadOnly, unread, viewModel::showUnreadOnly) },
-        findEmptyAction = allMatches?.let { all ->
-            {
-                OutlinedButton(onClick = { viewModel.showUnreadOnly(false) }) {
-                    Text(all.count?.let { pluralStringResource(R.plurals.find_show_in_all, it, it) } ?: stringResource(R.string.find_look_in_all))
-                }
+        body = { modifier ->
+            HorizontalPager(pager, modifier.fillMaxSize().openDrawerPastStart(navIcon), key = { it }) { page ->
+                val onUnread = page == 0
+                // Refreshing and errors belong to the tab being shown.
+                val current = onUnread == unreadOnly && page == pager.settledPage
+                val list = if (onUnread) unreadList else allList
+                ThreadListBody(
+                    sections = list.sections,
+                    refreshing = refreshing && current,
+                    error = error.takeIf { current },
+                    onRefresh = { viewModel.refresh() },
+                    viewModel = viewModel,
+                    nav = nav,
+                    emptyText = stringResource(if (onUnread) R.string.empty_watched_unread else R.string.empty_watched),
+                    findQuery = query,
+                    findEmptyAction = showInAll.takeIf { onUnread },
+                    listKey = list.listKey,
+                )
             }
         },
     )
