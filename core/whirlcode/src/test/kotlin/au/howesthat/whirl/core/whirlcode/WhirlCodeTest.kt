@@ -16,13 +16,21 @@ import kotlin.test.assertTrue
  * WhirlCode to the site's HTML, compared as the app sees both: parsed to [PostBody]. Oracles: Dallin's every-code test
  * post (`fixtures/whirlcode/post_76888474.txt`, rendered in `thread_9244p8v1_whirlcode.html`), the wiki's inline table
  * (`wiki_whirlcode.html`) and the links in all fixtures. Cases marked "guess" wait for the edge-case capture
- * (`docs/plans/post-writer.md` §1.4).
+ * (`docs/plans/post-writer.md` §1.4), now settled by the edge-case post.
  */
 class WhirlCodeTest {
 
     private val fixtures = File(System.getProperty("whirl.fixtures") ?: error("whirl.fixtures not set"))
 
     private fun body(source: String): List<Block> = PostBodyParser.parse(WhirlCode.toHtml(source)).blocks
+
+    /**
+     * As a post's body reaches the parser from a page: re-serialised by jsoup (ThreadPageParser stores `element.html()`),
+     * which puts a line break after a `<br>` inside an inline tag, read as a space. The site's posts in the app carry
+     * that space, so a comparison with them does the same to Whirl's HTML.
+     */
+    private fun stored(source: String): List<Block> =
+        PostBodyParser.parse(Jsoup.parseBodyFragment(WhirlCode.toHtml(source)).body().html()).blocks
     private fun site(html: String): List<Block> = PostBodyParser.parse(html).blocks
 
     @Test
@@ -35,6 +43,19 @@ class WhirlCodeTest {
         val expected = posted.drop(start)
         val actual = body(source)
         // Block by block first, so a failure names the block that differs.
+        expected.zip(actual).forEachIndexed { i, (e, a) -> assertEquals(e, a, "block $i") }
+        assertEquals(expected.size, actual.size)
+    }
+
+    @Test
+    fun `the edge-case post renders as the site rendered it`() {
+        // Dallin's post of 2026-11-25 (reply 76935755): an announcement, then fixtures/whirlcode/edge_cases.txt.
+        val source = File(fixtures, "whirlcode/edge_cases.txt").readText()
+        val page = ThreadPageParser.parse(File(fixtures, "html/thread_9244p8v1_edgecases.html").readText())
+        val posted = PostBodyParser.parse(page.posts.single { it.replyId == 76935755L }.bodyHtml).blocks
+        val start = posted.indexOfFirst { (it as? Block.Paragraph)?.text()?.startsWith("Edge cases for Whirl") == true }
+        val expected = posted.drop(start)
+        val actual = stored(source)
         expected.zip(actual).forEachIndexed { i, (e, a) -> assertEquals(e, a, "block $i") }
         assertEquals(expected.size, actual.size)
     }
@@ -84,14 +105,14 @@ class WhirlCodeTest {
             link("https://forums.whirlpool.net.au/forum-replies.cfm?t=2691384"),
         )
         assertEquals(Inline.Link("https://whrl.pl/RgCnTb", "whrl.pl/RgCnTb"), link("https://whrl.pl/RgCnTb"))
-        assertEquals(Inline.Link("http://www.google.com.au", "www.google.com.au"), link("www.google.com.au"))
         assertEquals(Inline.Link("mailto:someone@example.com", "someone@example.com"), link("someone@example.com"))
         assertEquals(Inline.Link("https://www.google.com.au", "Google"), link("<a href=\"https://www.google.com.au\">Google</a>"))
         assertEquals(
             Inline.Link("https://forums.whirlpool.net.au/thread/3mnkq4v9?ur=1#bottom", "Reps"),
             link("<a href=\"https://forums.whirlpool.net.au/thread/3mnkq4v9?ur=1#bottom\">Reps</a>"),
         )
-        // Guess: trailing punctuation belongs to the sentence.
+        // A bare www. address is not linked (edge-case post, line 10); trailing punctuation is the sentence's (line 9).
+        assertEquals(listOf(Block.Paragraph(listOf(Inline.Text("see www.example.com/page")))), body("see www.example.com/page"))
         val sentence = (body("See https://example.com/a_(b), then go.").single() as Block.Paragraph).inlines
         assertEquals(Inline.Link("https://example.com/a_(b)", "https://example.com/a_(b)"), sentence[1])
     }
@@ -102,8 +123,12 @@ class WhirlCodeTest {
     }
 
     @Test
-    fun `codes nest, and one with no closer stays as typed (guess)`() {
+    fun `codes match their nearest closer, across lines but not past the paragraph`() {
         assertEquals(site("<p><strong><em>both</em></strong> and [*open</p>"), body("[*[/both/]*] and [*open"))
+        // An unclosed code takes everything to the next closer, on a later line too (edge-case post, lines 1 to 5)...
+        assertEquals(site("<p><strong>a<br>[*b<br>c</strong> d*]</p>"), body("[*a\n[*b\nc*] d*]"))
+        // ...but a blank line ends the paragraph, and the code with it (a guess: the post never tried this).
+        assertEquals(site("<p>[*a</p>\n<p>b*]</p>"), body("[*a\n\nb*]"))
         assertEquals(site("<p>array[i] costs \$5 * 2</p>"), body("array[i] costs \$5 * 2"))
         assertEquals(site("<p>&gt;not a quote</p>"), body(">not a quote"))
         assertEquals(site("<p>#hashtag</p>"), body("#hashtag"))
@@ -116,8 +141,20 @@ class WhirlCodeTest {
     }
 
     @Test
-    fun `five structural codes are text (guess)`() {
-        assertEquals(site("<p>&gt;&gt;&gt;&gt; deep</p>"), body(">>>> deep"))
+    fun `codes over the limits are text, a rule needs a blank line after it, and $ lines run together`() {
+        // Edge-case post, lines 15, 14 and the end.
+        assertEquals(
+            site("<blockquote class=\"wcrep1\"><blockquote class=\"wcrep1\"><blockquote class=\"wcrep1\"><p>&gt; deep</p></blockquote></blockquote></blockquote>"),
+            body(">>>> deep"),
+        )
+        assertEquals(site("<p>-----<br>Last line.</p>"), body("-----\nLast line."))
+        assertEquals(site("<p>a</p><hr><p>b</p>"), body("a\n\n-----\n\nb"))
+        assertEquals(site("<pre>one\ntwo</pre>"), body("$ one\n$ two"))
+    }
+
+    @Test
+    fun `a less-than typed as an entity never becomes a tag`() {
+        assertEquals(site("<p>&lt;b&gt;x&lt;/b&gt;</p>"), body("&lt;b&gt;x&lt;/b&gt;"))
     }
 
     @Test
@@ -150,8 +187,11 @@ class WhirlCodeTest {
     }
 
     @Test
-    fun `an unclosed tag is closed at the end of its line, and a stray closer dropped`() {
-        assertEquals(site("<p><strong>bold</strong><br>plain</p>"), body("<b>bold\nplain</b>"))
+    fun `allowed tags work only as pairs, and anything else shows as typed`() {
+        // Edge-case post, line 12.
+        assertEquals(site("<p><strong>bold<br>plain</strong></p>"), body("<b>bold\nplain</b>"))
+        assertEquals(site("<p>&lt;b&gt;open and &lt;/i&gt; closed</p>"), body("<b>open and </i> closed"))
+        assertEquals(site("<p>&lt;u&gt;u&lt;/u&gt; &lt;a href=\"javascript:x\"&gt;j&lt;/a&gt;</p>"), body("<u>u</u> <a href=\"javascript:x\">j</a>"))
     }
 
     @Test

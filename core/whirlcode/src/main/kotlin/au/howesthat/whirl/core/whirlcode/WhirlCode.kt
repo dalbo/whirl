@@ -7,10 +7,9 @@ import au.howesthat.whirl.core.model.PostBody
  * it, so the post writer's preview goes through the same parser and renderer as every post
  * (`docs/plans/post-writer.md` §2).
  *
- * What the site does is known from the wiki, from Dallin's every-code test post (`fixtures/whirlcode/`) and from the
- * links in all fixtures. Malformed text (an unclosed `[*`, five structural codes on a line) is a guess until the
- * edge-case post is captured (plan §1.4); the guesses are marked in the code and in `WhirlCodeTest`. Whatever the
- * input, the output holds no HTML but the tags and attributes listed here.
+ * What the site does is known from the wiki, from Dallin's every-code test post and edge-case post (both in
+ * `fixtures/whirlcode/`, rendered in `fixtures/html/thread_9244p8v1_whirlcode.html` and `…_edgecases.html`) and from
+ * the links in all fixtures. Whatever the input, the output holds no HTML but the tags and attributes listed here.
  */
 object WhirlCode {
     fun toHtml(source: String): String = BlockWriter(source.replace("\r\n", "\n").replace('\r', '\n')).write()
@@ -48,7 +47,7 @@ private class BlockWriter(source: String) {
     private val lines = source.split('\n')
     private val out = mutableListOf<String>()
     private val open = mutableListOf<Container>()
-    /** Lines of the paragraph being written (already converted), joined by `<br>`; null when none is open. */
+    /** Lines of the paragraph being written, as typed; null when none is open. Codes run across them (Inline). */
     private var paragraph: MutableList<String>? = null
     private var table: MutableList<List<String>>? = null
 
@@ -65,8 +64,14 @@ private class BlockWriter(source: String) {
                     topLevel(Pre(lines.subList(i, end).joinToString("\n")))
                     i = (end + 1).coerceAtMost(lines.size)
                 }
-                line.startsWith("$ ") -> topLevel(Pre(line.substring(2)))
-                RULE.matches(line.trim()) -> topLevel("<hr>")
+                // Lines starting `$ ` one after another make one code block.
+                line.startsWith("$ ") -> {
+                    val end = (i until lines.size).firstOrNull { !lines[it].startsWith("$ ") } ?: lines.size
+                    topLevel(Pre((listOf(line) + lines.subList(i, end)).joinToString("\n") { it.substring(2) }))
+                    i = end
+                }
+                // A rule only on its own: `-----` with a line of text straight after it is text (edge-case post).
+                RULE.matches(line.trim()) && paragraph == null && (i == lines.size || lines[i].isBlank()) -> topLevel("<hr>")
                 line.startsWith("|") -> {
                     closeContainers()
                     (table ?: mutableListOf<List<String>>().also { table = it }) += cells(line)
@@ -111,16 +116,16 @@ private class BlockWriter(source: String) {
             endParagraph()
             return
         }
-        val html = Inline.toHtml(text)
         if (open.lastOrNull()?.isList == true) {
-            out += "<li>$html</li>"
+            endParagraph()
+            out += "<li>${Inline.toHtml(text)}</li>"
         } else {
-            (paragraph ?: mutableListOf<String>().also { paragraph = it }) += html
+            (paragraph ?: mutableListOf<String>().also { paragraph = it }) += text
         }
     }
 
     private fun endParagraph() {
-        paragraph?.let { out += "<p>${it.joinToString("<br>")}</p>" }
+        paragraph?.let { out += "<p>${Inline.toHtml(it.joinToString("\n")).replace("\n", "<br>")}</p>" }
         paragraph = null
     }
 
@@ -173,8 +178,8 @@ private class BlockWriter(source: String) {
         /**
          * The structural codes at the start of [line] and the text after them, or null when there are none. Spaces
          * between codes are optional; one is required before the text, so `>foo` and `> *bold*`'s `*` are text.
-         * Limits (wiki): one `:`, three `>`, three list markers, four codes in all. Over them, the line is plain text
-         * (a guess, plan §1.4).
+         * Limits (wiki): one `:`, three `>`, three list markers, four codes in all. A code over a limit, and everything
+         * after it, is the line's text: `>>>> a` is three quotes holding `> a` (edge-case post).
          */
         fun structure(line: String): Pair<List<Char>, String>? {
             var end = 0
@@ -184,9 +189,17 @@ private class BlockWriter(source: String) {
             while (end > 0 && line[end - 1] in CODES && end == line.length) end-- // codes alone on a line
             val prefix = line.substring(0, end)
             if (prefix.isEmpty() || prefix[0] !in CODES) return null
-            val codes = prefix.filter { it in CODES }.toList()
-            val lists = codes.count { it == '*' || it == '#' }
-            if (codes.count { it == ':' } > 1 || codes.count { it == '>' } > 3 || lists > 3 || codes.size > 4) return null
+            val codes = mutableListOf<Char>()
+            for ((at, c) in prefix.withIndex()) {
+                if (c == ' ') continue
+                val over = codes.size == 4 || when (c) {
+                    ':' -> codes.count { it == ':' } == 1
+                    '>' -> codes.count { it == '>' } == 3
+                    else -> codes.count { it == '*' || it == '#' } == 3
+                }
+                if (over) return codes to line.substring(at)
+                codes += c
+            }
             return codes to line.substring(end)
         }
     }
