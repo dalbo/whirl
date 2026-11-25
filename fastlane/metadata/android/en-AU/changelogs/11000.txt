@@ -1,0 +1,4 @@
+Whirl 1.10.0
+- Write replies in Whirl: quote posts, format with a toolbar, preview as Whirlpool shows it, then Copy and reply to paste on the site (Whirl never posts)
+- Drafts save as you type, one per thread, with a Drafts list
+- Export and import your settings, favourites and mutes as a file (never your API key)

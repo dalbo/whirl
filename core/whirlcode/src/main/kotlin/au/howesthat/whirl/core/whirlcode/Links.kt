@@ -1,27 +1,31 @@
 package au.howesthat.whirl.core.whirlcode
 
 /**
- * Links as the site writes them, from every link in the fixtures (2026-11-19: 416 external, 45 forum, 18 whrl.pl):
+ * Links as the site writes them, from every link in the fixtures (2026-11-19: 416 external, 45 forum, 18 whrl.pl) and
+ * the edge-case post (2026-11-25):
  * - an external address links as typed, `class="external" rel="nofollow" target="_blank"`;
  * - a `forums.whirlpool.net.au` address is internal and scheme-relative, and shows only its path
  *   (`//forums.whirlpool.net.au/forum-replies.cfm?t=2691384` as `/forum-replies.cfm?t=2691384`);
  * - a `whrl.pl` address is internal and shows without its scheme (`whrl.pl/RgCnTb`);
  * - another `whirlpool.net.au` address is internal and shows as typed (one sample);
- * - a bare `www.` address links with `http://` and shows as typed;
- * - an email address links with `mailto:`.
- * Trailing punctuation (`.,;:!?'` and an unbalanced `)`) is the sentence's, not the link's (a guess, plan §1.4).
+ * - an email address links with `mailto:`;
+ * - a bare `www.` address is not linked;
+ * - trailing punctuation (`.,;:!?'` and an unbalanced `)`) is the sentence's, not the link's.
+ * Everything here takes and gives text already escaped for HTML.
  */
 internal object Links {
 
     private val CANDIDATE = Regex(
-        """(?<![\w@/.-])(?:https?://[^\s<>"]+|www\.[^\s<>"]+)|(?<![\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)+""",
+        """(?<![\w@/.-])https?://[^\s<>"]+|(?<![\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)+""",
         RegexOption.IGNORE_CASE,
     )
     private const val TRAILING = ".,;:!?'"
+    /** Escaped `<`, `>` and `"` end an address. */
+    private val ESCAPED_END = Regex("&(?:lt|gt|quot);")
 
-    /** Each address in [text], its trailing punctuation left out. */
+    /** Each address in [text] (escaped), its trailing punctuation left out. */
     fun find(text: String): List<Found> = CANDIDATE.findAll(text).mapNotNull { m ->
-        var value = m.value
+        var value = ESCAPED_END.find(m.value)?.let { m.value.substring(0, it.range.first) } ?: m.value
         while (value.isNotEmpty()) {
             val last = value.last()
             value = when {
@@ -34,41 +38,34 @@ internal object Links {
     }.toList()
 
     /** An address typed in the text. */
-    fun autolink(value: String): String = when {
-        '@' in value && !value.contains("://") -> {
-            val shown = Inline.escapeText(value)
-            "<a class=\"email\" href=\"mailto:$shown\">$shown</a>"
-        }
-        value.startsWith("www.", ignoreCase = true) -> anchor("http://$value", Inline.escapeText(value))
-        else -> anchor(value, null)
-    }
+    fun autolink(value: String): String =
+        if ('@' in value && "://" !in value) "<a class=\"email\" href=\"mailto:$value\">$value</a>"
+        else anchor(value, null) ?: value
 
-    /** `<a href>` typed by the user ([labelHtml] already converted), or an autolink ([labelHtml] null). */
-    fun anchor(href: String, labelHtml: String?): String {
-        val m = WHIRLPOOL.matchEntire(href.trim())
-        if (m == null) return external(href, labelHtml ?: Inline.escapeText(href))
+    /**
+     * A link to [href] showing [labelHtml] (a `<a href>` typed by the user), or the address itself ([labelHtml] null, an
+     * autolink). Null when [href] is not a web address: the site shows such a link as typed.
+     */
+    fun anchor(href: String, labelHtml: String?): String? {
+        val m = WHIRLPOOL.matchEntire(href)
+        if (m == null) {
+            if (!WEB.containsMatchIn(href)) return null
+            return "<a class=\"external\" rel=\"nofollow\" target=\"_blank\" href=\"${quoted(href)}\">${labelHtml ?: href}</a>"
+        }
         val host = m.groupValues[1].lowercase()
         val rest = m.groupValues[2]
-        val shown = labelHtml ?: Inline.escapeText(
-            when (host) {
-                "forums.whirlpool.net.au" -> rest.ifEmpty { "/" }
-                "whrl.pl" -> host + rest
-                else -> href
-            },
-        )
-        return "<a class=\"internal\" href=\"${attr("//$host$rest")}\">$shown</a>"
-    }
-
-    private fun external(href: String, labelHtml: String): String {
-        // Only web and mail addresses: a `javascript:` or other scheme is left as text.
-        if (!SAFE.containsMatchIn(href.trim())) return labelHtml
-        return "<a class=\"external\" rel=\"nofollow\" target=\"_blank\" href=\"${attr(href.trim())}\">$labelHtml</a>"
+        val shown = labelHtml ?: when (host) {
+            "forums.whirlpool.net.au" -> rest.ifEmpty { "/" }
+            "whrl.pl" -> host + rest
+            else -> href
+        }
+        return "<a class=\"internal\" href=\"${quoted("//$host$rest")}\">$shown</a>"
     }
 
     private val WHIRLPOOL = Regex("""(?i)(?:https?:)?//((?:forums\.|www\.)?whirlpool\.net\.au|whrl\.pl)(/.*)?""")
-    private val SAFE = Regex("""^(?:https?://|mailto:|/|#)""", RegexOption.IGNORE_CASE)
+    private val WEB = Regex("""^https?://""", RegexOption.IGNORE_CASE)
 
-    private fun attr(value: String) = value.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+    private fun quoted(value: String) = value.replace("\"", "&quot;")
 }
 
 /** A found address: where it is in the text and what it is. */

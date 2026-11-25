@@ -115,16 +115,12 @@ and chat bubbles pop up).
 - **v1.8: the archive reader** (released 2026-11-09; `docs/plans/v1.8.md`, history in `docs/history.md`): still to
   check on the phone are §7's TalkBack, process-death and offline items. Follow-ups: a moderator view of whole-thread
   search (the note in `docs/play-console.md` mentions it), "tap a filtered post to see it in context".
-- **v1.9: settings backup** (released 2026-11-11; plan `docs/plans/settings-backup.md`, history in
-  `docs/history.md`): settings, favourites, mutes and the key backed up; the key-rejected banner; mute; the Data Saver
-  note. **Part 2 built** (2026-11-19, releases in v1.10 with the post writer): export and import as JSON in Settings › Backup, and Room v8, which
-  stops declaring `favourite_forums`; `LibraryRepository` drops the table after moving its rows. Still to do: the phone
-  pass (export, share, import on a second install; a v1.8 → v1.10 update keeps favourites). Not checked: the API 27
-  emulator, password-manager fill.
-- **Post writer** (v1.10 with export and import; plan `docs/plans/post-writer.md`): write a reply with collected
-  quotes, a formatting bar and a live preview, then copy it into Whirlpool's reply page. All PRs built (converter both
-  ways, drafts, the writer screen, Quote and "Write a reply", the Drafts list and row marks); next step 0 (an edge-case
-  post for Dallin to post) and the phone pass.
+- **v1.9: settings backup** (released 2026-11-11; `docs/plans/settings-backup.md`, history in `docs/history.md`).
+  Not checked: the API 27 emulator, password-manager fill.
+- **v1.10: post writer, and settings export and import** (release PR 2026-11-25; plans `docs/plans/post-writer.md`,
+  `docs/plans/settings-backup.md` Part 2; history in `docs/history.md`). Not checked on the phone: TalkBack, 200 % font,
+  landscape, two panes (`docs/device-checklist.md` v1.10). Ideas from it: quoting a selection, styling as typed, a
+  length counter once the reply box's limit is known, a new thread from the writer (plan §9).
 - **Notifications with the posts** (idea, 2026-11-12): today a check makes one API call (`get=watched`) and never
   loads a thread page. Fetching the page with the first unread post would let a notification expand to the next
   unread post or the recent posters' names, let mute become a filter (only these users, only when OP or a moderator

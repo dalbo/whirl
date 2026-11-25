@@ -128,7 +128,6 @@ internal object FromBody {
             }
             href.startsWith(FORUMS) && text == href.removePrefix(FORUMS) -> bare(href)
             href.startsWith(WHRL) && text == href.removePrefix("https://") -> bare(href)
-            href.startsWith("http://www.") && text == href.removePrefix("http://") -> bare(text)
             href == text -> bare(href)
             else -> null
         }
@@ -159,14 +158,15 @@ internal object FromBody {
                     c == '<' -> "&lt;"
                     c == '>' -> "&gt;"
                     // An opener ([*, [[, [.*) or a closer (*]) would start or end a code.
-                    c == '[' && (next == '[' || next == '.' || next in MARKERS) -> "&#91;"
-                    c == ']' && (prev in MARKERS || prev == ']' || prev == '.') -> "&#93;"
+                    // A bracket at either end of the run could meet a code's bracket in the next run ("[" then ["q"]
+                    // reads as [[…]], a wiki link): the run cannot see its neighbours, so it always escapes those.
+                    c == '[' && (next == null || next == '[' || next == '.' || next in MARKERS) -> "&#91;"
+                    c == ']' && (prev == null || prev in MARKERS || prev == ']' || prev == '.') -> "&#93;"
                     // A hyphen with spaces both sides would become a dash (one at the start of the text has none before).
                     c == '-' && prev != null && prev.isWhitespace() && (next == null || next.isWhitespace() || next == '-') -> "&#45;"
                     // An address the converter would link: one entity inside it is enough.
                     inLink(i) && c == '@' -> "&#064;"
                     inLink(i) && c == ':' && s.startsWith("//", i + 1) -> "&#58;"
-                    inLink(i) && c == 'w' && s.startsWith("ww.", i + 1) && (prev == null || !prev.isLetterOrDigit()) -> "&#119;"
                     else -> c.toString()
                 },
             )
