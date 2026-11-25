@@ -121,7 +121,7 @@ jobs:
           serviceAccountJson: ${{ steps.gcloud.outputs.credentials_file_path }}
           packageName: au.howesthat.whirl
           releaseFiles: dist/whirl-${{ github.ref_name }}.aab
-          # `tracks` (a list, here one track): `track` is deprecated and warns on every release since v1.10.0.
+          # `tracks` (a list, here one track): `track` is deprecated (the v1.10.0 run warned).
           tracks: ${{ env.PLAY_TRACK }}
           status: completed
           whatsNewDirectory: whatsnew
