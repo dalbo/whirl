@@ -122,7 +122,11 @@ class ThreadViewModelTest {
     private fun enqueueHtml(name: String) =
         server.enqueue(MockResponse.Builder().body(File(System.getProperty("whirl.fixtures"), "html/$name").readText()).build())
 
-    private fun viewModel(route: ThreadRoute, saved: SavedStateHandle = SavedStateHandle()): ThreadViewModel {
+    /**
+     * Every view model goes through here, so tearDown clears it and waits for its work. Two tests once built theirs
+     * with watched.viewModel directly; their work outlived the test and broke the next one (the v1.10.1 release run).
+     */
+    private fun viewModel(route: ThreadRoute, repo: ThreadPageRepository = this.repo, saved: SavedStateHandle = SavedStateHandle()): ThreadViewModel {
         val factory = viewModelFactory { initializer { watched.viewModel(route, repo, saved) } }
         return ViewModelProvider.create(viewModels, factory)["vm${viewModelCount++}", ThreadViewModel::class].also { created += it }
     }
@@ -190,7 +194,7 @@ class ThreadViewModelTest {
         val later = Clock.offset(clock, Duration.ofSeconds(30))
         val laterRepo = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, later, Dispatchers.Default)
         enqueueHtml("thread_3pxj858k_p2.html")
-        val vm = watched.viewModel(ThreadRoute("3pxj858k", 2, scrollToPost = 41, fromWatched = true, lastReadPost = 40), laterRepo)
+        val vm = viewModel(ThreadRoute("3pxj858k", 2, scrollToPost = 41, fromWatched = true, lastReadPost = 40), laterRepo)
         val target = await { vm.scrollTarget.first { it?.fetched != null } }!!
         assertEquals(2, server.requestCount)
         assertEquals(ScrollTarget(2, postNumber = 41, waitForFetch = true, fetched = later.instant()), target)
@@ -310,7 +314,7 @@ class ThreadViewModelTest {
         // Two minutes later the cached page is stale, so the view model fetches, and the fetch fails.
         val later = Clock.offset(clock, Duration.ofMinutes(2))
         val staleRepo = ThreadPageRepository(WhirlpoolWeb(client, WhirlpoolUrls(server.url("/")), RetryPolicy.NONE), db.threadPageDao(), forums, later, Dispatchers.Default)
-        val vm = watched.viewModel(ThreadRoute("3pxj858k", 2), staleRepo)
+        val vm = viewModel(ThreadRoute("3pxj858k", 2), staleRepo)
         assertEquals(2, await { vm.state.mapNotNull { it.startPage }.first() })
         assertEquals("Simple, ad-free NBN plan comparison tool I built", await { vm.state.mapNotNull { it.title }.first() })
         await { vm.state.mapNotNull { it.error }.first() }
@@ -423,7 +427,7 @@ class ThreadViewModelTest {
     fun `find on page matches the posts with every word, and the query is saved`() = runTest {
         enqueueHtml("thread_9244p8v1_whirlcode.html")
         val saved = SavedStateHandle()
-        val vm = viewModel(ThreadRoute("9244p8v1", 2), saved)
+        val vm = viewModel(ThreadRoute("9244p8v1", 2), saved = saved)
         await { vm.state.mapNotNull { it.startPage }.first() }
         val page = await { vm.page(2).filterNotNull().first() }
         backgroundScope.launch { vm.findMatches.collect {} }
