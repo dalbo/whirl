@@ -2,9 +2,11 @@ package au.howesthat.whirl.core.whirlcode
 
 import au.howesthat.whirl.core.model.Block
 import au.howesthat.whirl.core.model.Inline
+import au.howesthat.whirl.core.model.ListItem
 import au.howesthat.whirl.core.model.PostBody
 import au.howesthat.whirl.core.model.QuoteKind
 import au.howesthat.whirl.core.model.Style
+import au.howesthat.whirl.core.model.TableCell
 import au.howesthat.whirl.core.scraper.PostBodyParser
 import au.howesthat.whirl.core.scraper.ThreadPageParser
 import org.junit.jupiter.api.Test
@@ -55,7 +57,7 @@ class QuoteTest {
             ),
         )
         val code = Quote.of(1, "Someone", body)
-        assertEquals("@1 Someone writes...\n\n[\"See [*this*] at https://example.com\"]\n[\"Second line\"]\n\n* a point", code)
+        assertEquals("@1 Someone writes...\n\n[\"See [*this*] at https://example.com\"]\n[\"Second line\"]\n\n* [\"a point\"]", code)
         val blocks = rendered(code)
         assertEquals(
             Block.Paragraph(
@@ -105,5 +107,47 @@ class QuoteTest {
         )
         // An address still is broken up, so it stays text rather than becoming a link.
         assertEquals("@1 A writes...\n\n[\"mail me at a&#064;b.com\"]", Quote.of(1, "A", PostBody(listOf(Block.Paragraph(listOf(Inline.Text("mail me at a@b.com")))))))
+    }
+
+    @Test
+    fun `lists, tables and indents keep their structure, their text quoted`() {
+        // From the phone (2026-11-26): a quoted list came out as the quoter's own list.
+        fun item(text: String, vararg sub: Block.ListBlock) = ListItem(listOf(Inline.Text(text)), sub.toList())
+        val body = PostBody(
+            listOf(
+                Block.ListBlock(ordered = false, items = listOf(item("one", Block.ListBlock(ordered = true, items = listOf(item("one a")))), item("two"))),
+                Block.Table(
+                    listOf(
+                        listOf(TableCell(listOf(Inline.Text("Name", Style(bold = true))), header = true), TableCell(listOf(Inline.Text("Size", Style(bold = true))), header = true)),
+                        listOf(TableCell(listOf(Inline.Text("a"))), TableCell(listOf(Inline.Text("1")))),
+                    ),
+                ),
+                Block.Quote(null, listOf(Block.Paragraph(listOf(Inline.Text("indented"))), Block.ListBlock(ordered = false, items = listOf(item("in an indent"))))),
+                Block.Rule,
+                Block.Code("$ not quoted\n* nor this"),
+            ),
+        )
+        val code = Quote.of(1, "A", body)
+        assertEquals(
+            listOf(
+                "@1 A writes...",
+                "* [\"one\"]\n*# [\"one a\"]\n* [\"two\"]",
+                "| [\"Name\"] | [\"Size\"]\n| --- | ---\n| [\"a\"] | [\"1\"]",
+                ": [\"indented\"]",
+                ":* [\"in an indent\"]",
+                "-----",
+                "$$\n$ not quoted\n* nor this\n$$",
+            ).joinToString("\n\n"),
+            code,
+        )
+        // Read back, every word is quoted text and the structure is as it was.
+        val blocks = rendered(code)
+        val list = blocks[1] as Block.ListBlock
+        assertEquals(listOf(Inline.Text("one", q)), list.items[0].inlines)
+        assertEquals(listOf(Inline.Text("one a", q)), list.items[0].sublists.single().items.single().inlines)
+        val table = blocks[2] as Block.Table
+        assertEquals(listOf(Inline.Text("1", q)), table.rows[1][1].inlines)
+        assertEquals(Block.Rule, blocks[4])
+        assertEquals(Block.Code("$ not quoted\n* nor this"), blocks[5])
     }
 }
