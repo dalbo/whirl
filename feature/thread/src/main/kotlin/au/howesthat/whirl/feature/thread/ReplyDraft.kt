@@ -3,8 +3,6 @@ package au.howesthat.whirl.feature.thread
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,6 +14,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import au.howesthat.whirl.core.data.DraftRepository
 import au.howesthat.whirl.core.model.ThreadId
+import au.howesthat.whirl.core.ui.TopBarTextButton
 import au.howesthat.whirl.core.whirlcode.Quote
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -91,7 +90,7 @@ internal fun ReplyDraftTitle(title: String?) {
 internal fun DraftChip() {
     val draft = LocalReplyDraft.current ?: return
     if (!draft.hasDraft) return
-    TextButton(onClick = draft.write) { Text(stringResource(R.string.draft_chip)) }
+    TopBarTextButton(stringResource(R.string.draft_chip), draft.write)
 }
 
 /** The reply draft for [viewModel]'s thread, while composing [content]. */
