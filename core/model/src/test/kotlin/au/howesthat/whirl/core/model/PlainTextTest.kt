@@ -11,6 +11,7 @@ class PlainTextTest {
         val body = PostBody(
             listOf(
                 Block.QuoteAttribution("BRK writes...", 5),
+                Block.Paragraph(listOf(Inline.Text("quoted ", Style(quote = QuoteKind.REPLIED_USER)), Inline.LineBreak, Inline.Text("inline", Style(quote = QuoteKind.REPLIED_USER, bold = true)))),
                 Block.Quote(QuoteKind.REPLIED_USER, listOf(Block.Paragraph(listOf(Inline.Text("their words"))), Block.Paragraph(listOf(Inline.Text("more"))))),
                 Block.Paragraph(listOf(Inline.Text("See "), Inline.Link("https://e.com", "this", Style(bold = true)), Inline.LineBreak, Inline.Text("and "), Inline.Spoiler(listOf(Inline.Text("a secret"))))),
                 Block.ListBlock(
@@ -28,6 +29,7 @@ class PlainTextTest {
         assertEquals(
             listOf(
                 "BRK writes...",
+                "> quoted\n> inline",
                 "> their words\n>\n> more",
                 "See this\nand a secret",
                 "1. one\n  • one a\n2. two",
