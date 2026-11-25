@@ -1,0 +1,3 @@
+Whirl 1.10.2
+- Swipe between Unread and All in Watched threads; swipe right on Unread for the menu
+- Quoted lists, tables and indents are quoted, not written as your own

@@ -121,6 +121,16 @@ Open ideas, roughly by value:
 ## Next: v1.7 tidy-up, then v1.8 archive reader (agreed 2026-11-05)
 **`docs/plans/v1.7.md`** is the plan: no new features in v1.7 (fixes from the 2026-11-05 review, dead code including the in-app post filter, build/CI, a shorter HANDOFF); the archive reader with search within a thread and posts by a user is v1.8 (§8 there).
 
+## v1.10.2
+- **Watched pager** (#179): Unread and All are pages of a `HorizontalPager`; `WatchedViewModel` keeps both lists
+  (`unreadState`, `allState`) so the next page shows its cache mid-swipe, and `ThreadListScaffold` takes a `body`.
+  `Modifier.openDrawerPastStart` (`:core:ui`) opens the drawer with what a right swipe leaves over on a pager's first
+  page (Watched's Unread, a top-level forum's page 1), since the pager otherwise takes the drawer's swipe. Checked on
+  the phone.
+- **Quotes** (#178): lists, tables and indents keep their codes with each line's text in `["…"]`; code and rules stay
+  as they were. Checked on the phone with the every-code test post.
+- The Compose BOM (#168) still waits for 1.11.
+
 ## v1.10.1
 - **Top bar text buttons** (#174): `TopBarTextButton` (`:core:ui`) draws in `LocalContentColor`, which in a top bar's
   actions is `onTopBar`. Copy and reply and the Draft chip had used `TextButton`'s primary, the same as the bar in
