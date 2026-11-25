@@ -288,4 +288,26 @@ class ListViewModelTest {
         assertEquals(WatchAction.MARK_READ, p.action)
         assertEquals(listOf(ThreadId("a"), ThreadId("b")), p.ids, "one action for all of them, with Undo")
     }
+
+    @Test
+    fun `both of Watched's tabs are ready for the pager, and the selected one is the screen's list`() = TestScope(dispatcher).runTest {
+        val threads = db.threadDao()
+        threads.replaceWatchedList("unread", listOf(watchedRow("a", "NBN plans", 3)))
+        threads.replaceWatchedList("all", listOf(watchedRow("a", "NBN plans", 3), watchedRow("c", "Bike racks", 0)))
+        db.fetchLogDao().put(FetchLogEntity("watched:unread", 1))
+        db.fetchLogDao().put(FetchLogEntity("watched:all", 1))
+        val vm = held { WatchedViewModel(deps, AppVisits()) }
+        fun ListState.count() = sections?.sumOf { it.items.size }
+
+        // While Unread is selected, All's page (beside it in the pager) has its list too.
+        assertEquals(1, vm.unreadState.first { it.sections != null }.count())
+        assertEquals(2, vm.allState.first { it.sections != null }.count())
+        assertEquals("unread", vm.state.first { it.sections != null }.listKey)
+        vm.showUnreadOnly(false)
+        assertEquals(2, vm.state.first { it.listKey == "all" }.count())
+        // Find narrows both pages.
+        vm.setQuery("bike")
+        assertEquals(0, vm.unreadState.first { it.count() != 1 }.count())
+        assertEquals(1, vm.allState.first { it.count() == 1 }.count())
+    }
 }

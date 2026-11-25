@@ -65,6 +65,8 @@ fun ThreadListScaffold(
     browserUrl: String? = null,
     findEmptyAction: (@Composable () -> Unit)? = null,
     header: (LazyListScope.() -> Unit)? = null,
+    /** In place of the one list, given its padding (Watched's Unread and All pages). */
+    body: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
@@ -90,6 +92,10 @@ fun ThreadListScaffold(
             }
         },
     ) { padding ->
+        if (body != null) {
+            body(Modifier.padding(padding))
+            return@Scaffold
+        }
         ThreadListBody(
             sections = state.sections,
             refreshing = refreshing,
