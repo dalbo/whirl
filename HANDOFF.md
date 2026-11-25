@@ -138,6 +138,10 @@ and chat bubbles pop up).
 - **Guest mode** (idea, `docs/plans/guest.md`): browse public pages with no API key. Ask the moderators first.
 - Waiting on others: Whirlpool's moderators (gates the community posts, `docs/community.md`, and the F-Droid merge
   request, `docs/fdroid/`).
+- **Next release: the Compose BOM** (#168, 2026.09.00 → 2026.11.01, Compose 1.13), deferred from v1.10 to test on its
+  own. It needs `compileSdk` 37.1, and two deprecations fail the build: `InputField` (`core/ui/.../Find.kt:143`) and the
+  `Slider` overload (`core/ui/.../PagePicker.kt:41`, wants `SliderState`). Check the find bar and the page picker on the
+  phone. AGP 9.5.2 (#170, closed by Dependabot in error) can go with it.
 - Housekeeping: targetSdk 37 before August 2027; Google developer verification (2027). Reproducibility is checked
   automatically after each release and on build-changing PRs (`docs/fdroid/README.md`).
 - Small: the poster's name is a tap target under 48 dp; find scrolls to the post, not the match; linked images; an
