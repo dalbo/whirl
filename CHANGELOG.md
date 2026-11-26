@@ -2,6 +2,11 @@
 
 Release notes for each tag are taken from the matching `## vX.Y.Z` section below by the release workflow.
 
+## v1.10.3
+Copy a post's text, and capitals in the post writer.
+- A post's menu has Copy text, and Select text to copy just part of it. Quotes, lists and tables come out as readable text.
+- The post writer now capitalises the start of each sentence and offers your keyboard's suggestions.
+
 ## v1.10.2
 Swipe between Unread and All, and quotes that keep lists as quotes.
 - In Watched threads, swipe sideways to move between Unread and All. Swiping right on Unread opens the menu.
