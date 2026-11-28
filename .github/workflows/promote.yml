@@ -14,6 +14,10 @@ on:
         description: 'Percentage of users (100 = everyone; less is a staged rollout, run again later to raise it)'
         required: true
         default: '100'
+      notes:
+        description: 'Release notes for production, in place of the tag''s own (when users skip patch releases); 500 characters at most'
+        required: false
+        default: ''
       check_only:
         description: 'Check only: validate the change with Play, then discard it'
         type: boolean
@@ -43,6 +47,7 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
           ROLLOUT: ${{ inputs.rollout }}
+          NOTES: ${{ inputs.notes }}
         run: |
           [[ "$VERSION" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || { echo "version must be vMAJOR.MINOR.PATCH, not '$VERSION'"; exit 1; }
           code=$((BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3]))
@@ -52,6 +57,11 @@ jobs:
           # The notes the testers saw: the changelog as it was at the tag.
           git show "$VERSION:fastlane/metadata/android/en-AU/changelogs/$code.txt" > "$RUNNER_TEMP/notes.txt" ||
             { echo "The tag has no changelogs/$code.txt"; exit 1; }
+          # Production can skip the patch releases the testers had, so its notes may sum them up instead.
+          if [ -n "$NOTES" ]; then
+            printf '%s\n' "$NOTES" > "$RUNNER_TEMP/notes.txt"
+            [ "$(wc -m < "$RUNNER_TEMP/notes.txt")" -le 500 ] || { echo "notes are over Play's 500 characters"; exit 1; }
+          fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
 
       - name: Sign in to Google Cloud
